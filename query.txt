@@ -1,0 +1,144 @@
+-- Drop existing functions (if any)
+DROP FUNCTION IF EXISTS get_schema_exists(text);
+DROP FUNCTION IF EXISTS get_conversation_history(text);
+DROP FUNCTION IF EXISTS create_new_schema(text);
+DROP FUNCTION IF EXISTS sql(text, text);
+DROP FUNCTION IF EXISTS create_user_schema_and_tables(text);
+
+-- Enable the vector extension (if not already enabled)
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Function to check if a schema exists
+CREATE OR REPLACE FUNCTION get_schema_exists(p_schema_name text)
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM information_schema.schemata WHERE schema_name = p_schema_name
+  );
+END;
+$$ LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public;
+
+-- Function to create a new schema
+CREATE OR REPLACE FUNCTION create_new_schema(p_schema_name text)
+RETURNS void AS $$
+BEGIN
+    IF NOT get_schema_exists(p_schema_name) THEN
+        EXECUTE 'CREATE SCHEMA "' || quote_ident(p_schema_name) || '"';
+    END IF;
+END;
+$$ LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public;
+
+-- Function to execute SQL commands
+CREATE OR REPLACE FUNCTION sql(command text, schema_name text DEFAULT 'public')
+RETURNS text AS $$
+#variable_conflict use_variable
+DECLARE
+    result text;
+BEGIN
+    IF schema_name != 'public' THEN
+        EXECUTE 'SET search_path TO "' || quote_ident(schema_name) || '", public';
+    END IF;
+    EXECUTE command INTO result;
+    RETURN result;
+EXCEPTION WHEN others THEN
+    RETURN SQLERRM;
+END;
+$$ LANGUAGE plpgsql
+SECURITY DEFINER;
+
+-- Function to create user schema and tables with consistent naming
+CREATE OR REPLACE FUNCTION create_user_schema_and_tables(schema_name TEXT)
+RETURNS VOID AS $$
+BEGIN
+    -- Ensure the schema exists
+    IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = schema_name) THEN
+        EXECUTE 'CREATE SCHEMA IF NOT EXISTS "' || schema_name || '"';
+    END IF;
+
+    -- Create interactions table (consistent naming)
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS "%s".interactions (
+            interactionID SERIAL PRIMARY KEY,
+            context TEXT,
+            question TEXT,
+            answer TEXT,
+            metadata JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );', schema_name);
+
+    -- Create knowledge_base table
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS "%s".knowledge_base (
+            id SERIAL PRIMARY KEY,
+            content TEXT,
+            embedding JSONB
+        );', schema_name);
+
+    -- Create interactions table (consistent naming)
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS "%s".interactions (
+            interactionID SERIAL PRIMARY KEY,
+            context TEXT,
+            question TEXT,
+            answer TEXT,
+            metadata JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );', schema_name);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get conversation history
+CREATE OR REPLACE FUNCTION get_conversation_history(schema_name TEXT)
+RETURNS TABLE (
+    interactionID INTEGER,
+    context TEXT,
+    question TEXT,
+    answer TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        SELECT interactionID, context, question, answer, metadata, created_at
+        FROM "%s".interactions
+        ORDER BY created_at;', schema_name);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get knowledge base documents
+CREATE OR REPLACE FUNCTION get_knowledge_base_documents(schema_name TEXT)
+RETURNS TABLE (
+    id INTEGER,
+    content TEXT,
+    embedding JSONB
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        SELECT id, content, embedding
+        FROM "%s".knowledge_base;', schema_name);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get topic-specific interactions
+CREATE OR REPLACE FUNCTION get_topic_interactions(schema_name TEXT, topic_name TEXT, max_limit INTEGER DEFAULT 5)
+RETURNS TABLE (
+    interactionID INTEGER,
+    context TEXT,
+    question TEXT,
+    answer TEXT, 
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        SELECT interactionID, context, question, answer, metadata, created_at
+        FROM "%s".interactions
+        WHERE metadata->>''topic'' = %L
+        ORDER BY created_at DESC
+        LIMIT %s;', schema_name, topic_name, max_limit);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

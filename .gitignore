@@ -1,0 +1,6 @@
+.venv/
+*__pycache__/
+security_files/
+rag_programm/
+logging/
+.env
