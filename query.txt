@@ -4,6 +4,9 @@ DROP FUNCTION IF EXISTS get_conversation_history(text);
 DROP FUNCTION IF EXISTS create_new_schema(text);
 DROP FUNCTION IF EXISTS sql(text, text);
 DROP FUNCTION IF EXISTS create_user_schema_and_tables(text);
+DROP FUNCTION IF EXISTS get_knowledge_base_documents(text);
+DROP FUNCTION IF EXISTS get_topic_interactions(text, text, integer);
+DROP FUNCTION IF EXISTS add_interaction(text, text, text, text, jsonb);
 
 -- Enable the vector extension (if not already enabled)
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -50,7 +53,7 @@ END;
 $$ LANGUAGE plpgsql
 SECURITY DEFINER;
 
--- Function to create user schema and tables with consistent naming
+-- Function to create user schema and tables with vector support
 CREATE OR REPLACE FUNCTION create_user_schema_and_tables(schema_name TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -59,7 +62,7 @@ BEGIN
         EXECUTE 'CREATE SCHEMA IF NOT EXISTS "' || schema_name || '"';
     END IF;
 
-    -- Create interactions table (consistent naming)
+    -- Create interactions table
     EXECUTE format('
         CREATE TABLE IF NOT EXISTS "%s".interactions (
             interactionID SERIAL PRIMARY KEY,
@@ -70,24 +73,20 @@ BEGIN
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );', schema_name);
 
-    -- Create knowledge_base table
+    -- Create knowledge_base table with vector type instead of jsonb
     EXECUTE format('
         CREATE TABLE IF NOT EXISTS "%s".knowledge_base (
             id SERIAL PRIMARY KEY,
             content TEXT,
-            embedding JSONB
+            embedding vector(1536)
         );', schema_name);
-
-    -- Create interactions table (consistent naming)
+        
+    -- Create vector search index (optional but recommended for performance)
     EXECUTE format('
-        CREATE TABLE IF NOT EXISTS "%s".interactions (
-            interactionID SERIAL PRIMARY KEY,
-            context TEXT,
-            question TEXT,
-            answer TEXT,
-            metadata JSONB,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );', schema_name);
+        CREATE INDEX IF NOT EXISTS embedding_idx 
+        ON "%s".knowledge_base 
+        USING ivfflat (embedding vector_cosine_ops)
+        WITH (lists = 100);', schema_name);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -140,5 +139,55 @@ BEGIN
         WHERE metadata->>''topic'' = %L
         ORDER BY created_at DESC
         LIMIT %s;', schema_name, topic_name, max_limit);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to add an interaction (avoiding direct table access)
+CREATE OR REPLACE FUNCTION add_interaction(
+    p_schema_name TEXT,
+    p_context TEXT,
+    p_question TEXT,
+    p_answer TEXT,
+    p_metadata JSONB
+)
+RETURNS INTEGER AS $$
+DECLARE
+    new_id INTEGER;
+BEGIN
+    EXECUTE format('
+        INSERT INTO "%s".interactions 
+        (context, question, answer, metadata)
+        VALUES ($1, $2, $3, $4)
+        RETURNING interactionID;
+    ', p_schema_name)
+    INTO new_id
+    USING p_context, p_question, p_answer, p_metadata;
+    
+    RETURN new_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to add an interaction (avoiding direct table access)
+CREATE OR REPLACE FUNCTION add_interaction(
+    p_schema_name TEXT,
+    p_context TEXT,
+    p_question TEXT,
+    p_answer TEXT,
+    p_metadata JSONB
+)
+RETURNS INTEGER AS $$
+DECLARE
+    new_id INTEGER;
+BEGIN
+    EXECUTE format('
+        INSERT INTO "%s".interactions 
+        (context, question, answer, metadata)
+        VALUES ($1, $2, $3, $4)
+        RETURNING interactionID;
+    ', p_schema_name)
+    INTO new_id
+    USING p_context, p_question, p_answer, p_metadata;
+    
+    RETURN new_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
