@@ -81,6 +81,7 @@ BEGIN
             id SERIAL PRIMARY KEY,
             content TEXT,
             embedding vector(1536)
+            embedding vector(1536)
         );', schema_name);
         
     -- Simple index creation with error handling
