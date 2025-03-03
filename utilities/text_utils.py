@@ -22,14 +22,6 @@ from collections import deque
 from school_logging.log import ColoredLogger
 from utilities.keep_words import keep_words
 
-import spacy
-import traceback
-import pandas as pd
-from typing import Any
-from collections import deque
-from school_logging.log import ColoredLogger
-from utilities.keep_words import keep_words
-
 
 def clean_text(text: str) -> str:
     """
@@ -126,3 +118,98 @@ def create_context(df: pd.DataFrame, max_context_turns: int = 3, logger: Colored
         logger.info("Context creation completed successfully (vectorized & inplace).")
     else:
         print("Context creation completed successfully (vectorized & inplace).")
+
+
+def load_enhanced_mental_health_taxonomy():
+    """
+    Load an enhanced mental health taxonomy based on professional frameworks.
+    Combines LIWC psychological dimensions with DSM-5 terminology.
+    """
+    return {
+        "Depression": [
+            "depressed", "sad", "hopeless", "worthless", "guilt", "suicidal", "fatigue",
+            "insomnia", "hypersomnia", "weight", "appetite", "concentration", "indecisive",
+            "psychomotor", "anhedonia", "emptiness", "unmotivated", "tired", "can't eat", 
+            "can't sleep", "don't enjoy", "no interest", "meaningless"
+        ],
+        
+        "Anxiety": [
+            "anxious", "worry", "fear", "panic", "nervous", "tense", "stress", "phobia", 
+            "obsessive", "compulsive", "avoidance", "catastrophizing", "overthinking", 
+            "racing thoughts", "restless", "irritable", "on edge", "hypervigilant", "apprehensive", 
+            "dread", "arousal", "social anxiety"
+        ],
+        
+        "Trauma": [
+            "trauma", "ptsd", "flashback", "nightmare", "hyperarousal", "avoidance", "intrusion", 
+            "dissociate", "abuse", "assault", "violence", "accident", "disaster", "threat", "danger", 
+            "helpless", "horror", "numb", "detached", "triggered", "startle", "hypervigilant", 
+            "emotional dysregulation"
+        ],
+        
+        "Interpersonal": [
+            "relationship", "marriage", "partner", "spouse", "family", "friend", "colleague", "conflict", 
+            "intimacy", "attachment", "boundary", "communication", "trust", "abandonment", "rejection", 
+            "loneliness", "isolation", "connection", "breakup", "divorce", "separation", "betrayal", 
+            "argument", "misunderstanding"
+        ],
+        
+        "Identity": [
+            "self-esteem", "identity", "self-worth", "confidence", "imposter", "shame", "perfectionism", 
+            "failure", "inadequacy", "self-doubt", "body image", "self-criticism", "self-compassion", 
+            "validation", "purpose", "meaning", "values", "authentic", "true self", "gender", "sexuality", 
+            "culture"
+        ],
+        
+        "Adjustment": [
+            "grief", "loss", "bereavement", "change", "transition", "adaptation", "adjustment", "stress", 
+            "coping", "resilience", "life stage", "retirement", "career", "moving", "relocation", 
+            "major life event", "crisis", "upheaval", "uncertainty", "decision-making", "crossroads", 
+            "opportunity", "challenge"
+        ],
+        
+        "Behavior": [
+            "addiction", "substance", "alcohol", "drug", "gambling", "compulsive", "habit", "dependence", 
+            "withdrawal", "craving", "relapse", "recovery", "abstinence", "moderation", "harm-reduction", 
+            "impulse control", "self-regulation", "behavioral therapy", "reinforcement", "trigger"
+        ],
+        
+        "Wellness": [
+            "mindfulness", "meditation", "relaxation", "self-care", "resilience", "growth", "strength", 
+            "resource", "wellness", "prevention", "maintenance", "balance", "harmony", "fulfillment", 
+            "joy", "satisfaction", "gratitude", "meaning", "purpose", "flourishing", "thriving", "vitality"
+        ],
+        
+        "Cognition": [
+            "thought", "belief", "cognition", "distortion", "schema", "assumption", "automatic thought", 
+            "rumination", "worry", "attention", "memory", "concentration", "problem-solving", "decision-making", 
+            "perception", "interpretation", "reframe", "perspective", "mindset", "attribution"
+        ],
+        
+        "Grief & Loss": [
+            "bereavement", "loss", "mourning", "acceptance", "denial", "anger", "bargaining", "depression", 
+            "adaptation", "adjustment", "memorialization", "letting go", "moving on", "honoring", "memory"
+        ],
+        
+        "Self-Compassion": [
+            "self-kindness", "common humanity", "mindfulness", "self-criticism", "self-care", "forgiveness", 
+            "acceptance", "compassionate voice", "inner peace", "empathy"
+        ],
+        
+        "Guilt & Shame": [
+            "guilt", "shame", "self-judgment", "self-blame", "embarrassment", "regret", "wrongdoing", "redemption", 
+            "forgiveness", "moral distress", "humiliation", "self-forgiveness"
+        ],
+        
+        "Obsessive-Compulsive Disorder (OCD)": [
+            "obsession", "compulsion", "ritual", "perfectionism", "control", "anxiety", "reassurance-seeking", 
+            "intrusive thought", "cleaning", "checking", "counting", "hoarding"
+        ],
+        
+        "Suicidality & Self-Harm": [
+            "suicidal", "self-harm", "cutting", "despair", "hopelessness", "crisis", "emotional pain", 
+            "coping", "prevention", "life-threatening", "overwhelming"
+        ],
+
+        "emotional_support": [] # Default fallback category
+    }

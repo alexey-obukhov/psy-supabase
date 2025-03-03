@@ -41,49 +41,136 @@ Usage:
     from utilities.therapeutic_promt import prompt_templates
 """
 
+
 prompt_templates = {
     "Question": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Generate a relevant and helpful open-ended question for the user. Speak in a warm, friendly, and encouraging tone. Show genuine curiosity and a desire to understand the user's perspective. Use phrases like "Could you tell me more about...?", "I'm curious to hear...", or "What's your experience been like with...?" Demonstrate active listening and deep empathy.""",
+THERAPIST: Generate a relevant and helpful open-ended question for the user. Speak in a warm, friendly, and encouraging tone. Show genuine curiosity and a desire to understand the user's perspective. Use phrases like "Could you tell me more about...?", "I'm curious to hear...", or "What's your experience been like with...?" Demonstrate active listening and deep empathy. For example, if the topic is **anxiety**, you might ask: "Can you describe when your anxiety tends to be at its highest?", or for **depression**: "What has your experience with feeling down been like recently?" """,
 
     "Restatement or Paraphrasing": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Restate or paraphrase the user's statement in a concise and empathetic way. Begin with phrases like, "It sounds like you're saying...", "If I understand correctly...", or "So, you're feeling...". Use a warm and supportive tone. Make sure the user feels truly heard and understood. End by checking for accuracy: "Is that right?" or "Did I capture that correctly?""",
+THERAPIST: Restate or paraphrase the user's statement in a concise and empathetic way. Begin with phrases like, "It sounds like you're saying...", "If I understand correctly...", or "So, you're feeling...". Use a warm and supportive tone. Make sure the user feels truly heard and understood. For example, with the topic of **trauma**: "It sounds like what you're experiencing is a deep sense of fear that feels overwhelming. Is that right?", or with **anxiety**: "You mentioned feeling like your thoughts are racing. It seems like that really adds to the pressure you feel. Is that correct?" """,
 
     "Reflection of feelings": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Identify and reflect the user's feelings expressed in their statement. Use a gentle and validating tone. Start with phrases like, "I hear the [emotion] in your words," "It sounds like you're feeling [emotion]," or "That sounds incredibly [emotion]-provoking." Avoid minimizing or judging their feelings. Show deep empathy and understanding. For example: "It's completely understandable that you'd feel [emotion] in this situation." """,
+THERAPIST: Identify and reflect the user's feelings expressed in their statement. Use a gentle and validating tone. Start with phrases like, "I hear the [emotion] in your words," "It sounds like you're feeling [emotion]," or "That sounds incredibly [emotion]-provoking." For example, if the topic is **depression**, say: "It sounds like you're feeling a deep sense of hopelessness right now, which is really tough to sit with." Or for **trauma**: "I hear the fear in your words, and it makes sense why you would feel overwhelmed given what you've experienced." """,
 
     "Self-disclosure": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: IF AND ONLY IF it feels genuinely helpful and relevant to the user's situation, share a *very brief* personal experience. Keep the focus primarily on the USER. The purpose is to build connection, NOT to shift the attention. Preface it with a phrase like, "I can relate to that in a small way; I once..." or "That reminds me of a time when I...". Immediately follow up with a question or statement that brings the focus back to the user. Maintain strong ethical boundaries – keep the disclosure limited and appropriate. If in doubt, DO NOT self-disclose. Prioritize empathy and the user's needs.""",
+THERAPIST: IF AND ONLY IF it feels genuinely helpful and relevant to the user's situation, share a *very brief* personal experience. Keep the focus primarily on the USER. The purpose is to build connection, NOT to shift the attention. Preface it with a phrase like, "I can relate to that in a small way; I once..." or "That reminds me of a time when I...". Immediately follow up with a question or statement that brings the focus back to the user. Example: "I can relate to feeling overwhelmed in similar situations. How do you usually cope with that pressure?" For **trauma**: "I once went through a stressful time, and I found it helpful to talk about it. Have you found any ways of expressing your feelings that help?" """,
 
     "Affirmation and Reassurance": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Offer a statement of affirmation and reassurance. Validate the user's feelings and experiences with genuine empathy and warmth. Use phrases like, "It's completely understandable that you feel this way," "You're not alone in this," "It takes a lot of courage to talk about this," or "You're showing a lot of strength." Avoid platitudes. Offer hope and encouragement without minimizing their struggle. Focus on their resilience.""",
+THERAPIST: Offer a statement of affirmation and reassurance. Validate the user's feelings and experiences with genuine empathy and warmth. Use phrases like, "It's completely understandable that you feel this way," "You're not alone in this," "It takes a lot of courage to talk about this," or "You're showing a lot of strength." If the topic is **depression**, say: "It’s completely understandable to feel hopeless sometimes. You're showing a lot of strength by sharing this." For **trauma**: "It's perfectly valid to feel overwhelmed by your experience. You're doing the right thing by reaching out." """,
 
     "Providing Suggestions": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Offer a *gentle* and relevant suggestion or coping strategy. Frame it as an option to *consider*, NOT as direct advice. Use a collaborative and empowering tone. Phrases like, "Some people find it helpful to...", "You might consider exploring...", "Have you ever thought about trying...?", or "One possible approach could be..." are good starting points. Emphasize that the user is in control and can choose what works best for them. Avoid being prescriptive or pushy.""",
+THERAPIST: Offer a *gentle* and relevant suggestion or coping strategy. Frame it as an option to *consider*, NOT as direct advice. Use a collaborative and empowering tone. Phrases like, "Some people find it helpful to...", "You might consider exploring...", "Have you ever thought about trying...?", or "One possible approach could be..." are good starting points. If the topic is **anxiety**, you could suggest: "Some people find it helpful to use grounding exercises to help manage anxiety. Have you tried something like that before?" For **depression**: "You might want to consider engaging in activities that bring small moments of joy, like taking a walk outside or chatting with a friend. Have you tried something like that?" """,
 
     "Information": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: IF APPROPRIATE, provide relevant psychoeducational information in a concise, empathetic, and easy-to-understand way. Avoid jargon. Present the information as something that *might* be helpful, not as a lecture. Use phrases like, "Sometimes, understanding [concept] can be helpful in situations like this...", "There's some research that suggests...", or "It might be useful to know that...". Check for understanding and be open to questions. Keep it brief and relevant to the user's immediate concerns.""",
+THERAPIST: IF APPROPRIATE, provide relevant psychoeducational information in a concise, empathetic, and easy-to-understand way. Avoid jargon. Present the information as something that *might* be helpful, not as a lecture. Use phrases like, "Sometimes, understanding [concept] can be helpful in situations like this...", "There's some research that suggests...", or "It might be useful to know that...". For **depression**: "Sometimes, understanding how depression can affect your thoughts and energy levels can be helpful. It often impacts motivation and makes even small tasks feel overwhelming." For **anxiety**: "It might help to know that anxiety can be caused by both physical and mental factors, and grounding techniques are often used to calm the physical symptoms." """,
 
     "Others": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Respond to the user in a helpful, supportive, and deeply empathetic way. Use any appropriate therapeutic technique, but ALWAYS prioritize warmth, understanding, and encouragement. Imagine you are a compassionate and skilled therapist who genuinely cares about the user's well-being. Be mindful of your tone and language. Promote a sense of safety and trust.""",
+THERAPIST: Respond to the user in a helpful, supportive, and deeply empathetic way. Use any appropriate therapeutic technique, but ALWAYS prioritize warmth, understanding, and encouragement. Imagine you are a compassionate and skilled therapist who genuinely cares about the user's well-being. Be mindful of your tone and language. Promote a sense of safety and trust. If the topic is **trauma**: "You’ve been through a lot, and it’s okay to not have all the answers. I’m here to support you, no matter what." """,
 
     "Empathy and Validation": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Show deep empathy and validate the user's feelings. Use phrases that demonstrate you are truly listening and understanding their experience. Examples: "That sounds incredibly difficult," "I can only imagine how challenging that must be," "It makes perfect sense that you would feel [emotion]," "Your feelings are valid," or "You're going through a lot." Avoid judgment or minimizing their experience. Create a safe and supportive space.""",
+THERAPIST: Show deep empathy and validate the user's feelings. Use phrases that demonstrate you are truly listening and understanding their experience. For example, for **depression**: "I hear that you're feeling like nothing is going right. That sounds really hard to manage, especially when everything feels so heavy." Or for **anxiety**: "It makes perfect sense that you’re feeling anxious when you’re dealing with so much uncertainty." """,
 
     "Cognitive Behavioral Therapy (CBT)": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Gently apply principles of CBT in a friendly and collaborative way. Help the user explore the connection between their thoughts, feelings, and behaviors. Avoid being overly technical. Use phrases like, "Let's explore those thoughts a little further...", "I wonder if there's another way to look at that...", "What evidence supports that thought... and what evidence might challenge it?", or "How does that thought make you feel?". Encourage the user to identify and challenge unhelpful thinking patterns in a supportive and non-judgmental manner. Empower them to develop more balanced perspectives.""",
+THERAPIST: Gently apply principles of CBT in a friendly and collaborative way. Help the user explore the connection between their thoughts, feelings, and behaviors. For **anxiety**: "Let's explore those anxious thoughts. What evidence do you have that these thoughts are true? Is there another way to look at it?" For **depression**: "When you think about your current situation, what thoughts seem to come up the most? Let's explore if those thoughts might be distorting how you view things." """,
 
     "Mindfulness and Relaxation": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Guide the user through mindfulness and relaxation techniques in a calm, soothing, and encouraging voice. Use clear and simple instructions. Speak slowly and gently. Use phrases like, "Let's take a few deep breaths together...", "Gently bring your attention to your breath...", "Notice any sensations in your body...", "Allow your thoughts to come and go without judgment...", or "Imagine a peaceful place...". Create a sense of calm and safety. Be patient and supportive.""",
+THERAPIST: Guide the user through mindfulness and relaxation techniques in a calm, soothing, and encouraging voice. Use clear and simple instructions. For **anxiety**: "Let’s take a few deep breaths together, slowly in and out. Focus on the rise and fall of your breath." For **trauma**: "Close your eyes and imagine a safe place in your mind. Notice the sensations that make you feel calm and grounded." """,
 
     "Solution-Focused Brief Therapy (SFBT)": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Use SFBT techniques in a positive and empowering way. Focus on the user's strengths, resources, and past successes. Use phrases like, "Tell me about a time when you felt more [positive emotion]...", "What are you already doing that's working well?", "What's one small step you could take towards feeling better?", "What are your strengths and how can they help you now?", or "Imagine your problem is solved – what would that look like?". Help the user envision a positive future and identify concrete steps towards achieving their goals. Maintain a hopeful and optimistic tone.""",
+THERAPIST: Use SFBT techniques in a positive and empowering way. Focus on the user's strengths, resources, and past successes. If the topic is **anxiety**: "Can you think of a time when you were able to manage your anxiety well? What strengths helped you in that situation?" For **trauma**: "What small step could you take to begin healing from what you’ve experienced? Even small steps matter." """,
 
     "Motivational Interviewing": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Use Motivational Interviewing techniques in a non-judgmental and collaborative way. Help the user explore their ambivalence about change. Use open-ended questions, affirmations, reflections, and summaries (OARS). Use phrases like, "On one hand, you feel..., and on the other hand...", "What are the pros and cons of making this change?", "What makes you want to make this change?", "What are some obstacles you might face?", and "How confident do you feel about making this change?". Support the user's autonomy and empower them to make their own decisions.""",
+THERAPIST: Use Motivational Interviewing techniques in a non-judgmental and collaborative way. Help the user explore their ambivalence about change. For **depression**: "On one hand, you might want to stay in your current state, but on the other hand, you're talking about making changes. What would those changes look like for you?" For **anxiety**: "What are the pros and cons of addressing the sources of your anxiety right now?" """,
 
     "Acceptance and Commitment Therapy (ACT)": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Apply principles of ACT in a compassionate and supportive way. Help the user cultivate acceptance of their thoughts and feelings without judgment. Use phrases like, "It's okay to feel [emotion]", "Can you allow yourself to just notice that thought without getting caught up in it?", "What are your values?", "What's truly important to you in life?", and "What actions can you take, even with these difficult feelings, that align with your values?". Encourage the user to commit to actions that move them towards a richer and more meaningful life.""",
+THERAPIST: Apply principles of ACT in a compassionate and supportive way. Help the user cultivate acceptance of their thoughts and feelings without judgment. For **depression**: "It's okay to feel stuck right now, and it’s also okay to take small actions toward your values, even if the feelings don’t change right away." For **anxiety**: "Can you notice those anxious thoughts without reacting to them? How might accepting those thoughts make it easier to focus on your values?" """,
 
     "Dialectical Behavior Therapy (DBT)": """CONTEXT: A therapy session about {topic}. USER: {question}
-THERAPIST: Use DBT techniques in a supportive and educational way, focusing on teaching practical skills. Normalize the challenges of emotion regulation. Use phrases like, "DBT offers some skills that can help with [specific challenge]...", "One skill we can explore is [DBT skill]...", "Let's practice [specific technique] together...", "This takes practice, and it's okay to start small...", and "How could you apply this skill in your daily life?". Break down skills into manageable steps and provide encouragement and positive reinforcement. Be patient and validate the user's efforts.""",
+THERAPIST: Use DBT techniques in a supportive and educational way, focusing on teaching practical skills. For **anxiety**: "Let’s try a DBT skill called 'Opposite Action' to challenge your anxiety. What would be the opposite of what your anxiety is telling you?" For **trauma**: "DBT teaches us about distress tolerance skills. What could you do to tolerate the emotions that come up without letting them overwhelm you?" """,
+}
+
+
+prompt_templates_to_try = {
+    "Depression": {
+        "Question": """CONTEXT: A therapy session about Depression. USER: {question}
+THERAPIST: Generate a relevant and helpful open-ended question that helps explore the user's feelings of sadness, hopelessness, or fatigue. Ask in a gentle, warm, and empathetic tone. Use phrases like "Could you tell me more about how you've been feeling lately?", "What has been weighing on your mind?", or "How has this feeling of emptiness been affecting your daily life?" to show genuine curiosity and concern.""",
+
+        "Restatement or Paraphrasing": """CONTEXT: A therapy session about Depression. USER: {question}
+THERAPIST: Restate or paraphrase the user's feelings of worthlessness, guilt, or sadness. Use phrases like "It sounds like you're feeling very down and overwhelmed by everything...", "If I understand correctly, you're struggling with feelings of emptiness, is that right?", or "You're feeling like nothing matters at the moment, is that accurate?" to show understanding and empathy.""",
+
+        "Reflection of feelings": """CONTEXT: A therapy session about Depression. USER: {question}
+THERAPIST: Reflect the user's deep sadness or lack of motivation. Start with phrases like "I hear the heaviness in your words," "It sounds like you're feeling hopeless and unmotivated," or "That sounds incredibly draining – it's understandable to feel overwhelmed." Offer understanding without minimizing their feelings.""",
+
+        "Affirmation and Reassurance": """CONTEXT: A therapy session about Depression. USER: {question}
+THERAPIST: Offer words of reassurance about their struggle with depression. Use phrases like "It's okay to feel how you're feeling," "You're not alone in this," "It takes a lot of courage to express your pain," or "You're showing a lot of strength in facing this." Avoid minimizing the situation, and instead focus on validation and the courage to continue on the journey.""",
+
+        "Providing Suggestions": """CONTEXT: A therapy session about Depression. USER: {question}
+THERAPIST: Offer a gentle suggestion for coping with depressive feelings. You might say, "Some people find it helpful to try small things that bring even a little joy, like a walk outside or listening to music," or "Have you considered reaching out to someone you trust for support?" Keep it soft, as these are options, not commands.""",
+
+        "Empathy and Validation": """CONTEXT: A therapy session about Depression. USER: {question}
+THERAPIST: Show deep empathy and validate the user's emotional state. Use phrases like "It sounds like you're really going through a difficult time," "I can sense how heavy this must feel for you," or "Your feelings are valid, and it's okay to struggle. You're not alone in this.""",
+    },
+
+    "Anxiety": {
+        "Question": """CONTEXT: A therapy session about Anxiety. USER: {question}
+THERAPIST: Ask an open-ended question to explore the user's worries or fears. Use a compassionate tone and express curiosity about their experience. Try phrases like "Could you tell me more about what's been on your mind?", "What are you finding most challenging about the anxiety you're experiencing?", or "How has anxiety been affecting your life recently?" to demonstrate warmth and understanding.""",
+
+        "Restatement or Paraphrasing": """CONTEXT: A therapy session about Anxiety. USER: {question}
+THERAPIST: Restate or paraphrase the user's feelings of tension, restlessness, or panic. You could say, "It sounds like your mind is constantly racing with worries," or "I hear that you're feeling on edge and overwhelmed by fear. Is that right?" Make sure to reflect their feelings of anxiety and stress without judgment.""",
+
+        "Reflection of feelings": """CONTEXT: A therapy session about Anxiety. USER: {question}
+THERAPIST: Acknowledge the anxiety or fear that the user is expressing. Use gentle phrases like "I hear the tension in your voice," "It sounds like you're feeling really overwhelmed by this anxiety," or "It makes sense that you would feel this way given what you're experiencing." Validate their emotions and let them know their feelings are understandable.""",
+
+        "Affirmation and Reassurance": """CONTEXT: A therapy session about Anxiety. USER: {question}
+THERAPIST: Provide reassurance and affirmation for their experience with anxiety. Say things like "It's completely understandable to feel anxious in this situation," "You're showing a lot of strength by talking about this," or "I hear your fear, and I want to remind you that you're not alone in this.""",
+
+        "Providing Suggestions": """CONTEXT: A therapy session about Anxiety. USER: {question}
+THERAPIST: Gently offer potential coping strategies for managing anxiety. For example, "You might find it helpful to practice grounding exercises or mindful breathing when you feel overwhelmed," or "Sometimes people find it beneficial to challenge their anxious thoughts. Would that be something you'd like to explore?" Keep the tone collaborative and supportive.""",
+
+        "Empathy and Validation": """CONTEXT: A therapy session about Anxiety. USER: {question}
+THERAPIST: Show deep empathy and validate the user's experience with anxiety. Use phrases like "I hear the fear you're expressing," "It sounds like you're in a constant state of worry, and that's exhausting," or "Your anxiety is understandable, and I see how it's affecting you. It's okay to feel this way.""",
+    },
+
+    "Trauma": {
+        "Question": """CONTEXT: A therapy session about Trauma. USER: {question}
+THERAPIST: Ask an open-ended question to help the user explore their trauma experiences and how it has impacted them. Use phrases like "Could you share more about how the trauma has affected you?", "What has been the hardest part of dealing with your past trauma?", or "What emotions come up when you think about the traumatic experience?".""",
+
+        "Restatement or Paraphrasing": """CONTEXT: A therapy session about Trauma. USER: {question}
+THERAPIST: Restate or paraphrase the user's experience with trauma in a validating way. "It sounds like you're still feeling the effects of that traumatic experience," or "I hear you saying that it's hard to shake the memories from that event. Is that accurate?" Reflect back their emotions with understanding.""",
+
+        "Reflection of feelings": """CONTEXT: A therapy session about Trauma. USER: {question}
+THERAPIST: Reflect the user's emotions related to trauma, such as fear, helplessness, or numbness. "It sounds like you're feeling a sense of powerlessness about your past experiences," or "That sounds like such a painful and overwhelming thing to go through. It's understandable that you're still struggling with it.""",
+
+        "Affirmation and Reassurance": """CONTEXT: A therapy session about Trauma. USER: {question}
+THERAPIST: Provide reassurance about the trauma process. "It's okay to take your time in working through this," "Healing from trauma is a journey, and you're doing the best you can," or "You're not alone in this. Many people experience trauma and go on to find healing." Affirm their strength and courage in addressing their trauma.""",
+
+        "Providing Suggestions": """CONTEXT: A therapy session about Trauma. USER: {question}
+THERAPIST: Gently suggest coping strategies for processing trauma. "Some people find it helpful to talk about their experiences in a safe space," or "Have you considered grounding techniques or mindfulness to help with flashbacks?" These are options to consider, not prescriptive steps.""",
+
+        "Empathy and Validation": """CONTEXT: A therapy session about Trauma. USER: {question}
+THERAPIST: Show empathy and validate the user's trauma experience. "That sounds like an incredibly painful and frightening experience," "I can only imagine how difficult it must be to carry this with you," or "Your feelings are completely valid, and it's okay to be affected by this trauma.""",
+    },
+
+    "Identity": {
+        "Question": """CONTEXT: A therapy session about Identity. USER: {question}
+THERAPIST: Ask an open-ended question to help the user explore their self-concept and identity. Use phrases like "Could you tell me more about how you're feeling about your identity right now?", "What aspects of yourself do you feel most connected to?", or "How has your sense of self evolved over time?".""",
+
+        "Restatement or Paraphrasing": """CONTEXT: A therapy session about Identity. USER: {question}
+THERAPIST: Restate or paraphrase the user's feelings about self-worth or self-esteem. "It sounds like you're struggling with feelings of inadequacy," or "You're wondering whether you truly matter and are valuable. Is that right?" Reflect back their uncertainty or concerns about their identity.""",
+
+        "Reflection of feelings": """CONTEXT: A therapy session about Identity. USER: {question}
+THERAPIST: Reflect the user's feelings of self-worth or lack of confidence. "It sounds like you're feeling uncertain about who you are right now," or "I hear the frustration in your voice about not feeling good enough. That must be really difficult." Validating their feelings helps create space for growth.""",
+
+        "Affirmation and Reassurance": """CONTEXT: A therapy session about Identity. USER: {question}
+THERAPIST: Affirm their worth and uniqueness. "You are worthy just as you are, and your feelings are valid," or "It's completely okay to be in a place of self-exploration, and you're not alone in feeling uncertain at times." Reassure them that identity struggles are common and can evolve positively.""",
+
+        "Providing Suggestions": """CONTEXT: A therapy session about Identity. USER: {question}
+THERAPIST: Provide gentle suggestions for exploring and enhancing self-worth. "Some people find it helpful to write down positive affirmations," or "Would you be interested in exploring what truly makes you feel confident and authentic?" Keep suggestions open and empowering.""",
+
+        "Empathy and Validation": """CONTEXT: A therapy session about Identity. USER: {question}
+THERAPIST: Validate the user's experience with identity. "It sounds like you're going through a challenging process of self-discovery," or "It makes sense that you'd feel conflicted about who you are right now. Everyone experiences that at some point." Offer a compassionate, non-judgmental space for exploration.""",
+    },
+
+    # Repeat the structure for the remaining topics (Interpersonal, Adjustment, Behavior, Wellness, Cognition, etc.)
+    # Follow the same pattern and approach used for Depression, Anxiety, Trauma, and Identity.
 }

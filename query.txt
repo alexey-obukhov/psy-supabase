@@ -1,11 +1,16 @@
--- Drop existing functions (if any)
+-- First, drop all existing functions 
 DROP FUNCTION IF EXISTS get_schema_exists(text);
 DROP FUNCTION IF EXISTS get_conversation_history(text);
 DROP FUNCTION IF EXISTS create_new_schema(text);
 DROP FUNCTION IF EXISTS sql(text, text);
 DROP FUNCTION IF EXISTS create_user_schema_and_tables(text);
+DROP FUNCTION IF EXISTS get_knowledge_base_documents(text);
+DROP FUNCTION IF EXISTS get_topic_interactions(text, text, integer);
+DROP FUNCTION IF EXISTS add_interaction(text, text, text, text, jsonb);
+DROP FUNCTION IF EXISTS find_similar_documents(text, vector(1536), integer);
+DROP FUNCTION IF EXISTS add_vector_index_to_knowledge_base(text);
 
--- Enable the vector extension (if not already enabled)
+-- Enable the vector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Function to check if a schema exists
@@ -50,16 +55,16 @@ END;
 $$ LANGUAGE plpgsql
 SECURITY DEFINER;
 
--- Function to create user schema and tables with consistent naming
+-- Function to create user schema and tables with vector support
 CREATE OR REPLACE FUNCTION create_user_schema_and_tables(schema_name TEXT)
-RETURNS VOID AS $$
+RETURNS BOOLEAN AS $$
 BEGIN
     -- Ensure the schema exists
     IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = schema_name) THEN
         EXECUTE 'CREATE SCHEMA IF NOT EXISTS "' || schema_name || '"';
     END IF;
 
-    -- Create interactions table (consistent naming)
+    -- Create interactions table
     EXECUTE format('
         CREATE TABLE IF NOT EXISTS "%s".interactions (
             interactionID SERIAL PRIMARY KEY,
@@ -70,24 +75,32 @@ BEGIN
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );', schema_name);
 
-    -- Create knowledge_base table
+    -- Create knowledge_base table with native vector type
     EXECUTE format('
         CREATE TABLE IF NOT EXISTS "%s".knowledge_base (
             id SERIAL PRIMARY KEY,
             content TEXT,
-            embedding JSONB
+            embedding vector(1536)
         );', schema_name);
-
-    -- Create interactions table (consistent naming)
-    EXECUTE format('
-        CREATE TABLE IF NOT EXISTS "%s".interactions (
-            interactionID SERIAL PRIMARY KEY,
-            context TEXT,
-            question TEXT,
-            answer TEXT,
-            metadata JSONB,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );', schema_name);
+        
+    -- Simple index creation with error handling
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx 
+            ON "%s".knowledge_base 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        -- Log the error but continue (index creation is not critical)
+        RAISE NOTICE 'Index creation failed: %', SQLERRM;
+    END;
+    
+    RETURN TRUE;
+    
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error creating schema: %', SQLERRM;
+    RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -109,12 +122,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to get knowledge base documents
+-- Function to get knowledge base documents with vector embeddings
 CREATE OR REPLACE FUNCTION get_knowledge_base_documents(schema_name TEXT)
 RETURNS TABLE (
     id INTEGER,
     content TEXT,
-    embedding JSONB
+    embedding vector(1536)
 ) AS $$
 BEGIN
     RETURN QUERY EXECUTE format('
@@ -140,5 +153,73 @@ BEGIN
         WHERE metadata->>''topic'' = %L
         ORDER BY created_at DESC
         LIMIT %s;', schema_name, topic_name, max_limit);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to add an interaction
+CREATE OR REPLACE FUNCTION add_interaction(
+    p_schema_name TEXT,
+    p_context TEXT,
+    p_question TEXT,
+    p_answer TEXT,
+    p_metadata JSONB
+)
+RETURNS INTEGER AS $$
+DECLARE
+    new_id INTEGER;
+BEGIN
+    EXECUTE format('
+        INSERT INTO "%s".interactions 
+        (context, question, answer, metadata)
+        VALUES ($1, $2, $3, $4)
+        RETURNING interactionID;
+    ', p_schema_name)
+    INTO new_id
+    USING p_context, p_question, p_answer, p_metadata;
+    
+    RETURN new_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to find similar documents using vector similarity
+CREATE OR REPLACE FUNCTION find_similar_documents(
+    p_schema_name TEXT,
+    p_embedding vector(1536),
+    p_limit INTEGER DEFAULT 5
+)
+RETURNS TABLE (
+    id INTEGER,
+    content TEXT,
+    similarity FLOAT
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        SELECT id, content, (embedding <=> $1) AS similarity
+        FROM "%s".knowledge_base
+        ORDER BY similarity ASC
+        LIMIT $2;
+    ', p_schema_name)
+    USING p_embedding, p_limit;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to add vector index to an existing knowledge_base table
+CREATE OR REPLACE FUNCTION add_vector_index_to_knowledge_base(schema_name TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Try to create the index
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx 
+            ON "%s".knowledge_base 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', schema_name);
+        
+        RETURN TRUE;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Failed to create index: %', SQLERRM;
+        RETURN FALSE;
+    END;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

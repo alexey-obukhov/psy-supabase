@@ -15,7 +15,6 @@ confection==0.1.5
 cymem==2.0.11
 Cython==0.29.37
 deprecation==2.1.0
-#en-core-web-sm==3.7.1
 exceptiongroup==1.2.2
 filelock==3.16.1
 Flask==2.0.1

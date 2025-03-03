@@ -9,7 +9,7 @@ from supabase import create_client, Client
 
 from rag_processor import RAGProcessor
 from database import DatabaseManager
-from text_generator import TextGenerator
+from model_manager import ModelManager
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -23,12 +23,20 @@ app = Flask(__name__)
 @app.before_first_request
 def initialize_app():
     """Set up the application before the first request."""
-    print("Setting up application...")
+    logger.info("Setting up application...")
     # Any global initialization can go here
 
 @app.before_request
 def before_request():
-    """Initialize DatabaseManager and RAGProcessor before each request."""
+    """Initialize DatabaseManager before each request."""
+    # Skip for preflight requests
+    if request.method == 'OPTIONS':
+        return
+
+    # Skip for paths that don't need authentication
+    if request.path in ['/health', '/status']:
+        return
+        
     user_id = request.headers.get('X-User-ID')
     if not user_id:
         return jsonify({'error': 'User not authenticated'}), 401
@@ -44,9 +52,10 @@ def before_request():
     
     if not schema_created:
         return jsonify({'error': 'Failed to create user schema'}), 500
+        
+    # Add vector index to knowledge base (new line)
+    g.db_manager.add_vector_index_to_knowledge_base()
 
-    # Initialize RAGProcessor and store in 'g'
-    g.rag_processor = RAGProcessor(g.db_manager, generator)
 
 if __name__ == '__main__':
     if mp.get_start_method(allow_none=True) is None:
@@ -55,65 +64,82 @@ if __name__ == '__main__':
 
     supabase_url = os.environ.get("SUPABASE_URL")
     supabase_key = os.environ.get("SUPABASE_KEY")
+    intelligent_processing_enabled = os.environ.get("INTELLIGENT_PROCESSING_ENABLED", None)
 
     if not supabase_url or not supabase_key:
-        print("Error: Please set SUPABASE_URL and SUPABASE_KEY environment variables.")
+        logger.critical("Error: Please set SUPABASE_URL and SUPABASE_KEY environment variables.")
         exit()
 
     # --- Use GPU if available ---
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Initialize TextGenerator (only initialize once)
-    generator = TextGenerator("microsoft/phi-1_5", device, use_bfloat16=False)
+    # Replace direct TextGenerator initialization with ModelManager
+    model_manager = ModelManager("microsoft/phi-1_5", device)
 
-    print("Welcome to the Therapy AI Assistant!")
+    logger.info("Welcome to the Therapy AI Assistant!")
 
     @app.route('/chat', methods=['POST'])
     def chat():
         """Handles chat interactions."""
         try:
             data = request.json
+            user_question = data.get('question')
             user_id = request.headers.get('X-User-ID')
-            user_question = data.get('question', '')
+            session_id = f"user_{user_id}"
             
-            if not user_question:
-                return jsonify({'error': 'No question provided'}), 400
-                
-            # Generate a unique question ID (timestamp + random component)
-            import time
-            import random
-            question_id = int(time.time() * 1000) + random.randint(1, 1000)
+            # Get the generator only when needed
+            generator = model_manager.get_generator()
             
-            device = "cpu"  # Default to CPU
-            if torch.cuda.is_available():
-                device = "cuda:0"
-            elif torch.backends.mps.is_available():
-                device = "mps"
-                
-            # Pass the question_id to generate_response
-            response = g.rag_processor.generate_response(user_question, device, question_id)
+            # Create a RAG processor using the retrieved documents
+            # This leverages Supabase embeddings more efficiently
+            rag_processor = RAGProcessor(g.db_manager, generator, intelligent_processing_enabled)
+            
+            # Generate response
+            response = rag_processor.generate_response(
+                user_question, 
+                device, 
+                session_id=session_id
+            )
+            
+            # Free GPU memory immediately after use
+            model_manager.free_memory()
+            
             return jsonify({'response': response})
-            
         except Exception as e:
-            logger.error(f"Error in chat endpoint: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error in chat endpoint: {e}")
+            # Always free memory, even on error
+            model_manager.free_memory()
             return jsonify({'error': 'An error occurred processing your request'}), 500
 
     @app.route('/add_document', methods=['POST'])
     def add_document():
         """Handles document addition requests."""
-        data = request.get_json()
-        content = data.get('content')
+        try:
+            data = request.get_json()
+            content = data.get('content')
 
-        if not content:
-            return jsonify({'error': 'Missing content'}), 400
+            if not content:
+                return jsonify({'error': 'Missing content'}), 400
 
-        # Generate embedding and store the document
-        embedding = generator.get_embedding(content)
-        if embedding is not None:
-            g.db_manager.add_document_to_knowledge_base(content, embedding.tolist())
-            return jsonify({'message': 'Document added successfully'})
-        else:
-            return jsonify({'error': 'Failed to generate embedding'}), 500
+            # Get the generator from model manager
+            generator = model_manager.get_generator()
+            
+            # Generate embedding and store the document
+            embedding = generator.get_embedding(content)
+            if embedding is not None:
+                g.db_manager.add_document_to_knowledge_base(content, embedding.tolist())
+                # Free GPU memory after use
+                model_manager.free_memory()
+                return jsonify({'message': 'Document added successfully'})
+            else:
+                # Free GPU memory even if embedding failed
+                model_manager.free_memory()
+                return jsonify({'error': 'Failed to generate embedding'}), 500
+        except Exception as e:
+            logger.error("Error in add_document endpoint: %s", e)
+            # Always free memory on error
+            model_manager.free_memory()
+            return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
     @app.route('/get_documents', methods=['GET'])
     def get_documents():
