@@ -113,36 +113,41 @@ def health_check():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """Handles chat interactions."""
     try:
         data = request.json
-        user_question = data.get('question')
-        user_id = request.headers.get('X-User-ID')
-        session_id = f"user_{user_id}"
+        if not data or 'question' not in data:
+            return jsonify({"error": "Missing question parameter"}), 400
+            
+        user_id = request.headers.get('X-User-ID', 'default_user')
+        question = data['question']
         
+        # Log the incoming request
+        logger.info(f"Received chat request from user {user_id}: {question[:50]}...")
+
         # Get the generator only when needed
         generator = model_manager.get_generator()
         
         # Create a RAG processor using the retrieved documents
         # This leverages Supabase embeddings more efficiently
         rag_processor = RAGProcessor(g.db_manager, generator, intelligent_processing_enabled)
-        
+
         # Generate response
-        response = rag_processor.generate_response(
-            user_question, 
-            device, 
-            session_id=session_id
-        )
+        response = rag_processor.generate_response(question, "cpu", 0, user_id)
         
-        # Free GPU memory immediately after use
-        model_manager.free_memory()
+        # Validate response before returning
+        if not response or len(response.strip()) < 10:
+            logger.error(f"Invalid response generated: {response}")
+            response = "I understand you're having difficulty with asking questions. Would you like to explore what makes this challenging for you? I'm here to support you."
         
-        return jsonify({'response': response})
+        # Additional safety check for inappropriate response patterns
+        if "# YOUR CODE HERE" in response or "SOLUTION:" in response:
+            logger.error(f"Code template detected in response: {response}")
+            response = "I notice you're concerned about asking questions and feeling stuck. Many people find this challenging. Would you like to explore what might help you feel more comfortable asking questions?"
+            
+        return jsonify({"response": response})
     except Exception as e:
-        logger.error(f"Error in chat endpoint: {e}")
-        # Always free memory, even on error
-        model_manager.free_memory()
-        return jsonify({'error': 'An error occurred processing your request'}), 500
+        logger.exception(f"Error in chat endpoint: {e}")
+        return jsonify({"response": "I apologize, but I encountered an error. Could you try expressing your concern in a different way?"}), 500
 
 @app.route('/add_document', methods=['POST'])
 def add_document():
