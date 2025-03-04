@@ -3,13 +3,11 @@ Prompt selector for therapeutic AI responses.
 Based on Alexey Obukhov's therapeutic prompt system.
 """
 import logging
-import traceback
-from typing import Dict, List, Tuple, Any, Optional
-import numpy as np
-from utilities.text_utils import load_enhanced_mental_health_taxonomy
-from utilities.therapeutic_promt import prompt_templates
-import json
-import spacy
+from typing import Dict, List, Tuple, Any
+
+from psy_supabase.utilities.text_utils import load_enhanced_mental_health_taxonomy
+from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
+from psy_supabase.utilities.nlp_utils import get_spacy_model
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +22,10 @@ class PromptSelector:
         self.generator = generator
         self.prompt_templates = prompt_templates
         
-        # Load spaCy model for text processing
-        try:
-            self.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            logger.warning("Downloading en_core_web_sm model...")
-            from spacy.cli import download
-            download("en_core_web_sm")
-            self.nlp = spacy.load("en_core_web_sm")
+        # Use the shared spaCy model
+        self.nlp = get_spacy_model()
+        if self.nlp is None:
+            logger.error("Failed to load spaCy model. Some functionality may be limited.")
         
         # Define keyword associations with prompt templates
         self.keyword_mappings = {
@@ -53,6 +47,13 @@ class PromptSelector:
             ],
             "Question": [
                 "confused", "unsure", "uncertain", "wonder", "think", "feel", "opinion"
+            ],
+            "Trauma": [
+                "abuse", "trauma", "ptsd", "harass", "assault", "bully", "victim",
+                "workplace abuse", "work abuse", "boss abuse", "manager abuse",
+                "toxic workplace", "hostile", "threat", "intimidate", "humiliate",
+                "mistreat", "mobbing", "gaslighting", "discrimination", "retaliate",
+                "harassment"
             ],
             # Add more mappings as needed
         }
@@ -178,8 +179,8 @@ class PromptSelector:
 
 
     def select_prompt_template(self,
-                               user_question: str
-                               ) -> Tuple[str, Dict[str, Any]]:
+user_question: str
+) -> Tuple[str, Dict[str, Any]]:
         """
         Select the most appropriate prompt template based on user input.
         
@@ -225,7 +226,25 @@ class PromptSelector:
         # Step 4: Determine the topic based on the category info and question
         topic = self._determine_topic(category_info, cleaned_question)
         
-        # Step 5: Build the enhanced context for the prompt
+        # Step 5: Make sure we have an appropriate template for the detected topic
+        # Check if we need to map the topic to a specific template
+        if topic in ["Workplace Trauma", "Heartbreak", "Relationship"]:
+            # These are specialized topics that need their own templates
+            if topic in self.prompt_templates:
+                # If we have a dedicated template for this topic, use it
+                template_name = topic
+                logger.info(f"Using specialized template '{template_name}' for topic '{topic}'")
+            else:
+                # Map to the closest template if no exact match exists
+                template_mapping = {
+                    "Workplace Trauma": "Trauma",
+                    "Heartbreak": "Empathy and Validation", 
+                    "Relationship": "Empathy and Validation"
+                }
+                template_name = template_mapping.get(topic, template_name)
+                logger.info(f"Mapped topic '{topic}' to closest template '{template_name}'")
+        
+        # Step 6: Build the enhanced context for the prompt
         enhanced_context = {
             "detected_template": template_name,
             "detected_topic": topic,
@@ -233,7 +252,7 @@ class PromptSelector:
         }
         
         # Log the final template selection for debugging purposes
-        logger.info(f"Selected template '{template_name}' for topic '{topic}'")
+        logger.info(f"Final template selection: '{template_name}' for topic '{topic}'")
         
         # Return the final selected template and the enhanced context
         return template_name, enhanced_context
@@ -251,6 +270,24 @@ class PromptSelector:
         
         # Track matches with their scores
         topic_scores = {}
+
+        # Special handling for workplace trauma detection
+        workplace_indicators = ["at work", "my job", "my boss", "my manager", 
+                            "my workplace", "my coworker", "my colleague",
+                            "office", "workplace", "company", "employer", "employment"]
+        
+        abuse_terms = ["abuse", "bully", "harass", "toxic", "trauma", "stress", 
+                    "unfair", "discriminat", "threat", "hostile", "intimidat",
+                    "yell", "scream", "humiliat", "mistreat", "fired", "lay off"]
+        
+        # Check for workplace context
+        has_workplace = any(term in question_lower for term in workplace_indicators)
+        has_abuse = any(term in question_lower for term in abuse_terms)
+        
+        # Strong signal: If both workplace AND abuse terms are present, prioritize Workplace Trauma
+        if has_workplace and has_abuse:
+            logger.info("Detected workplace abuse context - prioritizing Workplace Trauma topic")
+            return "Workplace Trauma"
 
         logger.info(f"Processing question with {len(self.topic_keywords)} possible topics")
         

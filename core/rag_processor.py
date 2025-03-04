@@ -1,13 +1,12 @@
-from text_generator import TextGenerator
-from database import DatabaseManager
 from typing import List, Dict
-from utilities.therapeutic_promt import prompt_templates
-from prompt_selector import PromptSelector  # Add this import
 import json
 import logging
 import numpy as np
-from flask import g
-from safety_handler import SafetyHandler
+
+from psy_supabase.core.database import DatabaseManager
+from psy_supabase.utilities.prompt_selector import PromptSelector
+from psy_supabase.core.text_generator import TextGenerator
+from psy_supabase.utilities.safety_handler import SafetyHandler
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

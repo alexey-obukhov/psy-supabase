@@ -5,8 +5,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequen
 import logging
 import traceback
 from typing import Dict, List, Optional, Any
-from utilities.therapeutic_promt import prompt_templates
-from utilities.text_utils import clean_text
+from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
+from psy_supabase.utilities.text_utils import clean_text
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

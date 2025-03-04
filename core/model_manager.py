@@ -1,7 +1,7 @@
 import gc
 import torch.cuda
 from school_logging.log import ColoredLogger
-from text_generator import TextGenerator
+from psy_supabase.core.text_generator import TextGenerator
 
 # Create a model manager class to handle loading/unloading
 class ModelManager:

@@ -13,7 +13,16 @@ Usage:
     from utilities.keep_words import keep_words
 """
 
-keep_words = ("i", "me", "my", "mine", "you", "your", "yours", "he", "him", "his", "she",
-              "her", "hers", "it", "its", "we", "us", "our", "ours", "they", "them", "their",
-              "theirs", "be", "am", "is", "are", "was", "were", "been", "being", "have",
-              "has", "had", "having", "do", "does", "did", "doing")
+keep_words = ("these", "shouldn't", "i'll", "isn't", "i'd",
+              "you've", "hasn't", "doesn't", "or",
+              "what", "she'd", "where", "won't", "cannot", "who",
+              "he'd", "those", "tought", "didn't", "because",
+              "that", "he's", "he'll", "had", "are", "we'll",
+              "why", "i'm", "if", "they'd", "could", "hadn't",
+              "you'll", "did", "when", "be", "they're", "as",
+              "do", "they'll", "we're", "should", "have", "you'd",
+              "a", "does", "being", "you're", "we've", "whom", "wouldn't",
+              "the", "couldn't", "haven't", "which", "but", "i've", "am", "this",
+              "it's", "she's", "was", "weren't", "can't", "having", "were", "been",
+              "doing", "don't", "they've", "an", "is", "wasn't", "and", "we'd", "she'll",
+              "mustn't", "shan't", "would", "has", "aren't", "how")

@@ -1,10 +1,11 @@
 import logging
-from supabase import create_client, Client
+from supabase import create_client
 from typing import List, Dict
 import json
 import re
 import traceback
-from utilities.text_utils import clean_text
+
+from psy_supabase.utilities.text_utils import clean_text
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -77,9 +78,9 @@ class DatabaseManager:
                 for item in response.data:
                     transformed_item = {
                         'interactionID': item.get('interactionid'),
-                        'questionText': item.get('question'),  # in db it is question
-                        'answerText': item.get('answer'),      # in db it is answer
-                        'context': item.get('context'),
+                        'questionText': self.clean_db_text(item.get('question')),  # in db it is question
+                        'answerText': self.clean_db_text(item.get('answer')),      # in db it is answer
+                        'context': self.clean_db_text(item.get('context')),
                         'metadata': item.get('metadata'),
                         'created_at': item.get('created_at')
                     }
@@ -483,3 +484,9 @@ class DatabaseManager:
             logger.error(f"Exception adding vector index: {str(e)}")
             logger.error(traceback.format_exc())
             return False
+
+    def clean_db_text(self, text):
+        """Clean text retrieved from the database to normalize quotes."""
+        if text is None:
+            return text
+        return re.sub(r"'{2,}", "'", text)

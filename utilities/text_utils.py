@@ -1,35 +1,27 @@
 """
 2025, Dresden Alexey Obukhov, alexey.obukhov@hotmail.com
 
-This module provides utility functions for text cleaning and decoding. These functions are used to handle
-Unicode characters, unwanted symbols, and other text normalization tasks.
-
-Functions:
-1. clean_text: Cleans and decodes text to handle Unicode characters and unwanted symbols.
-
-Usage:
-    from utilities.text_utils import create_context, process_chunk, get_embedding, clean_text
-    from utilities.text_utils import create_context, process_chunk, get_embedding, clean_text
+This module provides utility functions for text cleaning and decoding.
 """
 
 import re
 import html
-import spacy
 import traceback
 import pandas as pd
 from typing import Any
 from collections import deque
 from school_logging.log import ColoredLogger
-from utilities.keep_words import keep_words
+from psy_supabase.utilities.keep_words import keep_words
+from psy_supabase.utilities.nlp_utils import get_spacy_model
 
 
 def clean_text(text: str) -> str:
     """
     Cleans and decodes text to handle Unicode characters, unwanted symbols, and escape single quotes.
-
+    
     Args:
         text (str): The text to be cleaned and decoded.
-
+        
     Returns:
         str: The cleaned and decoded text.
     """
@@ -44,35 +36,46 @@ def clean_text(text: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()              # Remove extra whitespace
     text = re.sub(r'\n+', '\n', text)                     # Remove redundant newlines
     text = text.replace("'", "''")                        # Escape single quotes for SQL
-    #text = text.replace('"', '""')                        # Escape double quotes for SQL
     return text
 
 
-def tokenize_and_lemmatize(text: str, logger: Any, nlp=spacy.load("en_core_web_sm")) -> str:
+def tokenize_and_lemmatize(text: str, logger: Any = None) -> str:
     """
-    Static method to tokenize and lemmatize text.
-
+    Tokenize and lemmatize text using spaCy.
+    
     Args:
         text (str): Text to process
-        logger (Any): Logger instance
-        nlp: SpaCy model (default loads en_core_web_sm)
-
+        logger (Any, optional): Logger instance for debug messages
+        
     Returns:
-        str: Processed text
+        str: Processed text with tokens lemmatized and filtered
     """
+    nlp = get_spacy_model()
+    if nlp is None:
+        if logger:
+            logger.error("spaCy model not available. Cannot tokenize text.")
+        return text
+        
     try:
-        logger.debug(f"Tokenizing text (first 50 chars): '{text[:50]}...'")
+        if logger:
+            logger.debug(f"Tokenizing text (first 50 chars): '{text[:50]}...'")
+            
         doc = nlp(text)
         cleaned_tokens = [
             token.lemma_.lower() for token in doc
             if (token.lemma_.lower() in keep_words) or (not token.is_stop and not token.is_punct and not token.is_space)
         ]
         cleaned_text = " ".join(cleaned_tokens)
-        logger.debug(f"Lemmatized text (first 50 chars): '{cleaned_text[:50]}...'")
+        
+        if logger:
+            logger.debug(f"Lemmatized text (first 50 chars): '{cleaned_text[:50]}...'")
+            
         return cleaned_text.strip()
+        
     except Exception as e:
-        logger.error(f"Error in tokenize_and_lemmatize: {str(e)}\n{traceback.format_exc()}")
-        return ""
+        if logger:
+            logger.error(f"Error in tokenize_and_lemmatize: {str(e)}\n{traceback.format_exc()}")
+        return text
 
 
 def create_context(df: pd.DataFrame, max_context_turns: int = 3, logger: ColoredLogger = None) -> None:
@@ -127,26 +130,77 @@ def load_enhanced_mental_health_taxonomy():
     """
     return {
         "Depression": [
-            "depressed", "sad", "hopeless", "worthless", "guilt", "suicidal", "fatigue",
-            "insomnia", "hypersomnia", "weight", "appetite", "concentration", "indecisive",
-            "psychomotor", "anhedonia", "emptiness", "unmotivated", "tired", "can't eat", 
-            "can't sleep", "don't enjoy", "no interest", "meaningless"
+            'melancholy', 'fatigue', 'tired', 'unmotivated', "don't enjoy",
+            'insomnia', 'exhausted', 'weight', "can't sleep", 'appetite',
+            'guilt', 'concentration', 'depressed', 'no motivation', 'unhappy',
+            'empty', 'suicidal', 'no energy', 'no interest', 'lost interest',
+            'sad', 'hypersomnia', 'indecisive', 'numb', 'anhedonia', "can't eat",
+            'psychomotor', "can't enjoy", 'worthless', 'gloomy', 'despair', 'miserable',
+            'emptiness', 'meaningless', 'depression', 'hopeless'
         ],
         
         "Anxiety": [
-            "anxious", "worry", "fear", "panic", "nervous", "tense", "stress", "phobia", 
-            "obsessive", "compulsive", "avoidance", "catastrophizing", "overthinking", 
-            "racing thoughts", "restless", "irritable", "on edge", "hypervigilant", "apprehensive", 
-            "dread", "arousal", "social anxiety"
+            'nervous', 'on edge', 'frightened', 'catastrophizing', 'dread', 'arousal',
+            'apprehensive', 'overwhelmed', 'anxious', 'racing thoughts', 'uneasy',
+            'hypervigilant', 'stress', 'panic', 'worry', 'social anxiety', 'scared',
+            'obsessive', 'avoidance', 'tense', 'irritable', 'fear', 'restless', 'compulsive',
+            'phobia', 'worried', 'anxiety', 'overthinking', 'performance anxiety'
         ],
         
         "Trauma": [
-            "trauma", "ptsd", "flashback", "nightmare", "hyperarousal", "avoidance", "intrusion", 
-            "dissociate", "abuse", "assault", "violence", "accident", "disaster", "threat", "danger", 
-            "helpless", "horror", "numb", "detached", "triggered", "startle", "hypervigilant", 
-            "emotional dysregulation"
+            'neglect', 'avoidance', 'nightmare', 'trauma', 'violence',
+            'hyperarousal', 'harass', 'ptsd', 'assaulted', 'startle',
+            'horror', 'childhood trauma', 'threat', 'helpless', 'assault', 'intrusion',
+            'flashback', 'emotional dysregulation', 'survivor', 'accident', 'danger',
+            'numb', 'triggered', 'traumatized', 'dissociate', 'disaster',
+            'victim', 'abuse', 'hypervigilant', 'abused', 'victimized', 'detached'
+        ],
+
+        # Workplace trauma and abuse
+        "Workplace Trauma": [
+            # Primary workplace abuse terms (stronger matches)
+            "workplace abuse", "work abuse", "boss abuse", "manager abuse",
+            "toxic workplace", "hostile work", "bullied at work", "harassed at work",
+            "workplace harassment", "workplace bullying", "abused at work",
+            "work trauma", "workplace trauma", "toxic boss", "toxic manager", 
+            "abusive supervisor", "boss bully", "manager bully", "workplace bully",
+            
+            # Secondary workplace terms
+            "mobbing", "work stress", "threatened at work", "intimidated at work", 
+            "humiliated at work", "workplace retaliation", "work mistreatment", 
+            "gaslighting at work", "workplace injustice", "unfair treatment at work",
+            
+            # Additional workplace problem indicators
+            "discriminated at work", "work discrimination", "hostile environment",
+            "career sabotage", "workplace violence", "demotion", "unfair review",
+            "fired unfairly", "targeted at work", "work anxiety", "job trauma",
+            "toxic team", "toxic coworker", "work harassment", "work bullying",
+            
+            # Common phrases
+            "hate my job", "hate my boss", "terrible workplace", "awful job",
+            "hostile boss", "mean coworker", "being bullied", "being harassed",
+            "work is hell", "office politics", "power abuse", "authority abuse",
+            "work ptsd", "verbally abused", "yelled at", "screamed at"
         ],
         
+        # Relationship-related topics
+        "Relationship": [
+            "relationship", "marriage", "partner", "boyfriend", "girlfriend", "husband", 
+            "wife", "spouse", "couple", "dating", "significant other", "ex", "breakup",
+            "divorce", "separated", "together", "commitment", "trust", "betrayal", 
+            "cheating", "infidelity", "jealousy", "communication", "argument", "fight",
+            "romantic", "love", "loved", "loving", "connection", "attachment"
+        ],
+        
+        # Heartbreak and healing
+        "Heartbreak": [
+            "heartbreak", "heartbroken", "broken heart", "broken up", "dumped",
+            "rejected", "betrayed", "abandoned", "alone", "lonely", "miss them",
+            "missing them", "moving on", "get over", "heal", "healing", "closure",
+            "broken heart", "love pain", "hurt by love", "hurt by them", "never again",
+            "brake my heart", "break my heart", "no more love", "trust again",
+            "never trust", "fall in love", "falling for someone", "vulnerable"
+        ],
         "Interpersonal": [
             "relationship", "marriage", "partner", "spouse", "family", "friend", "colleague", "conflict", 
             "intimacy", "attachment", "boundary", "communication", "trust", "abandonment", "rejection", 
@@ -211,5 +265,7 @@ def load_enhanced_mental_health_taxonomy():
             "coping", "prevention", "life-threatening", "overwhelming"
         ],
 
-        "emotional_support": [] # Default fallback category
+        "emotional_support": [
+            "help", "support", "understand", "listen", "care", "concern"
+        ],
     }
