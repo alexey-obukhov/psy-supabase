@@ -20,9 +20,9 @@ class DatabaseManager:
         
         # Special case for default schema
         if user_id == "default":
-            self.schema_name = "default"  # Don't prepend "user_" for default schema
+            self.schema_name = "default"
         else:
-            self.schema_name = f"user_{user_id}"
+            self.schema_name = f"{user_id}"
             
         self.supabase = create_client(self.supabase_url, self.supabase_key)
         
@@ -236,7 +236,7 @@ class DatabaseManager:
 
     def get_interaction_history(self, user_id: str):
         """ Get interaction history from the user's schema """
-        schema_name = f'user_{user_id}'
+        schema_name = f'{user_id}'
         logger.info(f"Retrieving interaction history for user: {user_id} with schema {schema_name}")
 
         # Call SQL function to retrieve interaction history
@@ -253,7 +253,7 @@ class DatabaseManager:
 
     def ensure_user_schema_view(self, user_id: str):
         """ Ensure the view for the user schema exists in the public schema """
-        schema_name = f'user_{user_id}'
+        schema_name = f'{user_id}'
         logger.info(f"Ensuring view exists for user: {user_id} with schema {schema_name}")
 
         # Call SQL function to ensure the view exists
