@@ -315,26 +315,6 @@ class PromptSelector:
                 else:
                     template_scores["Empathy and Validation"] = weight * 0.8
         
-        # Detect common typos and misspellings
-        typo_corrections = {
-            "girlfrien": "girlfriend",
-            "boyfried": "boyfriend",
-            "mariage": "marriage",
-            "divorc": "divorce",
-            "seperat": "separate",
-            "breakin up": "breaking up"
-        }
-        
-        for typo, correction in typo_corrections.items():
-            if typo in cleaned_question.lower():
-                # Apply the same logic but with the corrected term
-                logger.info(f"Detected possible typo: '{typo}', treating as '{correction}'")
-                
-                # Loop through template keywords to see if the correction matches
-                for template, keywords in keyword_mappings.items():
-                    if any(kw in correction for kw in keywords):
-                        template_scores[template] = template_scores.get(template, 0) + 2.0
-        
         # Check for depression mentioned alongside relationship terms - common combination
         if "depress" in cleaned_question.lower() and any(term in cleaned_question.lower() for term in 
                                                         ["broke up", "breakup", "ex ", "relationship"]):

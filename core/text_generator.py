@@ -7,6 +7,8 @@ import traceback
 from typing import Dict, List, Optional, Any
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.text_utils import clean_text
+import os
+from jinja2 import Environment, FileSystemLoader
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -108,11 +110,16 @@ class TextGenerator:
             # Tokenize the input with explicit padding and attention mask
             inputs = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True, 
                                     max_length=1024)
-            
+
             # Make sure inputs are on the correct device
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+            # Log token count to track context usage
+            token_count = inputs['input_ids'].shape[1]
+            logger.info(f"Tokenized input length: {token_count} tokens")
             
-            logger.debug(f"Input shape: {inputs['input_ids'].shape}")
+            if token_count >= 1000:  # Almost at limit
+                logger.warning(f"Input approaching token limit: {token_count}/1024")
             
             with torch.no_grad():
                 outputs = self.model.generate(
@@ -120,8 +127,8 @@ class TextGenerator:
                     attention_mask=inputs["attention_mask"],
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,
-                    top_p=top_p,  # Now using the parameter instead of a hardcoded value
-                    do_sample=False,
+                    top_p=top_p,
+                    do_sample=True,
                     pad_token_id=self.tokenizer.eos_token_id,
                     num_return_sequences=1
                 )
@@ -179,6 +186,23 @@ class TextGenerator:
         Removes artifacts while preserving therapeutic content.
         """
         import re
+
+        # Check for direct instruction patterns like "Your therapeutic response should be:"
+        instruction_prefixes = [
+            r"Your therapeutic response should be:\s*[\"'](.+)[\"']",
+            r"Your response should be:\s*[\"'](.+)[\"']",
+            r"Your response:\s*[\"'](.+)[\"']",
+            r"Respond with:\s*[\"'](.+)[\"']"
+        ]
+        
+        # Check each instruction prefix pattern
+        for pattern in instruction_prefixes:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                # Extract just the content inside the quotes
+                extracted_text = match.group(1).strip()
+                logger.warning(f"Found instruction pattern. Extracting actual response content.")
+                return extracted_text
 
         # First pass: Check for code exercise patterns and return emergency fallback if found
         code_exercise_patterns = [
@@ -384,7 +408,7 @@ class TextGenerator:
                 self._load_toxicity_model()
                 
             # Process the text
-            inputs = self.toxic_tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+            inputs = self.toxic_tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=1024)
             
             # Run inference without gradients
             with torch.no_grad():
@@ -412,7 +436,7 @@ class TextGenerator:
             self._load_model()  # Only load if not already loaded
             
         try:
-            inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512).to(self.device)
+            inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=1024).to(self.device)
             with torch.no_grad():
                 outputs = self.model(**inputs, output_hidden_states=True)
             
@@ -461,189 +485,373 @@ class TextGenerator:
             
         return response
 
-    def _get_emergency_fallback(self) -> str:
+    def _get_emergency_fallback(self, question=None) -> str:
         """
-        Emergency fallback response when all else fails.
-        This ensures users always get something helpful even in worst-case scenarios.
+        Emergency fallback response based on the question content.
+        This ensures users always get an appropriate response even when generation fails.
+        
+        Args:
+            question: The user's original question (if available)
         """
-        return ("I understand you're having difficulty with asking questions and feel stuck when you need to inquire about "
-            "something. Many people struggle with this too. It can feel uncomfortable to put ourselves out there or worry "
-            "about how our questions might be received. Would you like to explore what makes asking questions challenging "
-            "for you? I'm here to listen and support you.")
-
-    def generate_therapeutic_response(self, question: str, template_name: str, 
-                                enhanced_context: Dict[str, Any], 
-                                previous_conversation: Optional[List[Dict[str, str]]] = None) -> str:
-        try:
-            # Extract rich information from enhanced context
-            topic = enhanced_context.get("detected_topic", "emotional_support")
-            confidence = enhanced_context.get("confidence", 0.5)
-            urgency = enhanced_context.get("urgency_level", "normal")
-            emotional_tone = enhanced_context.get("emotional_tone", ["neutral"])
-            keywords_matched = enhanced_context.get("keywords_matched", [])
+        # If we have the original question, check for critical content
+        if question:
+            # Check for suicidal ideation and crisis keywords
+            crisis_keywords = [
+                "kill myself", "suicide", "suicidal", 
+                "don't want to live", "dont want to live", 
+                "end my life", "ending my life",
+                "life is over", "rather be dead", 
+                "want to die", "hurt myself", 
+                "harm myself", "self harm",
+                "no reason to live"
+            ]
             
-            # Log the exact template being used
-            if template_name not in self.prompt_templates:
-                logger.error(f"Template {template_name} not found in prompt_templates")
-                template_name = "Empathy and Validation"  # Default fallback
-                
-            template = self.prompt_templates[template_name]
-            
-            # Log the template and formatted prompt for debugging
-            logger.debug(f"Using template: {template_name}")
-            logger.debug(f"Raw template: {template[:100]}...")
-            
-            # Log detailed generation parameters
-            logger.info(f"Generating response for topic: {topic}, template: {template_name}, " 
-                    f"urgency: {urgency}, confidence: {confidence:.2f}")
-            
-            # Adapt template based on confidence level and urgency
-            if urgency == "high":
-                # Crisis-oriented template for urgent situations
-                modified_template = """
-    You are responding to someone who may be in emotional distress or crisis. They mentioned: "{question}"
-
-    Focus on safety, validation, and immediate support. Be calm, direct, and compassionate.
-    If there are any signs of self-harm or danger, emphasize getting immediate professional help.
-
-    Your response should be:
-    1. Validating their feelings without judgment
-    2. Offering immediate coping strategies if appropriate
-    3. Encouraging professional support
-    4. Warm, present, and human
-
-    Write ONLY your therapeutic response without preamble, instructions, or metadiscussion.
-    """
-            elif confidence < 0.4:
-                # More general approach for low confidence situations
-                modified_template = """
-    You are a compassionate therapist responding to someone who mentioned: "{question}"
-
-    Since I'm not entirely certain about their specific needs, focus on:
-    1. Validating their experience without making assumptions
-    2. Offering general emotional support
-    3. Asking thoughtful questions to understand more
-    4. Being warm and genuine
-
-    Topic area seems to be related to {topic}, but keep your approach flexible.
-
-    Write ONLY your therapeutic response without labels, instructions, or markers.
-    """
-            else:
-                # Detailed template for high-confidence situations
-                modified_template = """
-    You are a skilled therapist using {template_name} techniques to respond to: "{question}"
-
-    Therapeutic approach: Focus on {topic} with these emotional tones present: {emotional_tone}.
-    Context: The person appears to be discussing issues related to {keywords_context}.
-
-    Your response should:
-    1. Validate their emotions and experiences authentically
-    2. Use principles from {template_name} without naming the technique
-    3. Address the specific {topic} concerns they've expressed
-    4. Maintain a warm, supportive tone while being genuine
-
-    If previous conversation exists, maintain continuity with what was discussed before.
-
-    Write ONLY your therapeutic response without any meta-commentary, instructions, or markers.
-    """
-            
-            # Format keywords context for better prompt specificity
-            keywords_context = ", ".join(keywords_matched[:5]) if keywords_matched else topic
-            
-            # Format with the essential information
-            try:
-                prompt = modified_template.format(
-                    question=question, 
-                    topic=topic,
-                    template_name=template_name,
-                    urgency=urgency,
-                    emotional_tone=", ".join(emotional_tone),
-                    keywords_context=keywords_context
-                )
-                logger.debug(f"Formatted prompt: {prompt[:100]}...")
-            except KeyError as e:
-                logger.error(f"Error formatting prompt: {e}")
-                # Use emergency template
-                prompt = f"You are a therapist. The user said: {question}. Respond with empathy."
-            
-            # Add relevant documents if available
-            relevant_docs = enhanced_context.get("relevant_documents", [])
-            if relevant_docs:
-                docs_summary = "\n\nRelevant information:\n"
-                for i, doc in enumerate(relevant_docs[:3]):
-                    # Limit each document to 300 characters to avoid overwhelming the context
-                    docs_summary += f"- {doc[:300]}{'...' if len(doc) > 300 else ''}\n"
-                prompt += docs_summary
-            
-            # Add conversation history if available in a structured format
-            if previous_conversation and len(previous_conversation) > 0:
-                # Log the exchanges we're adding for debug purposes
-                for exchange in previous_conversation[-2:]:
-                    logger.info(f"Including conversation context: {exchange.get('user_message', '')[:50]}...")
-                    
-                # Create context string using existing data format
-                conversation_context = "Previous conversation context:\n"
-                for exchange in previous_conversation[-2:]:
-                    if 'user_message' in exchange and 'ai_message' in exchange:
-                        conversation_context += f"Person: {exchange.get('user_message', '')}\n"
-                        conversation_context += f"You: {exchange.get('ai_message', '')}\n"
-                
-                # Add to prompt
-                prompt = conversation_context + "\n\nCurrent query: " + question + "\n\n" + prompt
-            
-            # Special handling for relationship breakup - ensure empathetic approach
-            if "broke up" in question.lower() or "breakup" in question.lower() or "ex " in question.lower():
-                if "depress" in question.lower() or "sad" in question.lower():
-                    # Add specific guidance for breakup+depression scenario
-                    breakup_guidance = "\n\nImportant context: The person is dealing with both a breakup and depression. " + \
-                                    "Make sure to validate their grief process and feelings of loss. Acknowledge " + \
-                                    "that the relationship ending can both cause and worsen depression. " + \
-                                    "Focus on empathy first, avoid clichés like 'plenty of fish in the sea'."
-                    prompt += breakup_guidance
-            
-            # Generate response with carefully tuned parameters
-            response = self.generate_text(
-                prompt, 
-                max_new_tokens=300,
-                temperature=0.75 if confidence > 0.6 else 0.7,  # Slightly higher temp for high confidence
-                top_p=0.92
+            # Check for breakup with crisis
+            breakup_crisis = any(kw in question.lower() for kw in crisis_keywords) and any(
+                term in question.lower() for term in ["broke up", "breakup", "left me", "ex", "girlfriend", "boyfriend"]
             )
             
-            # Validate the response isn't empty or default error text
-            if not response or len(response.strip()) < 5:
-                logger.error("Empty response received from model")
-                return self._get_emergency_fallback()
+            # Crisis with suicidal thoughts
+            if any(kw in question.lower() for kw in crisis_keywords):
+                if breakup_crisis:
+                    return (
+                        "I'm deeply concerned about what you're sharing regarding your breakup and your thoughts about not wanting to live. "
+                        "This pain is real, but it's temporary, even though it doesn't feel that way right now. "
+                        "\n\n"
+                        "Please reach out for immediate support:\n"
+                        "• Call the 988 Suicide and Crisis Lifeline (US): Call or text 988\n"
+                        "• Text HOME to 741741 to reach the Crisis Text Line\n"
+                        "• Call emergency services at 911 (US) or your local emergency number\n"
+                        "\n"
+                        "These trained professionals can help you through this difficult time. "
+                        "You deserve support, and help is available 24/7. Would you consider reaching out to one of these resources right now?"
+                    )
+                else:
+                    return (
+                        "I'm very concerned about what you've shared. Your life matters, and the pain you're experiencing right now can be addressed with the right support. "
+                        "\n\n"
+                        "Please reach out for immediate help:\n"
+                        "• Call or text 988 to reach the Suicide and Crisis Lifeline (US)\n"
+                        "• Text HOME to 741741 for the Crisis Text Line\n"
+                        "• Call emergency services (911 in US) or go to your nearest emergency room\n"
+                        "\n"
+                        "Trained professionals are available 24/7 who can help you through this difficult time. "
+                        "Would you be willing to contact one of these resources right now? You don't have to face this alone."
+                    )
             
-            # Clean with specialized therapeutic cleaning method
-            cleaned_response = self._clean_therapeutic_response(response)
+            # Handle relationship breakups (non-crisis)
+            elif any(term in question.lower() for term in ["broke up", "breakup", "left me", "ex", "girlfriend", "boyfriend"]):
+                return (
+                    "I'm sorry to hear about your breakup. Ending relationships can bring intense emotions - sadness, anger, confusion, and grief. "
+                    "These feelings are a natural response to loss, and it's important to acknowledge them. "
+                    "While it might not feel like it now, these feelings will gradually change over time. "
+                    "\n\n"
+                    "Would you like to share more about what you're going through? I'm here to listen and support you through this difficult time."
+                )
             
-            # Extra check for remaining template instructions or formatting issues
-            if "**depression**:" in cleaned_response.lower() or "since the topic is" in cleaned_response.lower():
-                logger.warning("Detected template echoing, regenerating response")
-                # More direct prompt for regeneration
-                emergency_prompt = f"As a therapist, respond compassionately to: '{question}' " + \
-                                f"The person is dealing with {topic}. Be warm and supportive."
-                response = self.generate_text(emergency_prompt, max_new_tokens=250, temperature=0.7)
-                cleaned_response = self._clean_therapeutic_response(response)
+            # Handle depression/sadness
+            elif any(term in question.lower() for term in ["depress", "sad", "down", "hopeless", "empty"]):
+                return (
+                    "I can hear that you're feeling down right now. Depression and sadness can feel overwhelming and make everything seem more difficult. "
+                    "Your feelings are valid, and many people experience similar struggles. "
+                    "\n\n"
+                    "Would you like to talk more about what you've been experiencing? I'm here to listen without judgment, and together we can explore ways to help you feel better."
+                )
+        
+        # Default supportive response if we can't determine the content or don't have the original question
+        return (
+            "I'm here to support you. It sounds like you might be going through a challenging time, and I want you to know that "
+            "your feelings are valid. Would you feel comfortable sharing more about what's on your mind? I'm here to listen and help."
+        )
+
+    def generate_therapeutic_response(self, question: str, template_name: str, 
+                        enhanced_context: Dict[str, Any], 
+                        previous_conversation: Optional[List[Dict[str, str]]] = None) -> str:
+        """Generate a therapeutic response using the appropriate template."""
+        try:
+            # Load the template
+            template = self._load_template("therapeutic_response")
             
-            # Final safety check for hallucinated dialogues
-            if "Person:" in cleaned_response or "Client:" in cleaned_response:
-                cleaned_response = re.sub(r"(Person|Client|User):.+?(?=\n|$)", "", cleaned_response)
-                cleaned_response = cleaned_response.strip()
+            # Fix conversation history formatting if not already in enhanced_context
+            if 'has_conversation' not in enhanced_context or not enhanced_context.get('has_conversation'):
+                # Format previous_conversation properly
+                if previous_conversation and len(previous_conversation) > 0:
+                    # Format the previous conversation for the template
+                    MAX_CONVERSATION_EXCHANGES = 2  # Only keep most recent exchanges
+                    recent_exchanges = previous_conversation[-MAX_CONVERSATION_EXCHANGES:]
+                    
+                    conversation_parts = []
+                    for exchange in recent_exchanges:
+                        user_msg = exchange.get('questionText', exchange.get('question', ''))
+                        ai_msg = exchange.get('answerText', exchange.get('answer', ''))
+                        if user_msg and ai_msg:
+                            # Truncate if too long
+                            user_short = user_msg[:100] + ("..." if len(user_msg) > 100 else "")
+                            ai_short = ai_msg[:150] + ("..." if len(ai_msg) > 150 else "")
+                            conversation_parts.append(f"User: {user_short}")
+                            conversation_parts.append(f"Assistant: {ai_short}")
+                    
+                    conversation_context = "\n".join(conversation_parts)
+                    
+                    # Update the enhanced_context with this conversation
+                    enhanced_context['conversation_context'] = conversation_context
+                    enhanced_context['has_conversation'] = bool(conversation_parts)
+                    
+                    logger.info(f"Added {len(recent_exchanges)} conversation exchanges from previous_conversation parameter")
             
-            # Final verification of response quality
-            if len(cleaned_response.split()) < 15 or "I apologize" in cleaned_response:
-                logger.warning("Low quality response detected, using fallback")
-                cleaned_response = self._get_targeted_fallback_response(question)
+            # Enforce hard limits on context size for template
+            MAX_TEMPLATE_CONTEXT = 600
+            MAX_CONVERSATION_CONTEXT = 300
             
-            # Final safety validation before returning to user
-            validated_response = self._final_response_validation(cleaned_response)
+            if enhanced_context.get('knowledge_context', '') and len(enhanced_context['knowledge_context']) > MAX_TEMPLATE_CONTEXT:
+                enhanced_context['knowledge_context'] = enhanced_context['knowledge_context'][:MAX_TEMPLATE_CONTEXT] + "..."
+                
+            if enhanced_context.get('conversation_context', '') and len(enhanced_context['conversation_context']) > MAX_CONVERSATION_CONTEXT:
+                enhanced_context['conversation_context'] = enhanced_context['conversation_context'][:MAX_CONVERSATION_CONTEXT] + "..."
             
-            logger.debug(f"Generated response length: {len(validated_response.split())} words")
-            return validated_response
+            # Prepare the template variables
+            template_vars = {
+                'user_question': question,
+                'enhanced_context': enhanced_context
+            }
+            
+            # Render the template
+            prompt = template.render(**template_vars)
+            
+            # Log prompt length
+            prompt_length = len(prompt)
+            logger.info(f"Template rendered prompt length: {prompt_length} chars")
+            
+            # Enforce absolute maximum prompt length
+            MAX_PROMPT_LENGTH = 1000
+            if prompt_length > MAX_PROMPT_LENGTH:
+                logger.warning(f"Prompt exceeds {MAX_PROMPT_LENGTH} chars, truncating")
+                # Find a good breakpoint to truncate
+                end_idx = prompt.rfind('\n\n', 0, MAX_PROMPT_LENGTH)
+                if end_idx == -1:
+                    end_idx = MAX_PROMPT_LENGTH
+                    
+                prompt = prompt[:end_idx] + "\n\nIMPORTANT: Provide a compassionate response to the user's current question."
+            
+            # Generate response with enhanced monitoring
+            logger.info(f"Generating response for prompt with {prompt_length} characters")
+            
+            # Generate response
+            response = self.generate_text(
+                prompt,
+                max_new_tokens=350,  # Standardized token limit
+                temperature=0.7
+            )
+            
+            # Clean the response
+            cleaned_response = self._clean_response(response, question)
+            
+            return cleaned_response
+        except Exception as e:
+            logger.error(f"Error generating therapeutic response: {e}")
+            return self._get_fallback_response()
+
+    def _get_breakup_recovery_steps(self) -> str:
+        """Provides concrete steps for breakup recovery."""
+        return (
+            "I understand how difficult breakups can be. Here are some concrete steps that might help you begin healing:\n\n"
+            
+            "1. Allow yourself to feel: Give yourself permission to experience all your emotions without judgment. Crying, journaling, or talking with trusted friends can help process these feelings.\n\n"
+            
+            "2. Establish healthy boundaries: Consider limiting contact with your ex for a while to give yourself space to heal. This might include muting social media or asking mutual friends not to share updates.\n\n"
+            
+            "3. Create a self-care routine: Focus on basic needs like regular sleep, nutritious meals, and physical movement. Even light exercise can boost your mood through endorphin release.\n\n"
+            
+            "4. Reconnect with yourself: Breakups can be an opportunity to rediscover parts of yourself. Try revisiting old hobbies or exploring new interests that bring you joy.\n\n"
+            
+            "5. Seek support: Connect with friends, family, or consider talking with a therapist who can provide professional guidance tailored to your situation.\n\n"
+            
+            "Remember that healing isn't linear - some days will be better than others. What aspects of these suggestions feel most helpful for your situation right now?"
+        )
+
+    def _get_crisis_response(self, question: str = "") -> str:
+        """
+        Returns a crisis response when a true emergency is detected.
+        We keep this hardcoded for safety.
+        """
+        # This is one of the few places where hardcoded responses make sense
+        return (
+            "I'm concerned about what you've shared. If you're having thoughts of harming yourself, "
+            "please reach out for immediate support from trained professionals who can help:\n\n"
+            "• Call or text 988 to reach the Suicide and Crisis Lifeline (US)\n"
+            "• Text HOME to 741741 for the Crisis Text Line\n"
+            "• Call emergency services (911 in US) or go to your nearest emergency room\n\n"
+            "Your life matters, and these difficult feelings can improve with proper support. "
+            "Would you be willing to reach out to one of these resources right now?"
+        )
+
+    def _get_fallback_response(self) -> str:
+        """
+        A simple general fallback when we can't generate a proper response.
+        """
+        import random
+        
+        # More natural variations to avoid repetition
+        fallbacks = [
+            "I'm here to listen and support you. Could you tell me more about what's on your mind?",
+            "Thank you for sharing that with me. I'd like to understand more about what you're experiencing.",
+            "I appreciate you opening up. Would it help to explore these feelings a bit more?",
+            "Your experiences and feelings are important. I'm here to listen if you'd like to share more.",
+            "I'd like to understand better what you're going through. Would you feel comfortable elaborating?"
+        ]
+        return random.choice(fallbacks)
+
+    def _is_crisis_situation(self, text: str) -> bool:
+        """
+        Simple check to detect if a user message contains suicidal or serious crisis content.
+        
+        Args:
+            text: The user's message
+            
+        Returns:
+            bool: True if crisis is detected, False otherwise
+        """
+        # Core crisis keywords - kept deliberately focused
+        crisis_keywords = [
+            "kill myself", "suicide", "suicidal", 
+            "don't want to live", "dont want to live", 
+            "end my life", "ending my life",
+            "life is over", "rather be dead", 
+            "want to die", "hurt myself", 
+            "harm myself"
+        ]
+        
+        # Simple check if any keyword appears in the user's message
+        return any(keyword in text.lower() for keyword in crisis_keywords)
+
+    def _final_validation(self, response, question=None):
+        """
+        A last-chance validation to catch any instructions or inappropriate content
+        before it reaches the user.
+        """
+        # Check for instructional patterns that should NEVER be sent to users
+        instruction_indicators = [
+            "remember that", "the key is to", "your goal is to", 
+            "make sure to", "don't forget to", "when responding", 
+            "your task is", "important to note", "the approach here"
+        ]
+        
+        if any(indicator in response.lower() for indicator in instruction_indicators):
+            logger.critical("INSTRUCTION LEAK DETECTED in final response!")
+            if question and any(kw in question.lower() for kw in ["suicide", "kill myself", "dont want to live"]):
+                return self._get_crisis_response(question)
+            return self._get_fallback_response()
+        
+        # If no instructions found, return the original
+        return response
+
+    def _clean_response(self, response: str, question: str = None) -> str:
+        """
+        Less aggressive cleaning method to preserve valid therapeutic responses.
+        """
+        import re
+        try:
+            # DEBUGGING - log raw response to understand what's being generated
+            logger.debug(f"Raw response before cleaning: {response[:100]}...")
+            
+            # STEP 1: CHECK FOR SERIOUS ISSUES REQUIRING IMMEDIATE FALLBACK
+            critical_patterns = [
+                "# YOUR CODE HERE", "# SOLUTION:", "```python", "```javascript", "def ", "class ", "function "
+            ]
+            
+            if any(pattern in response for pattern in critical_patterns):
+                logger.critical(f"Critical pattern detected in response")
+                return self._get_emergency_fallback(question)
+                
+            # STEP 1.5: CHECK FOR EDUCATIONAL/LECTURE CONTENT LEAKAGE
+            educational_markers = [
+                "Title:", "Chapter:", "Section:", "Introduction:", "Welcome to",
+                "In this section", "we will explore", "we will delve into",
+                "Let's embark on", "course", "module"
+            ]
+
+            if any(marker in response for marker in educational_markers):
+                logger.critical("EDUCATIONAL TEMPLATE DETECTED")
+                return self._get_targeted_fallback_response(question if question else "")
+            
+            # STEP 2: EXTRACT DIRECT RESPONSES IF QUOTED
+            instruction_prefixes = [
+                r"Your therapeutic response should be:\s*[\"'](.+)[\"']",
+                r"Your response should be:\s*[\"'](.+)[\"']",
+                r"Your response:\s*[\"'](.+)[\"']",
+                r"Respond with:\s*[\"'](.+)[\"']",
+                r"Here's a helpful response:\s*[\"']?(.+?)[\"']?(?=\n\n|$)"
+            ]
+            
+            for pattern in instruction_prefixes:
+                match = re.search(pattern, response, re.DOTALL)
+                if match:
+                    extracted_text = match.group(1).strip()
+                    logger.info(f"Found direct instruction pattern, extracting content")
+                    response = extracted_text
+                    break
+            
+            # STEP 3: REMOVE COMMON INSTRUCTION SECTIONS - LESS AGGRESSIVE
+            sections_to_remove = [
+                r"Instructions:.*?(?=\n\n|$)",
+                r"USER QUESTION:.*?(?=\n|$)",
+                r"THERAPEUTIC APPROACH:.*?(?=\n|$)",
+                r"RESPONSE \(keep.*?(?=\n|$)",
+                r"PREVIOUS CONVERSATION:.*?(?=\n\n|$)",
+                r"RELEVANT KNOWLEDGE:.*?(?=\n\n|$)",
+            ]
+            
+            for pattern in sections_to_remove:
+                response = re.sub(pattern, '', response, flags=re.DOTALL|re.IGNORECASE)
+            
+            # STEP 4: HANDLE DIALOGUE FORMAT - EXTRACT THERAPEUTIC CONTENT
+            dialogue_patterns = [
+                r'(?:Therapist|Assistant|Counselor): "?([^"]+)"?', 
+            ]
+            
+            for pattern in dialogue_patterns:
+                therapist_responses = re.findall(pattern, response, re.IGNORECASE)
+                if therapist_responses and len(therapist_responses[-1]) > 30:
+                    response = therapist_responses[-1].strip()
+                    logger.info(f"Extracted therapist response from dialogue")
+                    break
+            
+            # STEP 5: CLEAN REMAINING STRUCTURAL ELEMENTS
+            # Remove role references but be less aggressive
+            response = re.sub(r"^As (?:a|your) therapist,?\s+", "", response, flags=re.IGNORECASE)
+            response = re.sub(r"^In my role as (?:a|your) therapist,?\s+", "", response, flags=re.IGNORECASE)
+            
+            # CRITICAL FIX: Less aggressive cleaning for numbered lists and bullet points
+            # We want to keep these helpful structures
+            
+            # Remove leading quote marks
+            response = response.strip('"\'')
+            
+            # STEP 6: FINAL CHECKS
+            # If we still have a valid substantial response, use it
+            if len(response.strip()) >= 30:
+                logger.info("Generated valid response with appropriate length")
+                return response.strip()
+            
+            # If response is too short, use targeted fallback
+            logger.warning(f"Response too short after cleaning: {len(response)} chars")
+            return self._get_targeted_fallback_response(question if question else "")
             
         except Exception as e:
-            logger.error(f"Error generating therapeutic response: {e}", exc_info=True)
-            # Provide a thoughtful fallback based on the topic if possible
-            return self._get_emergency_fallback()
+            logger.error(f"Error cleaning response: {e}")
+            return self._get_fallback_response()
+
+    def _load_template(self, template_name):
+        """Load a template from the templates directory."""
+        try:
+            # Set up Jinja environment
+            template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+            env = Environment(loader=FileSystemLoader(template_dir))
+            
+            # Load the specified template
+            template = env.get_template(f"{template_name}.j2")
+            return template
+        except Exception as e:
+            logger.error(f"Error loading template {template_name}: {e}")
+            # Return a simple default template as fallback
+            return "You are a compassionate AI therapist. The user said: '{{user_question}}'. Provide a supportive response."

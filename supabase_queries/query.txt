@@ -7,8 +7,27 @@ DROP FUNCTION IF EXISTS create_user_schema_and_tables(text);
 DROP FUNCTION IF EXISTS get_knowledge_base_documents(text);
 DROP FUNCTION IF EXISTS get_topic_interactions(text, text, integer);
 DROP FUNCTION IF EXISTS add_interaction(text, text, text, text, jsonb);
-DROP FUNCTION IF EXISTS find_similar_documents(text, vector(1536), integer);
+DROP FUNCTION IF EXISTS find_similar_documents(text, text, integer);
 DROP FUNCTION IF EXISTS add_vector_index_to_knowledge_base(text);
+DROP FUNCTION IF EXISTS create_concept_connections_table(text);
+DROP FUNCTION IF EXISTS connect_psychological_concepts(text, integer, integer, text, float);
+DROP FUNCTION IF EXISTS get_psychological_connections(text, integer, text);
+DROP FUNCTION IF EXISTS mark_therapeutic_insight(text, integer, text);
+DROP FUNCTION IF EXISTS find_psychological_memories(text, text, integer, float);
+DROP FUNCTION IF EXISTS analyze_theme_clusters(text, float, integer);
+DROP FUNCTION IF EXISTS analyze_emotional_vector_trajectory(text);
+DROP FUNCTION IF EXISTS find_concept_connections(text, integer, float);
+DROP FUNCTION IF EXISTS find_cross_session_patterns(text, text[]);
+DROP FUNCTION IF EXISTS ensure_vector_indexes(text);
+DROP FUNCTION IF EXISTS find_psychological_patterns(text, integer);
+DROP FUNCTION IF EXISTS add_embedding_to_interactions(text);
+DROP FUNCTION IF EXISTS add_embedding_to_interaction(text, integer, text);
+DROP FUNCTION IF EXISTS get_interactions_without_embeddings(text, integer);
+DROP FUNCTION IF EXISTS update_table_statistics(text);
+DROP FUNCTION IF EXISTS find_similar_interactions(text, text, int);
+DROP FUNCTION IF EXISTS analyze_conversation_themes(text, int);
+DROP FUNCTION IF EXISTS analyze_emotional_trajectory(text, int);
+DROP FUNCTION IF EXISTS initialize_knowledge_base(text, jsonb);
 
 -- Enable the vector extension
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -80,8 +99,7 @@ BEGIN
         CREATE TABLE IF NOT EXISTS "%s".knowledge_base (
             id SERIAL PRIMARY KEY,
             content TEXT,
-            embedding vector(1536)
-            embedding vector(1536)
+            embedding vector(2048)
         );', schema_name);
         
     -- Simple index creation with error handling
@@ -128,7 +146,7 @@ CREATE OR REPLACE FUNCTION get_knowledge_base_documents(schema_name TEXT)
 RETURNS TABLE (
     id INTEGER,
     content TEXT,
-    embedding vector(1536)
+    embedding vector(2048)
 ) AS $$
 BEGIN
     RETURN QUERY EXECUTE format('
@@ -182,27 +200,38 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to find similar documents using vector similarity
 CREATE OR REPLACE FUNCTION find_similar_documents(
     p_schema_name TEXT,
-    p_embedding vector(1536),
-    p_limit INTEGER DEFAULT 5
+    p_embedding TEXT,
+    p_limit INT DEFAULT 5
 )
 RETURNS TABLE (
-    id INTEGER,
+    id BIGINT,
     content TEXT,
+    embedding TEXT,
     similarity FLOAT
-) AS $$
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    query TEXT;
 BEGIN
-    RETURN QUERY EXECUTE format('
-        SELECT id, content, (embedding <=> $1) AS similarity
-        FROM "%s".knowledge_base
-        ORDER BY similarity ASC
-        LIMIT $2;
-    ', p_schema_name)
-    USING p_embedding, p_limit;
+    -- Convert the query string to dynamic SQL to avoid schema injection issues
+    query := format('
+        SELECT 
+            id, 
+            content, 
+            embedding::text, 
+            1 - (embedding <=> %s::vector) as similarity
+        FROM %I.knowledge_base
+        ORDER BY similarity DESC
+        LIMIT %s
+    ', p_embedding, p_schema_name, p_limit);
+
+    RETURN QUERY EXECUTE query;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Function to add vector index to an existing knowledge_base table
 CREATE OR REPLACE FUNCTION add_vector_index_to_knowledge_base(schema_name TEXT)
@@ -222,5 +251,783 @@ BEGIN
         RAISE NOTICE 'Failed to create index: %', SQLERRM;
         RETURN FALSE;
     END;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to create the concept_connections table
+CREATE OR REPLACE FUNCTION create_concept_connections_table(schema_name TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Create the connections table if it doesn't exist
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS "%s".concept_connections (
+            id SERIAL PRIMARY KEY,
+            source_id INTEGER NOT NULL,
+            target_id INTEGER NOT NULL,
+            relationship_type TEXT NOT NULL,
+            strength FLOAT NOT NULL DEFAULT 1.0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(source_id, target_id)
+        );', schema_name);
+    
+    RETURN TRUE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Failed to create concept_connections table: %', SQLERRM;
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to connect psychological concepts
+CREATE OR REPLACE FUNCTION connect_psychological_concepts(
+    p_schema_name TEXT,
+    p_source_id INTEGER,
+    p_target_id INTEGER,
+    p_relationship_type TEXT DEFAULT 'related',
+    p_strength FLOAT DEFAULT 1.0
+)
+RETURNS INTEGER AS $$
+DECLARE
+    new_id INTEGER;
+BEGIN
+    -- Ensure the table exists
+    PERFORM create_concept_connections_table(p_schema_name);
+    
+    -- Insert the new connection
+    EXECUTE format('
+        INSERT INTO "%s".concept_connections 
+        (source_id, target_id, relationship_type, strength)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (source_id, target_id) 
+        DO UPDATE SET 
+            relationship_type = $3,
+            strength = $4
+        RETURNING id;
+    ', p_schema_name)
+    INTO new_id
+    USING p_source_id, p_target_id, p_relationship_type, p_strength;
+    
+    RETURN new_id;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error connecting concepts: %', SQLERRM;
+    RETURN -1;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get psychological connections
+CREATE OR REPLACE FUNCTION get_psychological_connections(
+    p_schema_name TEXT,
+    p_concept_id INTEGER,
+    p_relationship_type TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+    id INTEGER,
+    source_id INTEGER,
+    target_id INTEGER,
+    relationship_type TEXT,
+    strength FLOAT,
+    created_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    IF p_relationship_type IS NULL THEN
+        RETURN QUERY EXECUTE format('
+            SELECT id, source_id, target_id, relationship_type, strength, created_at
+            FROM "%s".concept_connections
+            WHERE source_id = $1 OR target_id = $1
+            ORDER BY strength DESC;
+        ', p_schema_name)
+        USING p_concept_id;
+    ELSE
+        RETURN QUERY EXECUTE format('
+            SELECT id, source_id, target_id, relationship_type, strength, created_at
+            FROM "%s".concept_connections
+            WHERE (source_id = $1 OR target_id = $1)
+            AND relationship_type = $2
+            ORDER BY strength DESC;
+        ', p_schema_name)
+        USING p_concept_id, p_relationship_type;
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to mark therapeutic insight
+CREATE OR REPLACE FUNCTION mark_therapeutic_insight(
+    p_schema_name TEXT,
+    p_interaction_id INTEGER,
+    p_insight_level TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+    EXECUTE format('
+        UPDATE "%s".interactions 
+        SET metadata = jsonb_set(
+            CASE 
+                WHEN metadata IS NULL THEN ''{}''::jsonb 
+                WHEN metadata::text = '''' THEN ''{}''::jsonb
+                ELSE metadata::jsonb 
+            END, 
+            ''{"insight_level"}'', 
+            ''"%s"''::jsonb
+        )
+        WHERE interactionid = %s;
+    ', p_schema_name, p_insight_level, p_interaction_id);
+    
+    RETURN TRUE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Failed to mark therapeutic insight: %', SQLERRM;
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to efficiently find psychologically similar interactions with pgvector
+CREATE OR REPLACE FUNCTION find_psychological_memories(
+    p_schema_name TEXT,
+    p_embedding TEXT,
+    p_limit INTEGER DEFAULT 5,
+    p_threshold FLOAT DEFAULT 0.6
+)
+RETURNS TABLE (
+    interactionid INTEGER,
+    question TEXT,
+    answer TEXT,
+    context TEXT,
+    metadata JSONB,
+    similarity FLOAT
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        SELECT 
+            interactionid, 
+            question, 
+            answer, 
+            context, 
+            metadata::jsonb, 
+            (1 - (embedding <=> %L::vector)) AS similarity
+        FROM "%s".interactions
+        WHERE embedding IS NOT NULL 
+          AND (1 - (embedding <=> %L::vector)) > %s
+        ORDER BY similarity DESC
+        LIMIT %s;
+    ', p_embedding, p_schema_name, p_embedding, p_threshold, p_limit);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error in find_psychological_memories: %', SQLERRM;
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to analyze psychological theme clusters in vector space
+CREATE OR REPLACE FUNCTION analyze_theme_clusters(
+    p_schema_name TEXT,
+    p_min_similarity FLOAT DEFAULT 0.7,
+    p_max_clusters INTEGER DEFAULT 5
+)
+RETURNS TABLE (
+    cluster_id INTEGER,
+    dominant_theme TEXT,
+    avg_similarity FLOAT,
+    sample_questions TEXT[]
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        WITH psychological_data AS (
+            SELECT 
+                interactionid,
+                question,
+                embedding,
+                metadata->''topic'' AS theme
+            FROM "%s".interactions
+            WHERE embedding IS NOT NULL
+        ),
+        -- Calculate similarity matrix between interactions
+        similarity_matrix AS (
+            SELECT 
+                a.interactionid as id1,
+                b.interactionid as id2,
+                a.theme,
+                (1 - (a.embedding <=> b.embedding)) AS similarity
+            FROM psychological_data a
+            JOIN psychological_data b ON a.interactionid < b.interactionid
+            WHERE (1 - (a.embedding <=> b.embedding)) > %s
+        ),
+        -- Group by theme and calculate average similarity
+        theme_clusters AS (
+            SELECT 
+                theme,
+                AVG(similarity) AS avg_similarity,
+                COUNT(*) AS cluster_size,
+                ARRAY_AGG(DISTINCT pd.question) FILTER (WHERE pd.question IS NOT NULL) AS sample_questions
+            FROM similarity_matrix sm
+            JOIN psychological_data pd ON sm.id1 = pd.interactionid
+            GROUP BY theme
+            HAVING COUNT(*) > 1
+            ORDER BY AVG(similarity) DESC
+            LIMIT %s
+        )
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY avg_similarity DESC)::INTEGER AS cluster_id,
+            theme::TEXT,
+            avg_similarity,
+            sample_questions
+        FROM theme_clusters
+        WHERE theme IS NOT NULL
+    ', p_schema_name, p_min_similarity, p_max_clusters);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error in analyze_theme_clusters: %', SQLERRM;
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to analyze emotional trajectory in vector space
+CREATE OR REPLACE FUNCTION analyze_emotional_vector_trajectory(
+    p_schema_name TEXT
+)
+RETURNS TABLE (
+    segment_id INTEGER,
+    start_state TEXT,
+    end_state TEXT,
+    vector_movement FLOAT,
+    similarity_to_progress FLOAT
+) AS $$
+BEGIN
+    -- Create a positive emotional progress vector (this is a simplification)
+    EXECUTE format('
+        WITH emotional_states AS (
+            SELECT 
+                interactionid,
+                metadata->''emotional_state'' AS state,
+                (metadata->''emotional_intensity'')::FLOAT AS intensity,
+                embedding,
+                created_at
+            FROM "%s".interactions
+            WHERE 
+                metadata->''emotional_state'' IS NOT NULL AND
+                embedding IS NOT NULL
+            ORDER BY created_at
+        ),
+        -- Create segments between consecutive emotional states
+        emotional_segments AS (
+            SELECT 
+                ROW_NUMBER() OVER () AS segment_id,
+                curr.state AS start_state,
+                lead(curr.state) OVER (ORDER BY curr.created_at) AS end_state,
+                curr.intensity AS start_intensity,
+                lead(curr.intensity) OVER (ORDER BY curr.created_at) AS end_intensity,
+                -- Vector distance between consecutive states
+                1 - (curr.embedding <=> lead(curr.embedding) OVER (ORDER BY curr.created_at)) AS vector_movement,
+                -- This is a proxy for "therapeutic progress" - distance from negative to positive
+                CASE 
+                    WHEN curr.intensity > lead(curr.intensity) OVER (ORDER BY curr.created_at) THEN 1.0
+                    ELSE 0.5
+                END AS similarity_to_progress
+            FROM emotional_states curr
+        )
+        SELECT 
+            segment_id,
+            start_state::TEXT,
+            end_state::TEXT,
+            vector_movement,
+            similarity_to_progress
+        FROM emotional_segments
+        WHERE end_state IS NOT NULL
+        ORDER BY segment_id;
+    ', p_schema_name) INTO segment_id, start_state, end_state, vector_movement, similarity_to_progress;
+    
+    RETURN NEXT;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error in analyze_emotional_vector_trajectory: %', SQLERRM;
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to find conceptual connections between different psychological concepts
+CREATE OR REPLACE FUNCTION find_concept_connections(
+    p_schema_name TEXT,
+    p_concept_id INTEGER,
+    p_threshold FLOAT DEFAULT 0.7
+)
+RETURNS TABLE (
+    source_id INTEGER,
+    target_id INTEGER,
+    semantic_similarity FLOAT,
+    relationship_strength FLOAT
+) AS $$
+BEGIN
+    -- First verify the concept exists
+    PERFORM FROM information_schema.tables 
+    WHERE table_schema = p_schema_name
+    AND table_name = 'knowledge_base';
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Knowledge base table not found in schema %', p_schema_name;
+    END IF;
+
+    RETURN QUERY EXECUTE format('
+        WITH source_embedding AS (
+            SELECT id, embedding
+            FROM "%s".knowledge_base
+            WHERE id = %L
+        ),
+        -- Find semantically related concepts
+        related_concepts AS (
+            SELECT 
+                %L AS source_id,
+                target.id AS target_id,
+                (1 - (source.embedding <=> target.embedding)) AS semantic_similarity
+            FROM source_embedding source
+            CROSS JOIN "%s".knowledge_base target
+            WHERE target.id != %L
+            AND (1 - (source.embedding <=> target.embedding)) > %L
+        ),
+        -- Check for explicit connections
+        explicit_connections AS (
+            SELECT 
+                source_id,
+                target_id,
+                strength AS relationship_strength
+            FROM "%s".concept_connections
+            WHERE source_id = %L OR target_id = %L
+        )
+        -- Combine semantic and explicit connections
+        SELECT 
+            rc.source_id,
+            rc.target_id,
+            rc.semantic_similarity,
+            COALESCE(ec.relationship_strength, 0) AS relationship_strength
+        FROM related_concepts rc
+        LEFT JOIN explicit_connections ec 
+            ON (rc.source_id = ec.source_id AND rc.target_id = ec.target_id)
+            OR (rc.source_id = ec.target_id AND rc.target_id = ec.source_id)
+        ORDER BY 
+            -- Prioritize concepts with both semantic similarity and explicit connections
+            (rc.semantic_similarity + COALESCE(ec.relationship_strength, 0)) DESC;
+    ', p_schema_name, p_concept_id, p_concept_id, p_schema_name, p_concept_id, p_threshold, p_schema_name, p_concept_id, p_concept_id);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error in find_concept_connections: %', SQLERRM;
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to find psychological patterns across sessions
+CREATE OR REPLACE FUNCTION find_cross_session_patterns(
+    p_user_schema TEXT,
+    p_session_ids TEXT[]
+)
+RETURNS TABLE (
+    pattern_topic TEXT,
+    session_occurrences INTEGER,
+    avg_embedding_similarity FLOAT,
+    example_questions TEXT[]
+) AS $$
+DECLARE
+    session_id TEXT;
+    temp_result RECORD;
+BEGIN
+    -- Create a temporary table to collect data across sessions
+    CREATE TEMP TABLE session_data (
+        topic TEXT,
+        question TEXT,
+        embedding_json TEXT,
+        session_id TEXT
+    ) ON COMMIT DROP;
+    
+    -- Collect data from all specified sessions
+    FOREACH session_id IN ARRAY p_session_ids
+    LOOP
+        BEGIN
+            -- Get interaction data from this session
+            EXECUTE format('
+                INSERT INTO session_data
+                SELECT 
+                    metadata->''topic'' AS topic,
+                    question,
+                    embedding::text AS embedding_json,
+                    %L AS session_id
+                FROM "%s".interactions
+                WHERE 
+                    metadata->''topic'' IS NOT NULL AND
+                    embedding IS NOT NULL;
+            ', session_id, session_id);
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Error processing session %: %', session_id, SQLERRM;
+            CONTINUE; -- Skip to next session
+        END;
+    END LOOP;
+    
+    -- Find patterns across sessions
+    RETURN QUERY
+    WITH topic_sessions AS (
+        SELECT 
+            topic,
+            COUNT(DISTINCT session_id) AS session_count,
+            ARRAY_AGG(DISTINCT question) FILTER (WHERE question IS NOT NULL) AS questions
+        FROM session_data
+        GROUP BY topic
+        HAVING COUNT(DISTINCT session_id) > 1
+    ),
+    embedding_similarities AS (
+        SELECT
+            a.topic,
+            a.session_id AS session1,
+            b.session_id AS session2,
+            -- Approximate vector similarity by converting text back to vector
+            -- In real implementation, you'd use proper vector operators
+            AVG(1 - (a.embedding_json::vector <=> b.embedding_json::vector)) AS similarity
+        FROM session_data a
+        JOIN session_data b ON 
+            a.topic = b.topic AND 
+            a.session_id < b.session_id -- Compare different sessions
+        GROUP BY a.topic, a.session_id, b.session_id
+    )
+    SELECT 
+        ts.topic::TEXT AS pattern_topic,
+        ts.session_count AS session_occurrences,
+        AVG(es.similarity) AS avg_embedding_similarity,
+        (SELECT ts.questions[1:3]) AS example_questions
+    FROM topic_sessions ts
+    JOIN embedding_similarities es ON ts.topic = es.topic
+    GROUP BY ts.topic, ts.session_count, ts.questions
+    ORDER BY session_occurrences DESC, avg_embedding_similarity DESC;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error in find_cross_session_patterns: %', SQLERRM;
+    IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'session_data' AND schemaname = 'pg_temp') THEN
+        DROP TABLE session_data;
+    END IF;
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to create and maintain vector indexes for session tables
+CREATE OR REPLACE FUNCTION ensure_vector_indexes(
+    p_schema_name TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Create index on interactions table if it exists
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS %s_interactions_embedding_idx 
+            ON "%s".interactions 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', p_schema_name, p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Failed to create interactions index: %', SQLERRM;
+    END;
+    
+    -- Create index on knowledge_base table if it exists
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS %s_knowledge_base_embedding_idx 
+            ON "%s".knowledge_base 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', p_schema_name, p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Failed to create knowledge_base index: %', SQLERRM;
+    END;
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to find psychological patterns in vector space
+CREATE OR REPLACE FUNCTION find_psychological_patterns(
+    p_schema_name TEXT,
+    p_time_window_days INTEGER DEFAULT 30
+)
+RETURNS TABLE (
+    pattern_group TEXT,
+    avg_similarity FLOAT,
+    interaction_count INTEGER,
+    sample_content TEXT[]
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        WITH recent_interactions AS (
+            SELECT 
+                id, 
+                content, 
+                embedding,
+                metadata->''topic'' AS topic,
+                created_at
+            FROM "%s".interactions
+            WHERE created_at > NOW() - interval ''%s days''
+        ),
+        embedding_clusters AS (
+            SELECT 
+                id,
+                content,
+                topic,
+                AVG(1 - (a.embedding <=> b.embedding)) AS avg_similarity
+            FROM recent_interactions a
+            JOIN recent_interactions b ON a.id != b.id AND a.topic = b.topic
+            GROUP BY a.id, a.content, a.topic
+        )
+        SELECT 
+            topic::TEXT AS pattern_group,
+            AVG(avg_similarity) AS avg_similarity,
+            COUNT(*) AS interaction_count,
+            ARRAY_AGG(content) AS sample_content
+        FROM embedding_clusters
+        GROUP BY topic
+        HAVING AVG(avg_similarity) > 0.7
+        ORDER BY AVG(avg_similarity) DESC;
+    ', p_schema_name, p_time_window_days);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to add embedding column to interactions table
+CREATE OR REPLACE FUNCTION add_embedding_to_interactions(p_schema_name TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Check if column exists
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_schema = p_schema_name 
+        AND table_name = 'interactions' 
+        AND column_name = 'embedding'
+    ) THEN
+        -- Add embedding column
+        EXECUTE format('
+            ALTER TABLE "%s".interactions 
+            ADD COLUMN embedding vector(2048);
+        ', p_schema_name);
+    END IF;
+    
+    RETURN TRUE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error adding embedding column: %', SQLERRM;
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to add embedding to an interaction
+CREATE OR REPLACE FUNCTION add_embedding_to_interaction(
+    p_schema_name TEXT,
+    p_interaction_id INTEGER,
+    p_embedding TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Make sure embedding column exists
+    BEGIN
+        EXECUTE format('
+            ALTER TABLE "%s".interactions 
+            ADD COLUMN IF NOT EXISTS embedding vector(2048);
+        ', p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Error adding embedding column: %', SQLERRM;
+    END;
+    
+    -- Update the interaction with the embedding
+    EXECUTE format('
+        UPDATE "%s".interactions 
+        SET embedding = %L::vector 
+        WHERE interactionid = %s
+    ', p_schema_name, p_embedding, p_interaction_id);
+    
+    RETURN TRUE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Failed to add embedding: %', SQLERRM;
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get interactions without embeddings
+CREATE OR REPLACE FUNCTION get_interactions_without_embeddings(
+    p_schema_name TEXT,
+    p_limit INTEGER DEFAULT 50
+)
+RETURNS TABLE (
+    interactionid INTEGER,
+    question TEXT,
+    answer TEXT
+) AS $$
+BEGIN
+    -- Make sure embedding column exists
+    BEGIN
+        EXECUTE format('
+            ALTER TABLE "%s".interactions 
+            ADD COLUMN IF NOT EXISTS embedding vector(2048);
+        ', p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Error adding embedding column: %', SQLERRM;
+    END;
+    
+    -- Get interactions without embeddings
+    RETURN QUERY EXECUTE format('
+        SELECT 
+            interactionid,
+            question,
+            answer
+        FROM "%s".interactions
+        WHERE embedding IS NULL
+        ORDER BY created_at DESC
+        LIMIT %s;
+    ', p_schema_name, p_limit);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error retrieving interactions without embeddings: %', SQLERRM;
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to update table statistics for better query planning
+CREATE OR REPLACE FUNCTION update_table_statistics(
+    p_schema_name TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Update statistics for the interactions table
+    EXECUTE format('
+        ANALYZE "%s".interactions;
+    ', p_schema_name);
+    
+    -- Update statistics for the knowledge_base table if it exists
+    BEGIN
+        EXECUTE format('
+            ANALYZE "%s".knowledge_base;
+        ', p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Knowledge base table may not exist: %', SQLERRM;
+    END;
+    
+    RETURN TRUE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error updating statistics: %', SQLERRM;
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Find similar interactions based on vector similarity
+CREATE OR REPLACE FUNCTION find_similar_interactions(
+    p_schema_name TEXT,
+    p_embedding TEXT,
+    p_limit INT DEFAULT 3
+) RETURNS TABLE (
+    interaction_id TEXT,
+    question TEXT,
+    answer TEXT,
+    context TEXT,
+    similarity FLOAT,
+    created_at TIMESTAMP,
+    metadata JSONB
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        SELECT 
+            id::TEXT as interaction_id,
+            question,
+            answer,
+            context,
+            (1 - (embedding <=> %L::vector))::FLOAT as similarity,
+            created_at,
+            metadata
+        FROM %I.interactions
+        WHERE embedding IS NOT NULL
+        ORDER BY embedding <=> %L::vector
+        LIMIT %L
+    ', p_embedding, p_schema_name, p_embedding, p_limit);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Analyze conversation themes using vector clustering
+CREATE OR REPLACE FUNCTION analyze_conversation_themes(
+    p_schema_name TEXT,
+    p_min_count INT DEFAULT 2
+) RETURNS TABLE (
+    theme TEXT,
+    count INT
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        WITH themes AS (
+            SELECT 
+                CASE
+                    WHEN metadata->''topic'' IS NOT NULL THEN metadata->''topic''
+                    ELSE ''general''
+                END as theme
+            FROM %I.interactions
+            WHERE created_at > NOW() - INTERVAL ''30 days''
+        )
+        SELECT
+            theme::TEXT,
+            COUNT(*)::INT as count
+        FROM themes
+        GROUP BY theme
+        HAVING COUNT(*) >= %L
+        ORDER BY count DESC
+    ', p_schema_name, p_min_count);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Analyze emotional trajectory from recent interactions
+CREATE OR REPLACE FUNCTION analyze_emotional_trajectory(
+    p_schema_name TEXT,
+    p_limit INT DEFAULT 5
+) RETURNS TABLE (
+    interaction_id TEXT,
+    emotional_state TEXT,
+    created_at TIMESTAMP
+) AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('
+        SELECT
+            id::TEXT as interaction_id,
+            metadata->>''emotional_state'' as emotional_state,
+            created_at
+        FROM %I.interactions
+        WHERE metadata->>''emotional_state'' IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT %L
+    ', p_schema_name, p_limit);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to initialize knowledge base with therapeutic concepts
+CREATE OR REPLACE FUNCTION initialize_knowledge_base(p_schema_name TEXT, p_entries JSONB)
+RETURNS BOOLEAN AS $$
+DECLARE
+    entry JSONB;
+    content TEXT;
+    embedding TEXT;
+    success_count INTEGER := 0;
+BEGIN
+    -- Create schema and tables if they don't exist
+    PERFORM create_user_schema_and_tables(p_schema_name);
+    
+    -- Check if knowledge base already has entries
+    IF (SELECT COUNT(*) FROM information_schema.tables 
+        WHERE table_schema = p_schema_name AND table_name = 'knowledge_base') > 0 
+    THEN
+        IF (SELECT COUNT(*) FROM (SELECT 1 FROM (information_schema.tables 
+            JOIN pg_catalog.pg_class ON relname = table_name) 
+            WHERE table_schema = p_schema_name AND table_name = 'knowledge_base' LIMIT 1) AS tmp) > 0 
+        THEN
+            RETURN TRUE;
+        END IF;
+    END IF;
+    
+    -- Insert each entry
+    FOR i IN 0..jsonb_array_length(p_entries)-1 LOOP
+        entry := p_entries->i;
+        content := entry->>'content';
+        embedding := entry->>'embedding';
+        
+        BEGIN
+            EXECUTE format('
+                INSERT INTO "%s".knowledge_base (content, embedding)
+                VALUES (%L, %L::vector)
+            ', p_schema_name, content, embedding);
+            
+            success_count := success_count + 1;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Error inserting knowledge entry: %', SQLERRM;
+        END;
+    END LOOP;
+    
+    RETURN success_count > 0;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Error initializing knowledge base: %', SQLERRM;
+    RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
