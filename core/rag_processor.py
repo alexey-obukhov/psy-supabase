@@ -1,14 +1,15 @@
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import json
+import re
 import logging
-import numpy as np
 import traceback
 
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.safety_handler import SafetyHandler
+from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -28,6 +29,9 @@ class RAGProcessor:
         # Use EmbeddingProviderAdapter instead
         from psy_supabase.core.model_manager import EmbeddingProviderAdapter
         self.embedding_provider = EmbeddingProviderAdapter()
+        
+        # Get the embedding dimension directly from the provider
+        self.embedding_dimension = self.embedding_provider.get_embedding_dimension()
         
         # Constants for vector retrieval optimization
         self.SIMILARITY_THRESHOLD = 0.7       # Minimum similarity for relevant documents
@@ -76,217 +80,227 @@ class RAGProcessor:
             logger.error(f"Error retrieving documents with pgvector: {e}")
             return []
 
-    def generate_response(self, user_question: str, device: str = "cpu", question_id: int = 0, session_id: str = "default_session") -> str:
+    def generate_response(self, user_question: str, session_id: str = "default_session", 
+                     device: str = None, question_id: int = None) -> str:
         """
-        Generate a response using RAG with enhanced psychological memory and optimized pgvector retrieval.
+        Generate a response using Dynamic RAG with psychological memory.
         
         Args:
             user_question: The user's question
-            device: Device to use for generation
-            question_id: Question ID for tracking
-            session_id: Session ID for database operations
+            session_id: Session ID for database operations (primary identifier)
+            device: Optional device to use for generation (used by embedding provider if specified)
+            question_id: Optional question ID for tracking (can be used for analytics)
             
         Returns:
             str: Generated response
         """
         try:
-            # Initialize default values
-            topic = "general_support"  # Default topic
-            template_name = "Basic Answer"  # Default template
-            confidence = 0.5  # Default confidence
-            
-            # Safety check first with detailed logging
-            is_harmful, safety_response, metadata = self.safety_handler.process_input(user_question)
-            if is_harmful:
-                logger.warning(f"Safety filter triggered: {metadata.get('category', 'unknown')}")
-                data_point = {
-                    'context': "Safety response",
-                    'question': user_question,
-                    'answer': safety_response,
-                    'metadata': metadata or {'topic': 'Safety Response', 'questionID': question_id}
-                }
-                self.db_manager.add_interaction(data_point, session_id)
-                return safety_response
+            # Pass device to embedding provider if specified
+            if device and hasattr(self.embedding_provider, 'set_device'):
+                self.embedding_provider.set_device(device)
                 
-            # OPTIMIZATION: Check for cached embedding of similar questions
-            query_embedding = None
-            if self.VECTOR_CACHE_ENABLED:
-                cached_embedding = self.db_manager.find_similar_question_embedding(
-                    user_question, 
-                    session_id=session_id,
-                    similarity_threshold=0.92  # Only use cache for very similar questions
-                )
-                if cached_embedding:
-                    logger.info("Using cached embedding from similar previous question")
-                    query_embedding = cached_embedding
+            # Track query ID if provided (useful for analytics)
+            tracking_id = question_id if question_id is not None else f"auto_{int(datetime.now().timestamp())}"
             
-            # Generate embeddings for the question if not cached
-            if query_embedding is None:
-                query_embedding = self.embedding_provider.generate_embedding(user_question)
-                
-            if not query_embedding:
-                logger.error("Failed to generate embedding for question")
-                query_embedding = [0.0] * 768  # Default embedding dimension
-                
-            # OPTIMIZED pgvECTOR RETRIEVAL:
-            # 1. Find similar documents with threshold filtering done in the database
-            similar_documents = self.db_manager.find_similar_documents(
-                embedding=query_embedding, 
-                limit=5,
-                min_similarity=self.SIMILARITY_THRESHOLD  # Apply database-side filtering
-            )
-            
-            # 2. Find relevant memories with pgvector similarity and threshold filtering
-            similar_memories = self.db_manager.find_similar_memories(
-                embedding=query_embedding, 
-                session_id=session_id, 
-                limit=3,
-                threshold=0.65  # Slightly lower threshold for memories to capture broader context
-            )
-            
-            # 3. Use pgvector clustering to identify conversation themes
-            theme_clusters = self.db_manager.analyze_theme_clusters(
+            # Initialize the dynamic retriever
+            dynamic_retriever = DynamicRAGRetriever(
+                db_manager=self.db_manager,
                 session_id=session_id,
-                min_similarity=0.7,
-                max_clusters=2  # Limit clusters for efficiency
+                allow_dynamic_queries=True
             )
             
-            # 4. Vector-based emotional trajectory analysis
-            emotional_trajectory = self.db_manager.analyze_emotional_vector_trajectory(
-                session_id=session_id, 
-                # window_size=5  # Only analyze recent interactions
-            )
-                
-            # Build enhanced context with relevant documents and conversation history
-            enhanced_context = self._enhance_context_with_relevant_documents(
-                user_question, 
-                query_embedding, 
-                session_id
-            )
+            # Track pain point detection and template usage
+            pain_point_detected = False
+            template_used = "dynamic_rag_therapy"  # Default template
+            approach_type = "none"
+            metadata = {
+                "tracking_id": tracking_id,
+                "session_id": session_id
+            }
             
-            # Add psychological insights based on vector-retrieved data
-            psychological_context = self._build_psychological_context(
-                similar_memories, 
-                theme_clusters, 
-                emotional_trajectory
-            )
+            # Process the query to get semantic meaning
+            query_embedding = self.process_query(user_question, session_id)
             
-            # Template selection
-            try:
-                # Select the appropriate template based on the question
-                template_name, template_context = self.prompt_selector.select_prompt_template(user_question)
-                
-                # Merge template context with our enhanced context
-                enhanced_context.update(template_context)
-                
-                # Add psychological context 
-                enhanced_context["psychological_context"] = psychological_context
-                
-                # Add topic details
-                topic = template_context.get("detected_topic", topic)
-                confidence = template_context.get("confidence", confidence)
-                
-            except Exception as e:
-                logger.error(f"Error in template selection: {e}", exc_info=True)
-                # Continue with the default template
+            # Use the PromptSelector to identify psychological topics
+            selector = self.prompt_selector
             
-            # Get conversation history - already included in enhanced_context from _enhance_context_with_relevant_documents
-            conversation_history = self.db_manager.get_conversation_history(session_id)
-
-            # Generate text response with optimized context
-            try:
-                response = self.text_generator.generate_therapeutic_response(
-                    user_question, 
-                    template_name, 
-                    enhanced_context,
-                    conversation_history[-self.MAX_CONVERSATION_EXCHANGES:] if conversation_history else None
-                )
-            except Exception as e:
-                logger.error(f"Error in text generation: {e}", exc_info=True)
-                response = "I apologize, but I encountered an error while processing your question. Could you try rephrasing it?"
+            # Get detailed analysis of the question
+            question_analysis = selector._analyze_question(user_question)
+            detected_topic = question_analysis.get('topic', 'general')
+            emotion = question_analysis.get('emotion')
             
-            # Store interaction with optimized metadata
-            try:
-                # Extract relevant document context (limiting size)
-                context_text = ""
-                if similar_documents:
-                    # Take only the first two most similar documents
-                    context_docs = []
+            # Get more detailed category information
+            category_info = selector.generate_category_info(user_question)
+            
+            # Log the analysis results
+            logger.info(f"Question analysis: Topic={detected_topic}, Emotion={emotion}")
+            logger.info(f"Categories: {list(category_info.keys())}")
+            
+            # Extract psychological topics for dynamic retrieval
+            extracted_topics = []
+            
+            # Primary topic from question analysis
+            if detected_topic and detected_topic != "general":
+                extracted_topics.append(detected_topic.replace('_', ' '))
+                
+            # Add topics from categories (up to 3 total)
+            for category in category_info.keys():
+                # Convert category names to search terms
+                if category == "Empathy and Validation":
+                    if "depression" not in extracted_topics:
+                        extracted_topics.append("depression")
+                elif category == "Affirmation and Reassurance":
+                    if "anxiety" not in extracted_topics:
+                        extracted_topics.append("anxiety")
+                elif category == "Trauma":
+                    if "trauma" not in extracted_topics:
+                        extracted_topics.append("trauma")
+                elif "CBT" in category:
+                    if "cognitive behavioral therapy" not in extracted_topics:
+                        extracted_topics.append("cognitive behavioral therapy")
+            
+            # Set emotion as a topic if appropriate
+            if emotion and len(extracted_topics) < 3:
+                if emotion not in ["confusion", "surprise"]:  # Skip non-therapeutic emotions
+                    extracted_topics.append(emotion)
                     
-                    for doc in similar_documents[:2]:
-                        # Handle string objects
-                        if isinstance(doc, str):
-                            # Try to parse JSON if it's a JSON string
-                            try:
-                                import json
-                                doc_dict = json.loads(doc)
-                                content = doc_dict.get('content', '')[:150]
-                                similarity = doc_dict.get('similarity', 0)
-                            except:
-                                # If parsing fails, use the string as content
-                                content = doc[:150]  # Truncate if needed
-                                similarity = 0.7  # Default above threshold
-                        else:
-                            # Normal dictionary case
-                            content = doc.get('content', '')[:150]
-                            similarity = doc.get('similarity', 0)
-                            
-                        if similarity >= self.SIMILARITY_THRESHOLD:
-                            context_docs.append(content)
-                            
-                    context_text = ' | '.join(context_docs)
-                
-                # Extract the current emotional state if available
-                emotional_state = psychological_context.get("current_emotional_state", "")
-                
-                # Store with metadata including vector context
-                metadata = {
-                    'topic': topic,
-                    'template_used': template_name,
-                    'confidence': confidence,
-                    'vector_enriched': True,
-                    'similarity_threshold': self.SIMILARITY_THRESHOLD,
-                    'num_relevant_docs': len([d for d in similar_documents if d]) if similar_documents else 0,
-                    'num_similar_memories': len(similar_memories) if similar_memories else 0
+            # Ensure we have at least one topic
+            if not extracted_topics:
+                topic_from_text = selector._determine_topic(category_info, user_question)
+                if topic_from_text != "emotional_support":
+                    extracted_topics.append(topic_from_text)
+                else:
+                    extracted_topics.append("therapeutic support")
+            
+            # Limit to top 3 topics
+            extracted_topics = extracted_topics[:3]
+            logger.info(f"Extracted topics for RAG retrieval: {extracted_topics}")
+            
+            # Only include relevant context in the prompt to keep it small
+            context = {
+                "user_question": user_question,
+                "dynamic_retriever": dynamic_retriever,  # Pass the retriever object
+                "use_dynamic_retrieval": True,  # Signal to use dynamic retrieval
+                "session_id": session_id,
+                "extracted_topics": extracted_topics,  # Add extracted topics for the template
+                "psychological_context": {
+                    "topic": detected_topic,
+                    "emotion": emotion,
+                    "categories": list(category_info.keys())
                 }
+            }
+            
+            # Check for pain points if intelligent processing is enabled
+            if self.intelligent_processing_enabled:
+                # Get similar questions to detect possible pain points
+                similar_questions = self.db_manager.find_similar_interactions_by_embedding(
+                    query_embedding, 
+                    session_id, 
+                    limit=3
+                )
                 
-                # Add emotional state if available
-                if emotional_state:
-                    metadata["emotional_state"] = emotional_state
+                # Check if pain point detected based on repetition patterns
+                if similar_questions and len(similar_questions) >= 2:
+                    # Use the oldest similar question as the original
+                    original_question = similar_questions[-1].get('question', user_question)
                     
-                # Store interaction
-                self.db_manager.add_interaction({
-                    'context': context_text[:500],  # Limit context size
-                    'question': user_question,
-                    'answer': response,
-                    'metadata': metadata
-                }, session_id)
+                    # Get emotional signals for psychological context
+                    emotional_signals = self.db_manager.get_emotional_signals(session_id)
+                    
+                    # Detect repetition patterns
+                    repetition_pattern = self.detect_repetition_pattern(
+                        original_question, 
+                        user_question, 
+                        similar_questions
+                    )
+                    
+                    # Consider it a pain point if it's a fixation or has many recurring terms
+                    is_pain_point = repetition_pattern.get('is_fixation', False) or len(repetition_pattern.get('recurring_terms', [])) >= 2
+                    
+                    if is_pain_point:
+                        pain_point_detected = True
+                        
+                        # Generate approach for handling the pain point
+                        approach = self._generate_pain_point_approach(
+                            original_question, 
+                            user_question, 
+                            emotional_signals, 
+                            repetition_pattern
+                        )
+                        
+                        # Update template based on the approach
+                        approach_type = approach.get('approach_type', 'none')
+                        
+                        # With Dynamic RAG, we can use specialized templates
+                        if approach.get('should_redirect'):
+                            template_used = "dynamic_pain_point_redirection"
+                        else:
+                            template_used = "dynamic_pain_point_exploration"
+                        
+                        # Add pain point info to context - these will be small!
+                        context.update({
+                            'pain_point': {
+                                'recurring_terms': repetition_pattern.get('recurring_terms', []),
+                                'count': repetition_pattern.get('count', 0),
+                                'is_fixation': repetition_pattern.get('is_fixation', False)
+                            },
+                            'approach': approach
+                        })
+                        
+                        # Log that we detected a pain point
+                        logger.info(f"Pain point detected! Approach: {approach_type}, Template: {template_used}")
+            
+            # Add hot topics only if detected
+            hot_topics = self._identify_hot_topics(user_question, query_embedding)
+            if hot_topics:
+                context["hot_topics"] = hot_topics
+            
+            # Generate response with dynamic retrieval capability
+            try:
+                response = self.text_generator.generate_therapeutic_response_with_dynamic_retrieval(
+                    user_question=user_question,
+                    template_name=template_used,  # Use the appropriate template
+                    context=context,
+                    conversation_history=self.get_recent_conversation_history(session_id, limit=2)
+                )
                 
-                # OPTIMIZATION: Store embedding for future vector similarity
-                try:
-                    all_history = self.db_manager.get_conversation_history(session_id)
-                    latest_history = all_history[-1:] if all_history else []
-                    
-                    if latest_history and len(latest_history) > 0:
-                        interaction_id = latest_history[0].get('interaction_id')
-                        if interaction_id and query_embedding:
-                            self.db_manager.add_embedding_to_interaction(
-                                interaction_id,
-                                query_embedding,
-                                session_id
-                            )
-                except Exception as e:
-                    logger.error(f"Error storing embedding: {e}")
-                    
-            except Exception as e:
-                logger.error(f"Error storing interaction: {e}")
-                logger.error(traceback.format_exc())
-                
+                # If response is None or empty, generate a fallback response
+                if not response:
+                    logger.warning("Received empty response from text generator, using fallback")
+                    response = "I apologize, but I'm having trouble generating a response right now. Could you please try asking again?"
+            except Exception as gen_error:
+                logger.error(f"Error generating response with dynamic retrieval: {gen_error}")
+                response = "I apologize, but I'm experiencing a technical issue. Please try again with a different question."
+            
+            # Update metadata for saving
+            metadata.update({
+                "pain_point_detected": pain_point_detected,
+                "therapeutic_approach": approach_type,
+                "template_used": template_used,
+                "recurring_themes": context.get('pain_point', {}).get('recurring_terms', []) if pain_point_detected else [],
+                "pain_point_similarity": context.get('pain_point', {}).get('count', 0) if pain_point_detected else 0
+            })
+            
+            # Save the interaction with this metadata
+            try:
+                save_result = self.db_manager.save_interaction(
+                    context=session_id,  # Using session_id as context
+                    question=user_question,
+                    answer=response if response else "No response generated",
+                    metadata=metadata,
+                    session_id=session_id
+                )
+                if not save_result:
+                    logger.warning(f"Failed to save interaction for session {session_id}")
+            except Exception as save_error:
+                logger.error(f"Error saving interaction: {save_error}")
+            
             return response
+            
         except Exception as e:
-            logger.error(f"Error in generate_response: {e}")
+            logger.error(f"Error generating response: {e}")
             logger.error(traceback.format_exc())
-            return "I apologize, but I encountered an error processing your question. Would you mind rephrasing it?"
+            return "I'm sorry, I encountered an error while generating a response. Could you please try again?"
 
     def generate_simple_response(self, user_question: str) -> str:
         """Generates a simple response without any preprocessing or context."""
@@ -551,3 +565,441 @@ class RAGProcessor:
                 'has_conversation': False,
                 'user_question': user_question  # Include user question even in error case
             }
+
+    def detect_repetition_pattern(self, original_question: str, current_question: str, similar_questions: List[Dict]) -> Dict:
+        """
+        Analyze repetition patterns in similar questions to detect psychological fixation.
+        
+        Args:
+            original_question: The first occurrence of this question
+            current_question: The current question
+            similar_questions: List of similar questions identified
+            
+        Returns:
+            Dictionary with repetition pattern data
+        """
+        # Count occurrences of highly similar questions
+        high_similarity_count = sum(1 for q in similar_questions if q['similarity'] > 0.7)
+        
+        # Extract key terms that appear in both original and current question
+        original_terms = set(re.findall(r'\b\w+\b', original_question.lower()))
+        current_terms = set(re.findall(r'\b\w+\b', current_question.lower()))
+        
+        recurring_terms = original_terms.intersection(current_terms)
+        
+        # Remove common stopwords from recurring terms
+        stopwords = {'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 
+                    "you're", "you've", "you'll", "you'd", 'your', 'yours', 'yourself', 
+                    'yourselves', 'he', 'him', 'his', 'himself', 'she', "she's", 'her', 
+                    'hers', 'herself', 'it', "it's", 'its', 'itself', 'they', 'them', 
+                    'their', 'theirs', 'themselves', 'what', 'which', 'who', 'whom', 
+                    'this', 'that', "that'll", 'these', 'those', 'am', 'is', 'are', 
+                    'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 
+                    'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 
+                    'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 
+                    'with', 'about', 'against', 'between', 'into', 'through', 'during', 
+                    'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 
+                    'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once'}
+        
+        significant_terms = [term for term in recurring_terms if term not in stopwords and len(term) > 2]
+        
+        return {
+            'count': high_similarity_count,
+            'recurring_terms': list(significant_terms),
+            'is_fixation': high_similarity_count >= 3,  # Consider it fixation if asked 3+ times
+            'intensity': min(high_similarity_count / 5, 1.0)  # Scale intensity, max 1.0
+        }
+
+    def _generate_pain_point_approach(self, original_question: str, current_question: str, 
+                                    emotions: List[Dict], repetition_pattern: Dict) -> Dict:
+        """
+        Generate a specialized therapeutic approach when a pain point is detected.
+        
+        Args:
+            original_question: The first occurrence of this question
+            current_question: The current question being asked
+            emotions: Emotional response data
+            repetition_pattern: Repetition pattern analysis
+            
+        Returns:
+            Dictionary with therapeutic approach data
+        """
+        # Determine if this seems to be a fixation pattern
+        is_fixation = repetition_pattern.get('is_fixation', False)
+        recurring_terms = repetition_pattern.get('recurring_terms', [])
+        
+        # Analyze emotional tone from emotion data
+        emotional_tone = "neutral"
+        if emotions:
+            # Get the most common emotion
+            emotion_counter = {}
+            for e in emotions:
+                emotion = e.get('emotional_state', '').lower()
+                if emotion:
+                    emotion_counter[emotion] = emotion_counter.get(emotion, 0) + 1
+            
+            if emotion_counter:
+                emotional_tone = max(emotion_counter.items(), key=lambda x: x[1])[0]
+        
+        # Determine approach based on pattern and emotions
+        if is_fixation:
+            if emotional_tone in ['anxious', 'worried', 'fear', 'anxiety']:
+                approach_type = "anxiety_exploration"
+                guidance_question = f"I notice you've mentioned {', '.join(recurring_terms[:2])} several times. " \
+                                    f"These topics seem to cause you anxiety. Could you tell me what feels most " \
+                                    f"overwhelming about this situation?"
+                                   
+            elif emotional_tone in ['sad', 'depressed', 'grief', 'depression']:
+                approach_type = "grief_reflection"
+                guidance_question = f"You've brought up {', '.join(recurring_terms[:2])} multiple times, and I sense " \
+                                    f"some sadness there. What feelings come up for you when you think about this?"
+            
+            else:
+                approach_type = "gentle_refocus"
+                guidance_question = f"I've noticed we've discussed {', '.join(recurring_terms[:2])} several times. " \
+                                    f"I wonder if we could explore what makes this particularly important for you right now?"
+        else:
+            # Not a fixation, but still a pain point - use a lighter approach
+            approach_type = "exploratory"
+            guidance_question = f"I notice that {', '.join(recurring_terms[:2]) if recurring_terms else 'this topic'} " \
+                                f"seems meaningful to you. Could you share more about how it affects you?"
+        
+        return {
+            'approach_type': approach_type,
+            'emotional_tone': emotional_tone,
+            'guidance_question': guidance_question,
+            'should_redirect': is_fixation,  # Redirect the conversation if we detect fixation
+        }
+
+    def enhance_response_with_pain_point_guidance(self, response: str, pain_point_data: Dict) -> str:
+        """
+        Enhance the therapeutic response with specialized guidance when a pain point is detected.
+        
+        Args:
+            response: The original response
+            pain_point_data: Pain point detection data
+            
+        Returns:
+            Enhanced response with pain point guidance
+        """
+        if not pain_point_data or not pain_point_data.get('detected'):
+            return response
+            
+        # Get the suggested approach
+        approach = pain_point_data.get('suggested_approach', {})
+        guidance_question = approach.get('guidance_question', '')
+        
+        if not guidance_question:
+            return response
+            
+        # Determine how to enhance the response based on approach type
+        approach_type = approach.get('approach_type', 'exploratory')
+        
+        # For fixation patterns, more actively redirect
+        if approach.get('should_redirect'):
+            # Insert guidance question after a suitable transition
+            enhanced_response = response.rstrip() + "\n\n" + guidance_question
+            
+        # For exploratory approaches, append the guidance more gently
+        else:
+            # Add the guidance question at the end
+            enhanced_response = response.rstrip() + "\n\n" + guidance_question
+            
+        return enhanced_response
+
+    def get_contextual_data(self, question: str, session_id: str, max_context_chars: int = 1000):
+        """
+        Get contextualized data for a user question with database-side vector processing.
+        
+        Args:
+            question: The user's question
+            session_id: Session identifier
+            max_context_chars: Maximum context length to return
+            
+        Returns:
+            Dict containing knowledge and conversation context
+        """
+        try:
+            # DATABASE-FIRST APPROACH:
+            # Let PostgreSQL handle the vector similarity search instead of loading everything to RAM/GPU
+            
+            # 1. Generate embedding for the question using the EmbeddingProviderAdapter
+            question_embedding = self.embedding_provider.generate_embedding(question)
+            if question_embedding is None:
+                logger.warning("Could not generate embedding for question")
+                return {"knowledge_context": "", "conversation_context": ""}
+            
+            # 2. Convert embedding to the format expected by find_similar_documents_via_rpc
+            # The embedding_provider returns a tensor, so we need to convert it to a list
+            if hasattr(question_embedding, 'cpu') and callable(getattr(question_embedding, 'cpu')):
+                # It's a torch tensor, convert to list
+                embedding_list = question_embedding.cpu().numpy().tolist()
+                # If it's a 2D tensor with one row, extract the row
+                if isinstance(embedding_list, list) and len(embedding_list) == 1:
+                    embedding_list = embedding_list[0]
+            else:
+                # It might already be a list or numpy array
+                embedding_list = question_embedding
+            
+            # 3. Use a parameterized SQL query to find similar documents DIRECTLY in PostgreSQL
+            similar_docs = self.db_manager.find_similar_documents_via_rpc(
+                session_id=session_id,
+                embedding=embedding_list,  # Properly formatted embedding
+                similarity_threshold=0.7,
+                limit=3  # Just get top 3 most relevant docs
+            )
+            
+            # 4. Construct knowledge context from the results PostgreSQL returns
+            knowledge_context = ""
+            if similar_docs and len(similar_docs) > 0:
+                # Only take as much as we need to stay under max_context_chars
+                remaining_chars = max_context_chars
+                for doc in similar_docs:
+                    content = doc.get("content", "")
+                    if len(content) <= remaining_chars:
+                        knowledge_context += content + "\n\n"
+                        remaining_chars -= len(content) + 2
+                    else:
+                        # Take a partial document if we're running out of space
+                        knowledge_context += content[:remaining_chars] + "..."
+                        break
+                        
+                logger.info(f"Knowledge context: {len(knowledge_context)} chars from vector similarity search")
+                    
+            # 5. Get minimal conversation context
+            conversation_context = ""
+            conversation_history = self.db_manager.get_conversation_history(session_id)
+            if conversation_history and len(conversation_history) > 0:
+                # Only take the last 2 exchanges to limit context size
+                recent_history = conversation_history[-2:] if len(conversation_history) > 2 else conversation_history
+                
+                # Format as text, but be strict about length limits
+                for item in recent_history:
+                    q = item.get("questionText", "")[:150]  # Limit question length
+                    a = item.get("answerText", "")[:200]    # Limit answer length
+                    if q and a:
+                        conversation_context += f"User: {q}\nAssistant: {a}\n\n"
+                        
+                logger.info(f"Conversation context: {len(conversation_context)} chars")
+            
+            # 6. Ensure overall context stays within limits
+            total_context_chars = len(knowledge_context) + len(conversation_context)
+            logger.info(f"Total prompt context: {total_context_chars} chars")
+            
+            return {
+                "knowledge_context": knowledge_context,
+                "conversation_context": conversation_context
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting contextual data: {e}")
+            logger.error(traceback.format_exc())
+            return {"knowledge_context": "", "conversation_context": ""}
+
+    def process_query(self, user_question: str, session_id: str = None) -> List[float]:
+        """
+        Process a user query to generate an embedding.
+        Implements caching for similar previous questions.
+        
+        Args:
+            user_question: The user's question text
+            session_id: Optional session ID for cache lookup
+            
+        Returns:
+            List[float]: The embedding vector
+        """
+        try:
+            # Check if we can reuse a similar question's embedding (optimization)
+            if self.VECTOR_CACHE_ENABLED and session_id:
+                cached_embedding = self.db_manager.find_similar_question_embedding(
+                    user_question, 
+                    session_id=session_id,
+                    similarity_threshold=0.92  # High threshold for reuse
+                )
+                
+                if cached_embedding:
+                    logger.info("Using cached embedding from similar previous question")
+                    return cached_embedding
+            
+            # Generate a new embedding
+            embedding = self.embedding_provider.generate_embedding(user_question)
+            
+            # Convert embedding to list format if needed
+            if hasattr(embedding, 'cpu') and callable(getattr(embedding, 'cpu')):
+                # It's a torch tensor, convert to list
+                embedding_list = embedding.cpu().numpy().tolist()
+                # If it's a 2D tensor with one row, extract the row
+                if isinstance(embedding_list, list) and len(embedding_list) == 1:
+                    embedding_list = embedding_list[0]
+            else:
+                # It might already be a list or numpy array
+                embedding_list = embedding
+            
+            return embedding_list
+            
+        except Exception as e:
+            logger.error(f"Error processing query: {e}")
+            logger.error(traceback.format_exc())
+            # Return a zero embedding as fallback (will likely not match anything)
+            return [0.0] * self.embedding_dimension
+
+    def _identify_hot_topics(self, user_question: str, query_embedding: List[float]) -> List[Dict]:
+        """
+        Identify hot topics in the user's question using vector similarity.
+        
+        Args:
+            user_question: The user's question
+            query_embedding: The embedding of the user's question
+            
+        Returns:
+            List[Dict]: Hot topics with relevance scores
+        """
+        try:
+            # Use a specialized "hot topics" search
+            hot_topics = []
+            
+            # Focus on specific psychological themes
+            themes = ["anxiety", "depression", "stress", "relationships", 
+                     "trauma", "grief", "self-esteem", "identity"]
+            
+            # Check if any of these themes are directly mentioned
+            user_question_lower = user_question.lower()
+            
+            for theme in themes:
+                if theme in user_question_lower:
+                    hot_topics.append({
+                        "topic": theme,
+                        "relevance": 0.95,  # High relevance for direct mentions
+                        "source": "direct_mention"
+                    })
+            
+            # If we found direct mentions, return those
+            if hot_topics:
+                return hot_topics
+                
+            # Otherwise, try vector search
+            # This could use pgvector to find similar topics in your knowledge base
+            if query_embedding:
+                # Only include relevant hot topics (above threshold)
+                threshold = 0.75  # Higher threshold for hot topics
+                
+                # Format embedding for PostgreSQL vector format
+                from psy_supabase.utilities.embedding_utils import format_embedding_for_db
+                vector_str = format_embedding_for_db(query_embedding)
+                
+                # SQL to find hot topics
+                query = f"""
+                WITH hot_topic_embeddings AS (
+                    SELECT 
+                        id, 
+                        content, 
+                        embedding,
+                        1 - (embedding <=> '{vector_str}'::vector) as similarity
+                    FROM 
+                        public.hot_topics
+                    WHERE 
+                        1 - (embedding <=> '{vector_str}'::vector) > {threshold}
+                    ORDER BY 
+                        similarity DESC
+                    LIMIT 2
+                )
+                SELECT 
+                    id, 
+                    content as topic, 
+                    similarity as relevance
+                FROM 
+                    hot_topic_embeddings;
+                """
+                
+                try:
+                    # Check if hot_topics table exists first
+                    check_query = "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'hot_topics');"
+                    check_result = self.db_manager.supabase.rpc('sql', {'command': check_query}).execute()
+                    
+                    if check_result.data and (check_result.data[0] == 't' or check_result.data[0] == True):
+                        # Table exists, query it
+                        result = self.db_manager.supabase.rpc('sql', {'command': query}).execute()
+                        
+                        if result.data:
+                            for row in result.data:
+                                if isinstance(row, dict):
+                                    hot_topics.append({
+                                        "topic": row.get("topic", ""),
+                                        "relevance": row.get("relevance", 0),
+                                        "source": "vector_similarity"
+                                    })
+                                elif isinstance(row, str):
+                                    # Parse CSV-formatted response
+                                    parts = row.split(',')
+                                    if len(parts) >= 3:
+                                        hot_topics.append({
+                                            "topic": parts[1],
+                                            "relevance": float(parts[2]) if parts[2].replace('.','',1).isdigit() else 0,
+                                            "source": "vector_similarity"
+                                        })
+                except Exception as inner_e:
+                    logger.warning(f"Error finding hot topics: {inner_e}")
+                    # Continue without hot topics
+            
+            return hot_topics
+            
+        except Exception as e:
+            logger.error(f"Error identifying hot topics: {e}")
+            return []
+
+    def get_recent_conversation_history(self, session_id: str, limit: int = 2) -> List[Dict]:
+        """
+        Get recent conversation history with appropriate formatting for psychological context.
+        
+        Args:
+            session_id: Session identifier
+            limit: Maximum number of recent exchanges to include
+        
+        Returns:
+            List[Dict]: Recent conversation exchanges properly formatted
+        """
+        try:
+            # Get conversation history from database
+            conversation_history = self.db_manager.get_conversation_history(session_id)
+            
+            if not conversation_history:
+                return []
+            
+            # Only take the most recent exchanges to limit context size
+            recent_history = conversation_history[-limit:] if len(conversation_history) > limit else conversation_history
+            
+            # Format the conversation history for the generator
+            formatted_history = []
+            for item in recent_history:
+                # Extract question and answer
+                q = item.get('questionText', item.get('question', ''))
+                a = item.get('answerText', item.get('answer', ''))
+                
+                # Include metadata if available
+                metadata = item.get('metadata', {})
+                if isinstance(metadata, str):
+                    try:
+                        # Try to parse metadata if it's a string
+                        import json
+                        metadata = json.loads(metadata)
+                    except:
+                        metadata = {}
+                
+                # Create formatted entry
+                entry = {
+                    'question': q,
+                    'answer': a,
+                    'metadata': metadata,
+                    'timestamp': item.get('created_at', item.get('timestamp', ''))
+                }
+                
+                # For psychological work, preserve the FULL text of the exchanges
+                # DO NOT truncate text here - it's critical for psychological continuity
+                formatted_history.append(entry)
+            
+            return formatted_history
+        
+        except Exception as e:
+            logger.error(f"Error getting conversation history: {e}")
+            logger.error(traceback.format_exc())
+            return []

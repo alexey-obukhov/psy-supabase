@@ -91,7 +91,8 @@ BEGIN
             question TEXT,
             answer TEXT,
             metadata JSONB,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            embedding vector(2048) -- Embedding directly in interactions table for backward compatibility
         );', schema_name);
 
     -- Create knowledge_base table with native vector type
@@ -102,7 +103,17 @@ BEGIN
             embedding vector(2048)
         );', schema_name);
         
-    -- Simple index creation with error handling
+    -- Create interaction_embeddings table with foreign key to interactions
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS "%s".interaction_embeddings (
+            id SERIAL PRIMARY KEY,
+            interaction_id INTEGER REFERENCES "%s".interactions(interactionID),
+            embedding vector(2048),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT unique_interaction UNIQUE(interaction_id)
+        );', schema_name, schema_name);
+        
+    -- Simple index creation with error handling for knowledge_base
     BEGIN
         EXECUTE format('
             CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx 
@@ -112,7 +123,33 @@ BEGIN
         ', schema_name);
     EXCEPTION WHEN OTHERS THEN
         -- Log the error but continue (index creation is not critical)
-        RAISE NOTICE 'Index creation failed: %', SQLERRM;
+        RAISE NOTICE 'Knowledge base index creation failed: %', SQLERRM;
+    END;
+    
+    -- Index for interactions.embedding
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS interactions_embedding_idx 
+            ON "%s".interactions 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        -- Log the error but continue
+        RAISE NOTICE 'Interactions embedding index creation failed: %', SQLERRM;
+    END;
+    
+    -- Index for interaction_embeddings.embedding
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS interaction_embeddings_idx 
+            ON "%s".interaction_embeddings 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        -- Log the error but continue
+        RAISE NOTICE 'Interaction embeddings index creation failed: %', SQLERRM;
     END;
     
     RETURN TRUE;
@@ -999,9 +1036,9 @@ BEGIN
     IF (SELECT COUNT(*) FROM information_schema.tables 
         WHERE table_schema = p_schema_name AND table_name = 'knowledge_base') > 0 
     THEN
-        IF (SELECT COUNT(*) FROM (SELECT 1 FROM (information_schema.tables 
-            JOIN pg_catalog.pg_class ON relname = table_name) 
-            WHERE table_schema = p_schema_name AND table_name = 'knowledge_base' LIMIT 1) AS tmp) > 0 
+        IF (SELECT COUNT(*) FROM (
+            SELECT 1 FROM "%s".knowledge_base LIMIT 1
+        ) AS tmp) > 0 
         THEN
             RETURN TRUE;
         END IF;
@@ -1024,6 +1061,30 @@ BEGIN
             RAISE NOTICE 'Error inserting knowledge entry: %', SQLERRM;
         END;
     END LOOP;
+    
+    -- Also check if we need to create interaction_embeddings for existing interactions
+    BEGIN
+        -- Create interaction_embeddings entries for any interactions that have embeddings
+        EXECUTE format('
+            INSERT INTO "%s".interaction_embeddings (interaction_id, embedding)
+            SELECT 
+                interactionID, 
+                embedding
+            FROM "%s".interactions
+            WHERE 
+                embedding IS NOT NULL AND
+                interactionID NOT IN (
+                    SELECT interaction_id FROM "%s".interaction_embeddings
+                )
+        ', p_schema_name, p_schema_name, p_schema_name);
+        
+        -- Update table statistics for better query planning
+        EXECUTE format('ANALYZE "%s".knowledge_base;', p_schema_name);
+        EXECUTE format('ANALYZE "%s".interactions;', p_schema_name);
+        EXECUTE format('ANALYZE "%s".interaction_embeddings;', p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Error syncing interaction embeddings: %', SQLERRM;
+    END;
     
     RETURN success_count > 0;
 EXCEPTION WHEN OTHERS THEN

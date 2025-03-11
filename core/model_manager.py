@@ -49,7 +49,7 @@ class ModelManager:
         self.generator = None
         self.embedding_model = None
         self.sentence_transformer = None
-        self.logger = ColoredLogger("ModelManager")
+        self.logger = ColoredLogger(__name__)
         self.logger.info(f"ModelManager initialized with model: {model_name} and device: {device}")
         
     def get_generator(self):
@@ -260,6 +260,18 @@ class EmbeddingProviderAdapter:
     def batch_generate_embeddings(self, texts: List[str]) -> List[Optional[List[float]]]:
         """Generate embeddings for batch of texts"""
         return self.manager.batch_generate_embeddings(texts)
+        
+    def get_embedding_dimension(self) -> int:
+        """Returns the dimension of embeddings produced by this adapter."""
+        # Replace with the actual dimension of your embedding model
+        # For most modern embedding models, this is 384, 768, 1024, 2048
+        # This should match what your database pgvector columns expect
+        # Microsoft Phi-1.5 has a hidden dimension of 2048
+        if "microsoft/phi-1_5" in self.model_name:
+            return 2048
+        return 384  # If using a model like all-MiniLM-L6-v2
+        # return 768  # If using BERT-base or similar
+        # return 1536  # If using OpenAI embeddings
 
 
 def get_embedding_provider(model_name: str = None):

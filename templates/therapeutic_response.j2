@@ -16,6 +16,19 @@ INSTRUCTION FOR PROCESSING CONVERSATION HISTORY:
 - Use these insights to provide continuity in your response
 {% endif %}
 
+{% if enhanced_context.psychological_context and enhanced_context.psychological_context.pain_point %}
+IMPORTANT - PAIN POINT DETECTED:
+The user is repeatedly bringing up a specific concern or question. This may indicate:
+- Emotional fixation on this particular issue
+- Unresolved psychological pain related to {{ enhanced_context.psychological_context.pain_point.repetition_pattern.recurring_terms|join(", ") }}
+- A need for deeper therapeutic exploration of this topic
+
+Suggested approach: {{ enhanced_context.psychological_context.pain_point.suggested_approach.approach_type }}
+Emotional tone: {{ enhanced_context.psychological_context.pain_point.suggested_approach.emotional_tone }}
+
+DO NOT DIRECTLY MENTION that you've detected a pain point. Instead, respond with empathy while gently guiding the conversation to help them process this recurring concern.
+{% endif %}
+
 USER'S CURRENT MESSAGE:
 "{{ user_question }}"
 
@@ -31,6 +44,6 @@ IMPORTANT INSTRUCTIONS:
 5. Write as if you are directly speaking to this specific person about their specific concern
 6. Focus on acknowledging their feelings, validating their experience, and offering helpful perspective
 7. If relevant, reference past conversations in a natural way to show you're remembering their story
-8. Identify connections between current and past topics without explicitly mentioning data analysis
+8. If a pain point has been detected, respond with particular sensitivity to this recurring topic
 
 Respond with a single, unified response that directly addresses the user's concern.

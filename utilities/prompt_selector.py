@@ -2,7 +2,9 @@
 Prompt selector for therapeutic AI responses.
 Based on Alexey Obukhov's therapeutic prompt system.
 """
+import re
 import logging
+import traceback
 from typing import Dict, List, Tuple, Any
 
 from psy_supabase.utilities.text_utils import load_enhanced_mental_health_taxonomy
@@ -178,217 +180,61 @@ class PromptSelector:
         return raw_category_info
 
 
-    def select_prompt_template(self, user_question: str) -> Tuple[str, Dict[str, Any]]:
-        """
-        Select the most appropriate prompt template based on user input.
-        
-        Args:
-            user_question: The user's question or statement
-        
-        Returns:
-            Tuple of (template_name, enhanced_context)
-        """
-        # Clean and normalize the question
-        cleaned_question = self.clean_text(user_question)
-        
-        # Process with NLP for deeper understanding
-        doc = None
-        if self.nlp:
-            doc = self.nlp(cleaned_question)
-        
-        # Extract emotional tone and urgency signals
-        emotional_signals = []
-        if doc:
-            emotional_signals = [token.text for token in doc if token.pos_ == "ADJ" and token.text.lower() in 
-                            ["sad", "angry", "happy", "anxious", "scared", "worried", "depressed",
-                                "hopeless", "fearful", "desperate", "overwhelmed", "confused",
-                                "hurt", "upset", "frustrated", "lonely", "abandoned", "rejected"]]
-        
-        urgency_signals = any(word in cleaned_question.lower() for word in 
-                        ["immediate", "urgent", "emergency", "now", "help me", "desperate", 
-                        "crisis", "suicidal", "can't take it", "end my life", "give up"])
-        
-        # Full keyword mappings with comprehensive coverage
-        keyword_mappings = {
-            "Empathy and Validation": [
-                "sad", "depressed", "down", "unhappy", "alone", "lonely", "grief", "loss", 
-                "hurt", "pain", "suffering", "cry", "tears", "heartbroken", "devastated",
-                "miserable", "despair", "hopeless", "worthless", "meaningless", "empty",
-                "numb", "isolation", "rejected", "abandoned", "betrayed", "disappointed"
-            ],
-            "Affirmation and Reassurance": [
-                "anxious", "worried", "stressed", "nervous", "fear", "scared", "panic", 
-                "overwhelmed", "frightened", "uneasy", "tense", "afraid", "apprehensive",
-                "dread", "terror", "phobia", "paranoid", "restless", "concerned", 
-                "overthinking", "ruminating", "obsessing", "uncertainty", "doubt"
-            ],
-            "Providing Suggestions": [
-                "help", "advice", "tips", "suggestion", "guidance", "recommend", "strategy", 
-                "solution", "fix", "resolve", "approach", "technique", "method", "cope", "handle",
-                "manage", "deal with", "overcome", "improve", "change", "what should I do", 
-                "how can I", "options", "alternatives", "ideas", "tools"
-            ],
-            "Information": [
-                "why", "explain", "understand", "how", "what", "learn", "know", "curious", 
-                "information", "research", "fact", "science", "reason", "cause", "meaning",
-                "definition", "describe", "enlighten", "clarify", "detail", "background",
-                "mechanics", "process", "function", "operation", "mechanism", "theory"
-            ],
-            "Question": [
-                "confused", "unsure", "uncertain", "wonder", "think", "feel", "opinion",
-                "perspective", "view", "insight", "reflection", "consideration", "judgment",
-                "assessment", "evaluation", "analysis", "thoughts", "feedback", "response",
-                "reaction", "impression", "belief", "stance", "position"
-            ],
-            "Trauma": [
-                "abuse", "trauma", "ptsd", "harass", "assault", "bully", "victim", 
-                "workplace abuse", "work abuse", "boss abuse", "manager abuse",
-                "toxic workplace", "hostile", "threat", "intimidate", "humiliate",
-                "mistreat", "mobbing", "gaslighting", "discrimination", "retaliate",
-                "harassment", "violence", "attack", "violate", "nightmare", "flashback",
-                "trigger", "memory", "incident", "event", "childhood", "molest", "rape"
-            ],
-            "Cognitive Behavioral Therapy (CBT)": [
-                "thought", "belief", "think", "pattern", "distortion", "irrational", 
-                "negative", "cognitive", "automatic", "mindset", "perspective",
-                "interpretation", "assumption", "core belief", "schema", "mental filter",
-                "black and white", "catastrophizing", "personalization", "mind reading",
-                "should statements", "labeling", "discounting positives", "magnification"
-            ],
-            "Mindfulness and Relaxation": [
-                "calm", "breathe", "relax", "mindful", "present", "awareness", "meditation",
-                "grounding", "centering", "peace", "tranquility", "serene", "zen",
-                "breathing exercise", "body scan", "progressive relaxation", "visualization",
-                "guided imagery", "stress reduction", "tension", "attention", "focus",
-                "consciousness", "here and now", "sensations", "observation"
-            ],
-            "Grief and Loss": [
-                "grief", "loss", "death", "died", "passed away", "gone", "missing",
-                "mourning", "bereavement", "funeral", "memorial", "deceased", "departed",
-                "lost someone", "anniversary", "coping with loss", "stages of grief",
-                "denial", "anger", "bargaining", "depression", "acceptance", "widow",
-                "widower", "survivor", "remember", "legacy", "tribute"
-            ],
-            "Relationship Healing": [
-                "relationship", "partner", "spouse", "marriage", "couple", "together",
-                "communication", "conflict", "argument", "fight", "misunderstanding",
-                "trust", "betrayal", "infidelity", "cheating", "forgiveness", "reconciliation",
-                "commitment", "compromise", "boundaries", "respect", "intimacy", "connection",
-                "bond", "repair", "rebuild", "strengthen", "therapy"
-            ]
-        }
+    def select_prompt_template(self, question_text: str) -> Tuple[str, Dict[str, Any]]:
+        """Select the appropriate prompt template based on the question content."""
+        try:
+            # Analyze question to determine topic and template
+            classification = self._analyze_question(question_text)
+            topic = classification.get("topic", "general")
+            confidence = classification.get("confidence", 0.5)
 
-        # Match against keyword mappings with weighted scoring
-        template_scores = {}
-        for template, keywords in keyword_mappings.items():
-            # Score based on exact keyword matches
-            keyword_score = sum(2 for keyword in keywords if keyword in cleaned_question.lower())
-            
-            # Add partial matches with lower weight
-            keyword_score += sum(0.5 for keyword in keywords if any(word.startswith(keyword) for word in cleaned_question.lower().split()))
-            
-            if keyword_score > 0:
-                template_scores[template] = keyword_score
-        
-        # Enhanced keyword weights for relationship issues
-        relationship_breakup_terms = {
-            "broke up": 3.0,
-            "break up": 3.0,
-            "breakup": 3.0,
-            "ex girlfriend": 2.5,
-            "ex boyfriend": 2.5,
-            "ex partner": 2.5,
-            "ex wife": 2.5,
-            "ex husband": 2.5
-        }
-        
-        # Look for compound terms with higher weights
-        for compound_term, weight in relationship_breakup_terms.items():
-            if compound_term in cleaned_question.lower():
-                if "Relationship Issues" in template_scores:
-                    template_scores["Relationship Issues"] += weight
-                else:
-                    template_scores["Relationship Issues"] = weight
-                    
-                if "Empathy and Validation" in template_scores:
-                    template_scores["Empathy and Validation"] += weight * 0.8  # Also boost related template
-                else:
-                    template_scores["Empathy and Validation"] = weight * 0.8
-        
-        # Check for depression mentioned alongside relationship terms - common combination
-        if "depress" in cleaned_question.lower() and any(term in cleaned_question.lower() for term in 
-                                                        ["broke up", "breakup", "ex ", "relationship"]):
-            # This is a strong signal for empathy and validation with relationship focus
-            template_scores["Empathy and Validation"] = template_scores.get("Empathy and Validation", 0) + 4.0
-            template_scores["Relationship Issues"] = template_scores.get("Relationship Issues", 0) + 3.0
-            logger.info("Detected depression in relationship context - boosting relevant templates")
-                
-        # Default to 'Empathy and Validation' if no specific matches or if urgent
-        template_name = "Empathy and Validation"
-        
-        # After calculating all template_scores
-        if template_scores:
-            # Find max score for normalization
-            max_score = max(template_scores.values())
-            
-            # Normalize scores to 0-1 range with minimum threshold
-            normalized_scores = {}
-            for template, score in template_scores.items():
-                # Apply sigmoid-like normalization
-                normalized_score = min(0.95, max(0.3, score / (max_score * 1.2)))
-                normalized_scores[template] = normalized_score
-                
-            # Use normalized scores
-            template_scores = normalized_scores
-            
-            # Select highest scoring template
-            template_name = max(template_scores.items(), key=lambda x: x[1])[0]
-            confidence = template_scores[template_name]
-        else:
-            confidence = 0.3  # Default confidence when no templates match
-        
-        # If urgency is detected, override with appropriate supportive template
-        if urgency_signals:
-            template_name = "Crisis Support"
-            confidence = 0.9  # High confidence for crisis
-            logger.info("Urgency detected in query, using Crisis Support template with high confidence")
-        
-        # Generate rich category information
-        raw_category_info = self.generate_category_info(cleaned_question)
-        category_info = self.refine_category_info(raw_category_info)
-        
-        # Determine topic with all available data
-        topic = self._determine_topic(category_info, cleaned_question)
-        
-        # Special handling for detected trauma
-        if "trauma" in topic.lower() or template_name == "Trauma":
-            logger.info(f"Trauma detected: {topic}")
-            # For trauma topics, ensure we're using trauma-informed approach
-            template_name = "Trauma"
-            confidence = max(confidence, 0.7)  # Ensure high confidence for trauma
-        
-        # Special handling for grief
-        if "grief" in topic.lower() or "loss" in topic.lower():
-            template_name = "Grief and Loss"
-            confidence = max(confidence, 0.7)  # Ensure high confidence for grief
-        
-        # Build comprehensive enhanced context
-        enhanced_context = {
-            "detected_template": template_name,
-            "detected_topic": topic,
-            "category_info": category_info,
-            "urgency_level": "high" if urgency_signals else "normal",
-            "emotional_tone": emotional_signals[:3] if emotional_signals else ["neutral"],
-            "confidence": confidence,
-            "keywords_matched": [k for t in template_scores.keys() for k in keyword_mappings.get(t, []) if k in cleaned_question.lower()],
-            "input_length": len(cleaned_question.split())
-        }
-        
-        # Log the final template selection for debugging purposes
-        logger.info(f"Final template selection: '{template_name}' for topic '{topic}' with confidence {confidence:.2f}")
-        
-        return template_name, enhanced_context
+            # Basic mapping of topics to templates
+            template_mapping = {
+                "anxiety": "Anxiety Support",
+                "depression": "Depression Support",
+                "grief": "Grief Support",
+                "trauma": "Trauma Support",
+                "relationships": "Relationship Support",
+                "self_esteem": "Self-Esteem Support",
+                "stress": "Stress Management",
+                "identity": "Identity Exploration",
+                "loneliness": "Loneliness Support",
+                "motivation": "Motivation Support",
+                "general": "basic_answer",
+                "suicidal": "Crisis Support",
+                "crisis": "Crisis Support",
+                "direct_therapeutic_exploration": "direct_therapeutic_exploration",
+                "gentle_therapeutic_guidance": "gentle_therapeutic_guidance",
+                "subtle_therapeutic_exploration": "subtle_therapeutic_exploration",
+            }
 
+            # Check for emotion-based overrides
+            emotion = classification.get("emotion")
+            emotion_intensity = classification.get("emotion_intensity", 0.5)
+
+            # Override template for high emotional intensity
+            if emotion_intensity > 0.8:
+                if emotion in ["anger", "frustration"]:
+                    template_name = "Emotional Regulation"
+                elif emotion in ["sadness", "despair"]:
+                    template_name = "Empathy and Validation"
+                elif emotion in ["anxiety", "fear"]:
+                    template_name = "Grounding and Reassurance"
+                else:
+                    template_name = template_mapping.get(topic, "basic_answer")
+            else:
+                template_name = template_mapping.get(topic, "basic_answer")
+            
+            # Return the selected template name and context data
+            return template_name, {
+                "detected_topic": topic, 
+                "confidence": confidence,
+                "emotion": emotion,
+                "emotion_intensity": emotion_intensity
+            }
+        except Exception as e:
+            logger.error(f"Error selecting prompt template: {e}")
+            return "basic_answer", {"detected_topic": "general", "confidence": 0.5}
 
     def _determine_topic(self, category_info: Dict[str, str], question: str) -> str:
         """
@@ -579,3 +425,129 @@ class PromptSelector:
             analysis["metrics"]["error"] = str(e)
             
         return analysis
+
+    def _analyze_question(self, question_text: str) -> Dict[str, Any]:
+        """
+        Analyze a question to determine topic, emotion, and other contextual factors.
+        
+        Args:
+            question_text: The user's question text
+            
+        Returns:
+            Dict containing analysis results including topic, emotion, and confidence
+        """
+        try:
+            # Initialize default analysis results
+            analysis = {
+                "topic": "general",
+                "confidence": 0.5,
+                "emotion": None,
+                "emotion_intensity": 0.0
+            }
+            
+            # Skip analysis for empty questions
+            if not question_text or len(question_text.strip()) < 3:
+                return analysis
+                
+            # Check for crisis keywords first (safety priority)
+            crisis_keywords = [
+                "suicide", "kill myself", "want to die", "end my life", 
+                "don't want to live", "do not want to live", "suicidal", "harm myself"
+            ]
+            if any(keyword in question_text.lower() for keyword in crisis_keywords):
+                analysis["topic"] = "crisis"
+                analysis["confidence"] = 0.95
+                analysis["emotion"] = "distress"
+                analysis["emotion_intensity"] = 0.9
+                return analysis
+            
+            # Topic classification logic
+            topic_patterns = {
+                "anxiety": [r'\banxiety\b', r'\banxious\b', r'\bpanic\b', r'\bworried\b', r'\bfear\b', r'\bstress(ed)?\b', r'\boverwhelm(ed|ing)\b'],
+                "depression": [r'\bdepress(ed|ion)\b', r'\bsad\b', r'\blow\b', r'\bmood\b', r'\bhopeless\b', r'\bunmotivated\b', r'\bexhausted\b'],
+                "grief": [r'\bgrief\b', r'\bloss\b', r'\bdied\b', r'\bdeath\b', r'\bpassing\b', r'\bmiss them\b', r'\bremember them\b'],
+                "trauma": [r'\btrauma\b', r'\bptsd\b', r'\babuse\b', r'\bviolent\b', r'\bassault\b', r'\bincident\b', r'\bflashbacks\b'],
+                "relationships": [r'\bpartner\b', r'\bspouse\b', r'\bmarriage\b', r'\brelationship\b', r'\bdating\b', r'\bcouple\b', r'\bex\b', r'\bbreak[- ]?up\b'],
+                "self_esteem": [r'\bself[- ]esteem\b', r'\bconfidence\b', r'\bworth\b', r'\bunlovable\b', r'\bunattractive\b', r'\binadequate\b'],
+                "stress": [r'\bstress(ed)?\b', r'\boverwhelm(ed|ing)\b', r'\bbusy\b', r'\bworkload\b', r'\bburn[- ]?out\b', r'\bcoping\b'],
+                "identity": [r'\bidentity\b', r'\bwho am I\b', r'\bmeaning\b', r'\bpurpose\b', r'\bdirection\b', r'\blife purpose\b'],
+                "loneliness": [r'\blonely\b', r'\balone\b', r'\bisolat(ed|ion)\b', r'\bno friends\b', r'\bsocially\b', r'\bconnection\b'],
+                "motivation": [r'\bmotivat(e|ion)\b', r'\bgoals\b', r'\bprocrastinat(e|ion)\b', r'\bstuck\b', r'\bfocus\b', r'\bproductive\b'],
+            }
+            
+            # Emotion detection patterns
+            emotion_patterns = {
+                "anger": [r'\bangry\b', r'\bmad\b', r'\bfurious\b', r'\birritated\b', r'\bfrustrated\b', r'\bresent\b'],
+                "sadness": [r'\bsad\b', r'\bcry(ing)?\b', r'\btear(s|ful)?\b', r'\bupset\b', r'\bmiserable\b', r'\bheartbroken\b'],
+                "fear": [r'\bafraid\b', r'\bscared\b', r'\bfearful\b', r'\bterrified\b', r'\banxious\b', r'\bpanic\b'],
+                "joy": [r'\bhappy\b', r'\bjoy(ful)?\b', r'\belated\b', r'\bexcited\b', r'\bglad\b', r'\bpleased\b'],
+                "disgust": [r'\bdisgust(ed|ing)?\b', r'\bgross\b', r'\brevolting\b', r'\bnausea\b', r'\bsick\b'],
+                "surprise": [r'\bsurprised\b', r'\bshocked\b', r'\bastounded\b', r'\bamazed\b', r'\bastonished\b'],
+                "confusion": [r'\bconfus(ed|ing)\b', r'\bmixed feelings\b', r'\bnot sure\b', r'\buncertain\b', r'\bambivalent\b'],
+                "shame": [r'\bashamed\b', r'\bembarrassed\b', r'\bhumiliated\b', r'\bregret\b', r'\bguilt(y)?\b'],
+                "longing": [r'\bmissing\b', r'\bnostalgia\b', r'\byearning\b', r'\blonging\b', r'\bwistful\b', r'\bremisce\b'],
+            }
+            
+            # Normalize question text
+            normalized_text = question_text.lower()
+            
+            # Analyze topics
+            topic_scores = {}
+            for topic, patterns in topic_patterns.items():
+                score = 0
+                matches = 0
+                for pattern in patterns:
+                    if re.search(pattern, normalized_text):
+                        matches += 1
+                        score += 1
+                
+                if matches > 0:
+                    # Weight by number of matches and pattern density
+                    topic_scores[topic] = (score / len(patterns)) * (matches / len(patterns))
+            
+            # Select highest scoring topic
+            if topic_scores:
+                max_topic = max(topic_scores.items(), key=lambda x: x[1])
+                analysis["topic"] = max_topic[0]
+                analysis["confidence"] = min(0.95, max_topic[1])  # Cap at 0.95
+            
+            # Analyze emotions
+            emotion_scores = {}
+            for emotion, patterns in emotion_patterns.items():
+                score = 0
+                matches = 0
+                for pattern in patterns:
+                    if re.search(pattern, normalized_text):
+                        matches += 1
+                        score += 1
+                
+                if matches > 0:
+                    # Similar weighting logic
+                    emotion_scores[emotion] = (score / len(patterns)) * (matches / len(patterns))
+            
+            # Select emotion with highest score
+            if emotion_scores:
+                max_emotion = max(emotion_scores.items(), key=lambda x: x[1])
+                analysis["emotion"] = max_emotion[0]
+                analysis["emotion_intensity"] = min(0.9, max_emotion[1])  # Cap at 0.9
+            
+            # Apply contextual adjustment based on question length and complexity
+            words = normalized_text.split()
+            if len(words) > 25:  # Longer questions tend to be more detailed/specific
+                analysis["confidence"] = min(0.95, analysis["confidence"] * 1.1)
+                
+            # Log the analysis results
+            logger.info(f"Question analyzed - Topic: {analysis['topic']} ({analysis['confidence']:.2f}), "
+                    f"Emotion: {analysis['emotion'] or 'none'} ({analysis['emotion_intensity']:.2f})")
+            
+            return analysis
+        
+        except Exception as e:
+            logger.error(f"Error analyzing question: {e}")
+            logger.error(traceback.format_exc())
+            return {
+                "topic": "general",
+                "confidence": 0.5,
+                "emotion": None,
+                "emotion_intensity": 0.0
+            }

@@ -1,6 +1,6 @@
 import re
 import logging
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Tuple, Optional
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
