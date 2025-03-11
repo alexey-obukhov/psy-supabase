@@ -375,3 +375,48 @@ class DynamicRAGRetriever:
         except Exception as e:
             logger.error(f"Error analyzing topics: {e}")
             return [{"topic": f"Error: {str(e)}", "frequency": 0}]
+
+    def get_pain_point(self):
+        """
+        Check for recurring patterns in user questions and return detected pain points.
+        
+        Returns:
+            Dict: Pain point information if detected, otherwise None
+        """
+        try:
+            if not self.session_id:
+                logger.warning("Cannot check for pain points without session_id")
+                return None
+            
+            # Use the new method from database.py
+            pain_points = self.db_manager.detect_pain_points(
+                self.session_id, 
+                threshold=0.7, 
+                min_occurrences=2
+            )
+            
+            # If no pain points detected, return None
+            if not pain_points or not pain_points.get('pain_points'):
+                return None
+                
+            # Get the most significant pain point (first detected)
+            primary_pain_point = pain_points['pain_points'][0]
+            
+            # Get recommended therapeutic approach
+            approach = self.db_manager.get_recommended_therapeutic_approach(primary_pain_point)
+            
+            # Combine pain point info with approach
+            result = {
+                'pain_point': primary_pain_point.get('recurring_terms', ['unclear theme'])[0],
+                'recurring_terms': primary_pain_point.get('recurring_terms', []),
+                'count': primary_pain_point.get('count', 0),
+                'severity': pain_points['severity'],
+                'first_detected_at': pain_points['first_detected_at'],
+                'approach': approach
+            }
+            
+            logger.info(f"Detected pain point: {result['pain_point']} (severity: {result['severity']})")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting pain point: {e}")
+            return None

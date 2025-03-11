@@ -6,6 +6,7 @@ import time
 import random
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, g
+from psy_supabase.utilities.text_utils import cleanup_memory
 import spacy
 
 # Configure logging first thing
@@ -50,7 +51,7 @@ ensure_spacy_model()
 
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.database import DatabaseManager
-from psy_supabase.core.model_manager import get_model_manager  # Updated import
+from psy_supabase.core.model_manager import get_model_manager
 
 # --- Disable tokenizer parallelism ---
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -107,20 +108,6 @@ def should_cleanup_memory():
         return True
     
     return False
-
-def cleanup_memory():
-    """Clean up GPU memory."""
-    try:
-        model_manager = get_model_manager(model_name, device)
-        logger.info("Freeing GPU memory...")
-        model_manager.free_memory()
-        torch.cuda.empty_cache()
-        # Also call Python's garbage collector
-        import gc
-        gc.collect()
-        logger.info("Memory cleanup completed")
-    except Exception as e:
-        logger.error(f"Error during memory cleanup: {e}")
 
 @app.teardown_request
 def teardown_request(exception=None):

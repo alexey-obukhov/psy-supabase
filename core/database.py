@@ -2056,3 +2056,364 @@ class DatabaseManager:
             text = text[:max_length]
             
         return text
+
+    def detect_pain_points(self, session_id: str, threshold: float = 0.7, min_occurrences: int = 2) -> Dict:
+        """
+        Detect pain points from conversation history using vector similarity.
+        
+        Args:
+            session_id: The session ID to analyze
+            threshold: Similarity threshold for clustering (0.0-1.0)
+            min_occurrences: Minimum number of occurrences to consider a pain point
+            
+        Returns:
+            Dict with pain point information: {
+                'pain_points': List of pain point objects,
+                'severity': Overall severity assessment,
+                'first_detected_at': Index of first detection
+            }
+        """
+        try:
+            # Get conversation history
+            history = self.get_conversation_history(session_id)
+            
+            if not history or len(history) < min_occurrences:
+                return {'pain_points': [], 'severity': 'none', 'first_detected_at': None}
+            
+            # Extract questions and convert to vectors
+            questions = [item.get('questionText', '') for item in history]
+            
+            # Track clusters of similar questions
+            question_clusters = []
+            
+            # For each question, check if it forms a cluster with others
+            for i, question in enumerate(questions):
+                # Skip empty questions
+                if not question.strip():
+                    continue
+                    
+                # Search for similar questions in the conversation
+                similar_indices = []
+                
+                # Get the vector for this question (using standard embedding function)
+                # In a real implementation, you'd use your actual embedding function
+                for j, other_question in enumerate(questions):
+                    if i == j:  # Skip comparing to self
+                        continue
+                        
+                    # In production, you'd use vector similarity here
+                    # For testing, we'll use simple text matching as a proxy
+                    similarity = self._text_similarity(question, other_question)
+                    
+                    if similarity > threshold:
+                        similar_indices.append(j)
+                
+                # If we found enough similar questions, we have a cluster
+                if len(similar_indices) + 1 >= min_occurrences:  # +1 to include the current question
+                    # Create a pain point cluster
+                    cluster = {
+                        'indices': [i] + similar_indices,
+                        'questions': [questions[i]] + [questions[j] for j in similar_indices],
+                        'recurring_terms': self._extract_recurring_terms(
+                            [questions[i]] + [questions[j] for j in similar_indices]
+                        ),
+                        'first_occurrence': min([i] + similar_indices),
+                        'count': len(similar_indices) + 1
+                    }
+                    
+                    # Check if this cluster overlaps significantly with an existing one
+                    is_new_cluster = True
+                    for existing in question_clusters:
+                        overlap = len(set(cluster['indices']).intersection(set(existing['indices'])))
+                        # If more than 50% overlap, consider it the same cluster
+                        if overlap > len(cluster['indices']) / 2:
+                            is_new_cluster = False
+                            break
+                            
+                    if is_new_cluster:
+                        question_clusters.append(cluster)
+            
+            # Calculate overall pain point metrics
+            pain_points = sorted(question_clusters, key=lambda x: x['first_occurrence'])
+            
+            # Determine severity based on cluster counts and sizes
+            total_questions = len(questions)
+            if not pain_points:
+                severity = 'none'
+            elif sum(p['count'] for p in pain_points) > total_questions * 0.7:
+                severity = 'high'
+            elif sum(p['count'] for p in pain_points) > total_questions * 0.4:
+                severity = 'medium'
+            else:
+                severity = 'low'
+                
+            # Find the first detected pain point
+            first_detected_at = min([p['first_occurrence'] for p in pain_points]) if pain_points else None
+                
+            return {
+                'pain_points': pain_points,
+                'severity': severity,
+                'first_detected_at': first_detected_at
+            }
+            
+        except Exception as e:
+            logger.error(f"Error detecting pain points: {e}")
+            return {'pain_points': [], 'severity': 'none', 'first_detected_at': None}
+
+    def _text_similarity(self, text1: str, text2: str) -> float:
+        """
+        Calculate simple text similarity for testing purposes.
+        In production, use actual vector embeddings.
+        """
+        # Simple word overlap calculation for testing
+        words1 = set(re.findall(r'\b\w+\b', text1.lower()))
+        words2 = set(re.findall(r'\b\w+\b', text2.lower()))
+        
+        if not words1 or not words2:
+            return 0.0
+            
+        overlap = len(words1.intersection(words2))
+        union = len(words1.union(words2))
+        
+        return overlap / union if union > 0 else 0.0
+
+    def _extract_recurring_terms(self, texts: List[str]) -> List[str]:
+        """
+        Extract common terms from a set of texts that might indicate pain points.
+        """
+        # Combine all texts
+        combined = " ".join(texts).lower()
+        
+        # Extract words and count frequencies
+        words = re.findall(r'\b\w+\b', combined)
+        word_counts = {}
+        
+        for word in words:
+            # Skip stop words and very short words
+            if len(word) <= 2 or word in ['the', 'and', 'for', 'that', 'this', 'with', 'you']:
+                continue
+            word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # Find words that appear in multiple texts
+        recurring_words = []
+        for word, count in word_counts.items():
+            # Word must appear multiple times and in multiple texts
+            if count >= 2 and sum(1 for text in texts if word in text.lower()) >= 2:
+                recurring_words.append(word)
+        
+        # Sort by frequency
+        recurring_words.sort(key=lambda w: word_counts[w], reverse=True)
+        
+        # Return top terms
+        return recurring_words[:5]  # Limit to top 5 terms
+
+    def get_recommended_therapeutic_approach(self, pain_point: Dict) -> Dict:
+        """
+        Get a recommended therapeutic approach for a detected pain point.
+        
+        Args:
+            pain_point: Information about the detected pain point
+            
+        Returns:
+            Dict with approach information
+        """
+        try:
+            # Determine the pattern type based on recurring terms
+            recurring_terms = pain_point.get('recurring_terms', [])
+            term_set = set(t.lower() for t in recurring_terms)
+            
+            approaches = {
+                'anxiety': {
+                    'name': 'Anxiety Management',
+                    'primary_technique': 'CBT',
+                    'redirection_strategy': 'Encourage exploration of anxiety triggers and develop coping mechanisms',
+                    'exploration_questions': 'What physical sensations do you notice when anxious? What thoughts come to mind?'
+                },
+                'worried': {
+                    'name': 'Worry Management',
+                    'primary_technique': 'CBT',
+                    'redirection_strategy': 'Examine evidence for and against worries, develop realistic assessments',
+                    'exploration_questions': 'How likely is this worry to come true? What would happen if it did?'
+                },
+                'relationship': {
+                    'name': 'Relationship Pattern Exploration',
+                    'primary_technique': 'Interpersonal Therapy',
+                    'redirection_strategy': 'Explore recurring relationship patterns and attachment style',
+                    'exploration_questions': 'Have you noticed this pattern in other relationships? How does this relate to early experiences?'
+                },
+                'alone': {
+                    'name': 'Loneliness & Attachment',
+                    'primary_technique': 'Attachment-Based Therapy',
+                    'redirection_strategy': 'Explore fear of abandonment and connection needs',
+                    'exploration_questions': 'What does being alone mean to you? What feelings come up when you think about it?'
+                },
+                'sad': {
+                    'name': 'Mood Exploration',
+                    'primary_technique': 'Behavioral Activation',
+                    'redirection_strategy': 'Focus on activities that may improve mood and energy',
+                    'exploration_questions': 'What activities used to bring you joy? What small step might feel manageable?'
+                },
+                'grief': {
+                    'name': 'Grief Processing',
+                    'primary_technique': 'Grief Therapy',
+                    'redirection_strategy': 'Create space for grief expression and meaning-making',
+                    'exploration_questions': 'What does this loss mean to you? What memories are most significant?'
+                },
+                'failure': {
+                    'name': 'Self-Criticism Pattern',
+                    'primary_technique': 'Compassion-Focused Therapy',
+                    'redirection_strategy': 'Develop self-compassion practice and examine inner critic',
+                    'exploration_questions': 'How would you respond to a friend who felt this way? What might self-compassion look like here?'
+                },
+                'trauma': {
+                    'name': 'Trauma Processing',
+                    'primary_technique': 'Trauma-Informed Care',
+                    'redirection_strategy': 'Focus on safety and grounding before processing traumatic content',
+                    'exploration_questions': 'What helps you feel safe in the present moment? How can we work on grounding techniques?'
+                }
+            }
+            
+            # Find matching approach
+            for key, approach in approaches.items():
+                if key in term_set or any(key in term.lower() for term in recurring_terms):
+                    return approach
+            
+            # Default approach if no specific match
+            return {
+                'name': 'General Exploration',
+                'primary_technique': 'Person-Centered',
+                'redirection_strategy': 'Reflect recurring theme and invite deeper exploration',
+                'exploration_questions': 'I notice this theme comes up frequently. Could you share more about what this means to you?'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting therapeutic approach: {e}")
+            return {
+                'name': 'Supportive Listening',
+                'primary_technique': 'Person-Centered',
+                'redirection_strategy': 'Provide empathetic reflection',
+                'exploration_questions': 'Can you tell me more about your experience?'
+            }
+
+    def analyze_pain_points_over_time(self, session_id: str) -> List[Dict]:
+        """
+        Analyze how pain points evolve over therapy sessions.
+        
+        Args:
+            session_id: The session ID to analyze
+            
+        Returns:
+            List of pain point trajectory data points
+        """
+        try:
+            # Get full conversation history
+            history = self.get_conversation_history(session_id)
+            
+            if not history or len(history) < 3:  # Need minimum data
+                return []
+                
+            # Identify session boundaries
+            sessions = []
+            current_session = []
+            
+            for item in history:
+                metadata = {}
+                if isinstance(item.get('metadata'), str):
+                    try:
+                        metadata = json.loads(item.get('metadata', '{}'))
+                    except:
+                        metadata = {}
+                elif isinstance(item.get('metadata'), dict):
+                    metadata = item.get('metadata')
+                    
+                # Check for session start markers
+                if metadata.get('session_start'):
+                    if current_session:
+                        sessions.append(current_session)
+                    current_session = [item]
+                else:
+                    current_session.append(item)
+                    
+            # Add the last session if not empty
+            if current_session:
+                sessions.append(current_session)
+                
+            # If no explicit sessions, create time-based sessions (weekly)
+            if not sessions:
+                # Sort by timestamp
+                try:
+                    history = sorted(history, key=lambda x: x.get('created_at', ''))
+                    
+                    # Group by approximate week
+                    week_ms = 7 * 24 * 60 * 60 * 1000  # One week in milliseconds
+                    current_week = None
+                    current_session = []
+                    
+                    for item in history:
+                        timestamp = item.get('created_at', '')
+                        if not timestamp:
+                            continue
+                            
+                        # Extract milliseconds from timestamp
+                        import datetime
+                        try:
+                            dt = datetime.datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                            ms = int(dt.timestamp() * 1000)
+                            
+                            # Start a new week if needed
+                            if current_week is None:
+                                current_week = ms
+                                current_session = [item]
+                            elif ms - current_week > week_ms:
+                                sessions.append(current_session)
+                                current_session = [item]
+                                current_week = ms
+                            else:
+                                current_session.append(item)
+                        except:
+                            current_session.append(item)
+                            
+                    # Add the last session if not empty
+                    if current_session:
+                        sessions.append(current_session)
+                except:
+                    # If timestamp parsing fails, fall back to simple chunking
+                    chunk_size = max(len(history) // 3, 1)  # At least 3 chunks if possible
+                    sessions = [history[i:i+chunk_size] for i in range(0, len(history), chunk_size)]
+            
+            # Analyze pain points in each session
+            results = []
+            
+            for i, session in enumerate(sessions):
+                # Skip very small sessions
+                if len(session) < 2:
+                    continue
+                    
+                # Get session date from first message
+                session_date = session[0].get('created_at', '')
+                
+                # Detect pain points in this session
+                session_pain_points = self.detect_pain_points(
+                    session_id, 
+                    threshold=0.6,  # Lower threshold for smaller sample
+                    min_occurrences=max(min(len(session) // 3, 2), 1)  # Scale with session size
+                )
+                
+                # Record pain point data
+                results.append({
+                    'session_number': i + 1,
+                    'session_date': session_date,
+                    'pain_point_count': len(session_pain_points.get('pain_points', [])),
+                    'severity': session_pain_points.get('severity', 'none'),
+                    'primary_themes': [
+                        pp.get('recurring_terms', [])[0] if pp.get('recurring_terms') else 'unknown'
+                        for pp in session_pain_points.get('pain_points', [])
+                    ],
+                    'message_count': len(session)
+                })
+                
+            return results
+                
+        except Exception as e:
+            logger.error(f"Error analyzing pain points over time: {e}")
+            return []

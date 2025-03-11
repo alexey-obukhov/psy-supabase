@@ -122,6 +122,28 @@ def create_context(df: pd.DataFrame, max_context_turns: int = 3, logger: Colored
     else:
         print("Context creation completed successfully (vectorized & inplace).")
 
+def cleanup_memory():
+    """Clean up GPU memory."""
+    import torch
+    from psy_supabase.core.model_manager import get_model_manager
+    from school_logging.log import ColoredLogger
+    logger = ColoredLogger("MemoryCleanup")
+    # --- Use GPU if available ---
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Define model name at module level for consistency
+    model_name = "microsoft/phi-1_5"
+    try:
+        model_manager = get_model_manager(model_name, device)
+        logger.info("Freeing GPU memory...")
+        model_manager.free_memory()
+        torch.cuda.empty_cache()
+        # Also call Python's garbage collector
+        import gc
+        gc.collect()
+        logger.info("Memory cleanup completed")
+    except Exception as e:
+        logger.error(f"Error during memory cleanup: {e}")
 
 def load_enhanced_mental_health_taxonomy():
     """

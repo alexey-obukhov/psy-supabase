@@ -148,112 +148,95 @@ class TextGenerator:
         if self.device == "cuda":
             torch.cuda.empty_cache()
 
-    def generate_text(self, prompt: str, max_new_tokens: int = 1000, temperature: float = 0.7, top_p: float = 0.9) -> str:
-        """Generate text from a prompt."""
+    def generate_text(self, prompt: str, max_new_tokens: int = 512, temperature: float = 0.7, top_p: float = 0.9) -> str:
+        """
+        Generate text using the loaded model with token management.
+        
+        Args:
+            prompt: Input prompt
+            max_new_tokens: Maximum new tokens to generate
+            temperature: Sampling temperature
+            top_p: Top-p sampling parameter
+            
+        Returns:
+            Generated text
+        """
         try:
-            logger.info(f"Generating text with prompt of length {len(prompt)}")
+            if not self.model or not self.tokenizer:
+                logger.error("Model or tokenizer not loaded")
+                return ""
             
-            # Check if model is initialized
-            if not hasattr(self, 'model') or self.model is None:
-                logger.error("Model not initialized! Initializing now...")
-                # Re-initialize model
-                from psy_supabase.core.model_manager import get_generator_model
-                self.model, self.tokenizer = get_generator_model()
+            # Check token count and limit if necessary
+            token_count = len(self.tokenizer.encode(prompt))
+            max_context_tokens = 2048  # Set your model's context window size here
+            logger.info(f"Prompt token count: {token_count} (limit: {max_context_tokens})")
             
-            # Process tokens (for testing in CI environment, just return a mock response)
-            if os.environ.get('PSY_TEST_MODE') == 'true':
-                logger.info("Test mode active, returning mock response")
-                return f"This is a mock response to: {prompt[:30]}..."
+            if token_count > max_context_tokens:
+                # If too long, truncate the prompt to fit within token limit
+                logger.warning(f"Prompt exceeds token limit ({token_count} > {max_context_tokens})")
                 
-            # Ensure tokenizer is available
-            if not hasattr(self, 'tokenizer') or self.tokenizer is None:
-                logger.error("Tokenizer not available")
-                return "Error: Tokenizer not available"
+                # Truncate by re-encoding with truncation
+                truncated_tokens = self.tokenizer.encode(
+                    prompt, 
+                    truncation=True, 
+                    max_length=max_context_tokens - 50  # Leave room for generation
+                )
+                prompt = self.tokenizer.decode(truncated_tokens)
+                logger.info(f"Prompt truncated to {len(truncated_tokens)} tokens")
                 
-            # Tokenize prompt
-            input_ids = self.tokenizer.encode(prompt, return_tensors="pt")
+                # Log first and last part of truncated prompt for debugging
+                prompt_start = prompt[:100]
+                prompt_end = prompt[-100:]
+                logger.debug(f"Truncated prompt starts with: {prompt_start}...")
+                logger.debug(f"Truncated prompt ends with: ...{prompt_end}")
             
-            # Check if we should use CUDA - with safety checks and fallback
-            device = 'cpu'  # Default to CPU
-            try:
-                # Only use CUDA if:
-                # 1. It's available
-                # 2. Not explicitly disabled by environment
-                # 3. There's enough free memory (at least 500MB)
-                if torch.cuda.is_available() and not os.environ.get('FORCE_CPU'):
-                    # Check free memory
-                    free_memory = torch.cuda.memory_reserved(0) - torch.cuda.memory_allocated(0)
-                    free_memory_mb = free_memory / (1024 * 1024)
-                    
-                    if free_memory_mb > 500:  # At least 500MB free
-                        device = 'cuda'
-                        logger.info(f"Using CUDA with {free_memory_mb:.2f} MB free memory")
-                    else:
-                        logger.warning(f"Not enough GPU memory ({free_memory_mb:.2f} MB free). Using CPU instead.")
-                
-                # Move input and model to the appropriate device
-                input_ids = input_ids.to(device)
-                self.model = self.model.to(device)
-                
-            except Exception as cuda_error:
-                logger.warning(f"Error setting device, falling back to CPU: {cuda_error}")
-                # Force CPU and retry
-                device = 'cpu'
-                input_ids = input_ids.to('cpu')
-                self.model = self.model.to('cpu')
+            # Generate text with the prepared prompt
+            logger.info(f"Generating text with prompt of length {len(prompt)} (tokens: {token_count if token_count <= max_context_tokens else 'truncated'})")
             
-            # Generate output with additional safety
-            try:
-                with torch.no_grad():
+            with torch.no_grad():
+                input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.device)
+                
+                # Check if input fits on device
+                try:
                     output = self.model.generate(
                         input_ids,
                         max_new_tokens=max_new_tokens,
                         temperature=temperature,
                         top_p=top_p,
-                        do_sample=True
+                        do_sample=True if temperature > 0 else False,
+                        pad_token_id=self.tokenizer.eos_token_id
                     )
+                except RuntimeError as e:
+                    if "out of memory" in str(e).lower():
+                        logger.warning("CUDA out of memory. Trying on CPU...")
+                        # Move to CPU and try again
+                        input_ids = input_ids.cpu()
+                        self.model = self.model.cpu()
+                        self.device = "cpu"
+                        
+                        output = self.model.generate(
+                            input_ids,
+                            max_new_tokens=max_new_tokens,
+                            temperature=temperature,
+                            top_p=top_p,
+                            do_sample=True if temperature > 0 else False,
+                            pad_token_id=self.tokenizer.eos_token_id
+                        )
+                    else:
+                        raise e
+                        
+                output_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
                 
-                # Decode the output (excluding the input)
-                response = self.tokenizer.decode(output[0][input_ids.shape[1]:], skip_special_tokens=True)
+                # Extract only the generated response, not including the prompt
+                response = output_text[len(prompt):]
                 
-            except torch.cuda.OutOfMemoryError:
-                logger.warning("CUDA out of memory during generation, falling back to CPU")
-                # Move everything to CPU and retry with reduced parameters
-                self.model = self.model.to('cpu')
-                input_ids = input_ids.to('cpu')
+                logger.info(f"Generated text of length {len(response)}")
+                return response
                 
-                # Clear CUDA cache
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                
-                # Try again with CPU and reduced parameters
-                with torch.no_grad():
-                    output = self.model.generate(
-                        input_ids,
-                        max_new_tokens=min(max_new_tokens, 200),  # Reduce max tokens
-                        temperature=temperature,
-                        top_p=top_p,
-                        do_sample=True
-                    )
-                
-                response = self.tokenizer.decode(output[0][input_ids.shape[1]:], skip_special_tokens=True)
-                
-            # For tests, ensure we have a non-empty response
-            if not response and os.environ.get('PSY_TEST_MODE') == 'true':
-                response = f"Fallback test response for: {prompt[:20]}..."
-            
-            logger.info(f"Generated response of length {len(response)}")
-            return response
-            
         except Exception as e:
-            logger.error(f"Error in text generation: {e}")
+            logger.error(f"Error generating text: {e}")
             logger.error(traceback.format_exc())
-            
-            # For tests, return a valid response even after error
-            if os.environ.get('PSY_TEST_MODE') == 'true':
-                return f"Error fallback response: {prompt[:20]}..."
-                
-            return "Error generating response."
+            return ""
 
     def _clean_therapeutic_response(self, text: str) -> str:
         """
@@ -519,7 +502,7 @@ class TextGenerator:
             embeddings = hidden_states.mean(dim=1)
             return embeddings
         except Exception as e:
-            logger.error(f"Error during embedding generation: {e}\n{traceback.format_exc()}")
+            logger.error(f"Error during embedding generation: {e}")
             return None
 
     def _final_response_validation(self, response: str) -> str:
@@ -1291,8 +1274,48 @@ class TextGenerator:
                 logger.info("Rendering template with context")
                 logger.debug(f"Template context keys: {list(template_context.keys())}")
                 prompt = template.render(**template_context)
-                logger.info(f"Template rendered successfully, length: {len(prompt)} chars")
-                logger.debug(f"First 100 chars of prompt: {prompt[:100]}")
+                
+                # Add token count check after rendering
+                token_count = len(self.tokenizer.encode(prompt))
+                max_context_tokens = 2048  # Set model's context window size
+                
+                logger.info(f"Template rendered successfully, length: {len(prompt)} chars ({token_count} tokens)")
+                
+                # Check if prompt exceeds token limit
+                if token_count > max_context_tokens:
+                    logger.warning(f"Prompt exceeds token limit ({token_count} > {max_context_tokens})")
+                    # Truncate the prompt but preserve important parts
+                    prompt_parts = prompt.split("\n\n")
+                    essential_parts = []
+                    current_length = 0
+                    
+                    # Always include the first part (instructions) and the user question
+                    essential_parts.append(prompt_parts[0])  # Instructions
+                    current_length += len(prompt_parts[0])
+                    
+                    # Find and include the user's question
+                    for part in prompt_parts:
+                        if "USER'S CURRENT MESSAGE:" in part:
+                            essential_parts.append(part)
+                            current_length += len(part)
+                            break
+                    
+                    # Add remaining parts until we approach the limit
+                    for part in prompt_parts[1:]:
+                        if "USER'S CURRENT MESSAGE:" in part:
+                            continue  # Already added
+                            
+                        if current_length + len(part) + 10 < max_context_tokens:  # Leave a small buffer
+                            essential_parts.append(part)
+                            current_length += len(part) + 2  # +2 for the newlines
+                        else:
+                            # We're out of space
+                            break
+                    
+                    # Combine the essential parts back into a prompt
+                    prompt = "\n\n".join(essential_parts)
+                    logger.info(f"Truncated prompt length: {len(prompt)} chars")
+                    
             except Exception as render_error:
                 logger.error(f"Error rendering template: {render_error}")
                 # Fall back to a basic prompt

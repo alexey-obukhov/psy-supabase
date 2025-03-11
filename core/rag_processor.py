@@ -83,7 +83,7 @@ class RAGProcessor:
     def generate_response(self, user_question: str, session_id: str = "default_session", 
                      device: str = None, question_id: int = None) -> str:
         """
-        Generate a response using Dynamic RAG with psychological memory.
+        Generate a response using Dynamic RAG with psychological memory and pain point detection.
         
         Args:
             user_question: The user's question
@@ -192,63 +192,110 @@ class RAGProcessor:
             
             # Check for pain points if intelligent processing is enabled
             if self.intelligent_processing_enabled:
-                # Get similar questions to detect possible pain points
-                similar_questions = self.db_manager.find_similar_interactions_by_embedding(
-                    query_embedding, 
-                    session_id, 
-                    limit=3
-                )
-                
-                # Check if pain point detected based on repetition patterns
-                if similar_questions and len(similar_questions) >= 2:
-                    # Use the oldest similar question as the original
-                    original_question = similar_questions[-1].get('question', user_question)
-                    
-                    # Get emotional signals for psychological context
-                    emotional_signals = self.db_manager.get_emotional_signals(session_id)
-                    
-                    # Detect repetition patterns
-                    repetition_pattern = self.detect_repetition_pattern(
-                        original_question, 
-                        user_question, 
-                        similar_questions
+                # NEW: First try the updated pain point detection system
+                try:
+                    # Use the enhanced detect_pain_points method from DatabaseManager
+                    pain_points_analysis = self.db_manager.detect_pain_points(
+                        session_id,
+                        threshold=0.7,
+                        min_occurrences=2
                     )
                     
-                    # Consider it a pain point if it's a fixation or has many recurring terms
-                    is_pain_point = repetition_pattern.get('is_fixation', False) or len(repetition_pattern.get('recurring_terms', [])) >= 2
-                    
-                    if is_pain_point:
+                    # If pain points were detected
+                    if pain_points_analysis and pain_points_analysis.get('pain_points'):
+                        # Get the primary pain point
+                        primary_pain_point = pain_points_analysis['pain_points'][0]
+                        
+                        # Get recommended therapeutic approach
+                        approach = self.db_manager.get_recommended_therapeutic_approach(primary_pain_point)
+                        
+                        # Format the pain point info
+                        pain_point = {
+                            'pain_point': primary_pain_point.get('recurring_terms', ['unclear theme'])[0],
+                            'recurring_terms': primary_pain_point.get('recurring_terms', []),
+                            'count': primary_pain_point.get('count', 0),
+                            'severity': pain_points_analysis['severity'],
+                            'first_detected_at': pain_points_analysis['first_detected_at'],
+                            'approach': approach
+                        }
+                        
                         pain_point_detected = True
+                        approach_type = approach.get('name', 'general')
                         
-                        # Generate approach for handling the pain point
-                        approach = self._generate_pain_point_approach(
-                            original_question, 
-                            user_question, 
-                            emotional_signals, 
-                            repetition_pattern
-                        )
+                        logger.info(f"New system detected pain point: {pain_point['pain_point']} (severity: {pain_point['severity']})")
                         
-                        # Update template based on the approach
-                        approach_type = approach.get('approach_type', 'none')
-                        
-                        # With Dynamic RAG, we can use specialized templates
-                        if approach.get('should_redirect'):
-                            template_used = "dynamic_pain_point_redirection"
+                        # Determine which template to use based on severity and count
+                        if pain_point['severity'] == 'high' or pain_point['count'] >= 5:
+                            template_used = "direct_therapeutic_exploration"
                         else:
                             template_used = "dynamic_pain_point_exploration"
                         
-                        # Add pain point info to context - these will be small!
-                        context.update({
-                            'pain_point': {
-                                'recurring_terms': repetition_pattern.get('recurring_terms', []),
-                                'count': repetition_pattern.get('count', 0),
-                                'is_fixation': repetition_pattern.get('is_fixation', False)
-                            },
-                            'approach': approach
-                        })
+                        # Add pain point info to context
+                        context['pain_point'] = pain_point
+                        context['approach'] = approach
+                except Exception as pain_point_error:
+                    logger.error(f"Error in new pain point detection: {pain_point_error}")
+                    # Fall back to original pain point detection below
+                
+                # Fall back to original pain point detection if needed
+                if not pain_point_detected:
+                    # Get similar questions to detect possible pain points
+                    similar_questions = self.db_manager.find_similar_interactions_by_embedding(
+                        query_embedding, 
+                        session_id, 
+                        limit=3
+                    )
+                    
+                    # Check if pain point detected based on repetition patterns
+                    if similar_questions and len(similar_questions) >= 2:
+                        # Use the oldest similar question as the original
+                        original_question = similar_questions[-1].get('question', user_question)
                         
-                        # Log that we detected a pain point
-                        logger.info(f"Pain point detected! Approach: {approach_type}, Template: {template_used}")
+                        # Get emotional signals for psychological context
+                        emotional_signals = self.db_manager.get_emotional_signals(session_id)
+                        
+                        # Detect repetition patterns
+                        repetition_pattern = self.detect_repetition_pattern(
+                            original_question, 
+                            user_question, 
+                            similar_questions
+                        )
+                        
+                        # Consider it a pain point if it's a fixation or has many recurring terms
+                        is_pain_point = repetition_pattern.get('is_fixation', False) or len(repetition_pattern.get('recurring_terms', [])) >= 2
+                        
+                        if is_pain_point:
+                            pain_point_detected = True
+                            
+                            # Generate approach for handling the pain point
+                            approach = self._generate_pain_point_approach(
+                                original_question, 
+                                user_question, 
+                                emotional_signals, 
+                                repetition_pattern
+                            )
+                            
+                            # Update template based on the approach
+                            approach_type = approach.get('approach_type', 'none')
+                            
+                            # With Dynamic RAG, we can use specialized templates
+                            if approach.get('should_redirect'):
+                                template_used = "dynamic_pain_point_redirection"
+                            else:
+                                template_used = "dynamic_pain_point_exploration"
+                            
+                            # Add pain point info to context - these will be small!
+                            context.update({
+                                'pain_point': {
+                                    'recurring_terms': repetition_pattern.get('recurring_terms', []),
+                                    'count': repetition_pattern.get('count', 0),
+                                    'is_fixation': repetition_pattern.get('is_fixation', False)
+                                },
+                                'approach': approach
+                            })
+                            
+                            # Log that we detected a pain point
+                            logger.info(f"Pain point detected! Approach: {approach_type}, Template: {template_used}")
             
             # Add hot topics only if detected
             hot_topics = self._identify_hot_topics(user_question, query_embedding)
@@ -283,6 +330,14 @@ class RAGProcessor:
             
             # Save the interaction with this metadata
             try:
+                # NEW: Also log pain point detection for analytics if detected
+                if pain_point_detected:
+                    self._log_pain_point_detection(
+                        user_question, 
+                        context.get('pain_point', {}), 
+                        template_used
+                    )
+                    
                 save_result = self.db_manager.save_interaction(
                     context=session_id,  # Using session_id as context
                     question=user_question,
@@ -1003,3 +1058,33 @@ class RAGProcessor:
             logger.error(f"Error getting conversation history: {e}")
             logger.error(traceback.format_exc())
             return []
+
+    def _log_pain_point_detection(self, user_question, pain_point, template_used):
+        """Log pain point detection for analysis."""
+        try:
+            # Log structured data for later analysis
+            metadata = {
+                'event_type': 'pain_point_detected',
+                'pain_point': pain_point.get('pain_point', ''),
+                'recurring_terms': pain_point.get('recurring_terms', []),
+                'count': pain_point.get('count', 0),
+                'severity': pain_point.get('severity', ''),
+                'template_used': template_used,
+                'approach': pain_point.get('approach', {}).get('name', '')
+            }
+            
+            # Create a special log entry in interactions table
+            self.db_manager.save_interaction(
+                context="Pain Point System",
+                question=user_question,
+                answer="Pain point detection triggered",
+                metadata=metadata,
+                session_id=None  # System-level event
+            )
+            
+            logger.info(
+                f"Pain point detected: {pain_point.get('pain_point', 'unknown')} "
+                f"(count: {pain_point.get('count', 0)}, severity: {pain_point.get('severity', 'unknown')})"
+            )
+        except Exception as e:
+            logger.error(f"Error logging pain point detection: {e}")

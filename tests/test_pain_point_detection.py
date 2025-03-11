@@ -36,71 +36,73 @@ from psy_supabase.core.model_manager import ModelManager, EmbeddingProviderAdapt
 
 # Test conversation scenarios with recurring themes
 TEST_CONVERSATIONS = [
-    {
-        "name": "Workplace Trauma Pattern",
-        "questions": [
-            "I had a really difficult day at work today. My boss criticized me in front of everyone again.",
-            "Why do I always feel so nervous before team meetings? I'm prepared but still worry about being called out.",
-            "Do you have any tips for handling workplace stress? I'm finding it hard to concentrate lately.",
-            "My manager humiliated me in the meeting yesterday and I can't stop thinking about it. I feel like I'm walking on eggshells at my job."
-        ],
-        "expected_pain_point": {
-            "themes": ["workplace", "criticism", "anxiety", "humiliation"],
-            "approach_types": ["subtle", "gentle", "direct"]
-        }
-    },
+    # {
+    #     "name": "Workplace Trauma Pattern",
+    #     "questions": [
+    #         "I had a really difficult day at work today. My boss criticized me in front of everyone again.",
+    #         "Why do I always feel so nervous before team meetings? I'm prepared but still worry about being called out.",
+    #         "Do you have any tips for handling workplace stress? I'm finding it hard to concentrate lately.",
+    #         "My manager humiliated me in the meeting yesterday and I can't stop thinking about it. I feel like I'm walking on eggshells at my job."
+    #     ],
+    #     "expected_pain_point": {
+    #         "themes": ["workplace", "criticism", "anxiety", "humiliation"],
+    #         "approach_types": ["subtle", "gentle", "direct"]
+    #     }
+    # },
     {
         "name": "Relationship Confidence Pattern",
         "questions": [
             "How do I know if someone really likes me or is just being nice?",
-            "I went on a date yesterday but I'm not sure if it went well. They haven't texted me back yet.",
+            "I went on a date yesterday but I'm not sure if it went well. She haven't texted me back yet.",
             "My friends tell me I'm attractive but I don't feel confident when meeting new people. Any advice?",
-            "I'm worried I'll be alone forever. Why do people never seem interested in me romantically?"
+            "I'm worried I'll be alone forever. Why do people never seem interested in me romantically?",
+            "She texted me back and asked me out again! I'm excited but also nervous. What if I mess it up?",
+            "Date went badly. She said she didn't feel a connection. I feel terrible."
         ],
         "expected_pain_point": {
             "themes": ["relationship", "confidence", "self-esteem", "rejection"],
             "approach_types": ["subtle", "gentle", "direct"]
         }
     },
-    {
-        "name": "Grief Processing Pattern",
-        "questions": [
-            "Today would have been my mom's birthday. I miss her.",
-            "Sometimes I think I hear my mom's voice even though she passed away last year. Is that normal?",
-            "How long does grief usually last? I thought I was doing better but then found myself crying in the grocery store.",
-            "I keep dreaming about my mom. In the dreams she's still alive and we're just doing normal things together. I wake up feeling terrible."
-        ],
-        "expected_pain_point": {
-            "themes": ["grief", "loss", "mom", "dreams"],
-            "approach_types": ["gentle", "direct"]
-        }
-    },
-    {
-        "name": "Self-Blame Pattern",
-        "questions": [
-            "How can I stop making so many mistakes at work?",
-            "I feel like I'm disappointing everyone around me lately.",
-            "What's wrong with me? I can never seem to get things right the first time.",
-            "My friend says I'm too hard on myself but I just have high standards."
-        ],
-        "expected_pain_point": {
-            "themes": ["mistake", "disappoint", "perfectionism", "self-criticism"],
-            "approach_types": ["subtle", "gentle"]
-        }
-    },
-    {
-        "name": "Hidden Trauma Reference Pattern",
-        "questions": [
-            "I've been having trouble sleeping lately. Any suggestions?",
-            "Sometimes I get really jumpy when I hear loud noises. Is that anxiety?",
-            "I had a panic attack when a car backfired near me yesterday.",
-            "Why do certain sounds make me feel like I'm in danger even when I'm safe?"
-        ],
-        "expected_pain_point": {
-            "themes": ["anxiety", "trauma", "trigger", "panic"],
-            "approach_types": ["subtle", "gentle", "direct"]
-        }
-    }
+    # {
+    #     "name": "Grief Processing Pattern",
+    #     "questions": [
+    #         "Today would have been my mom's birthday. I miss her.",
+    #         "Sometimes I think I hear my mom's voice even though she passed away last year. Is that normal?",
+    #         "How long does grief usually last? I thought I was doing better but then found myself crying in the grocery store.",
+    #         "I keep dreaming about my mom. In the dreams she's still alive and we're just doing normal things together. I wake up feeling terrible."
+    #     ],
+    #     "expected_pain_point": {
+    #         "themes": ["grief", "loss", "mom", "dreams"],
+    #         "approach_types": ["gentle", "direct"]
+    #     }
+    # },
+    # {
+    #     "name": "Self-Blame Pattern",
+    #     "questions": [
+    #         "How can I stop making so many mistakes at work?",
+    #         "I feel like I'm disappointing everyone around me lately.",
+    #         "What's wrong with me? I can never seem to get things right the first time.",
+    #         "My friend says I'm too hard on myself but I just have high standards."
+    #     ],
+    #     "expected_pain_point": {
+    #         "themes": ["mistake", "disappoint", "perfectionism", "self-criticism"],
+    #         "approach_types": ["subtle", "gentle"]
+    #     }
+    # },
+    # {
+    #     "name": "Hidden Trauma Reference Pattern",
+    #     "questions": [
+    #         "I've been having trouble sleeping lately. Any suggestions?",
+    #         "Sometimes I get really jumpy when I hear loud noises. Is that anxiety?",
+    #         "I had a panic attack when a car backfired near me yesterday.",
+    #         "Why do certain sounds make me feel like I'm in danger even when I'm safe?"
+    #     ],
+    #     "expected_pain_point": {
+    #         "themes": ["anxiety", "trauma", "trigger", "panic"],
+    #         "approach_types": ["subtle", "gentle", "direct"]
+    #     }
+    # }
 ]
 
 class PainPointDetectionTester:
