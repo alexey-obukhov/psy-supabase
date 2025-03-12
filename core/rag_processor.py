@@ -2,9 +2,9 @@ from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import json
 import re
-import logging
 import traceback
 
+from school_logging.log import ColoredLogger
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.core.text_generator import TextGenerator
@@ -12,8 +12,8 @@ from psy_supabase.utilities.safety_handler import SafetyHandler
 from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Set up logging
+logger = ColoredLogger(__name__)
 
 class RAGProcessor:
     """Handles retrieval-augmented generation logic with optimized pgvector integration."""
@@ -1079,7 +1079,7 @@ class RAGProcessor:
                 question=user_question,
                 answer="Pain point detection triggered",
                 metadata=metadata,
-                session_id=None  # System-level event
+                session_id="default_session"  # Use consistent session ID, not None
             )
             
             logger.info(

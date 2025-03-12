@@ -2,12 +2,11 @@
 NLP utilities for the psy_supabase package.
 Provides a SpacyModelManager singleton for efficient spaCy model management.
 """
-import logging
 import spacy
 from typing import Optional
+from school_logging.log import ColoredLogger
 
-
-logger = logging.getLogger(__name__)
+logger = ColoredLogger(__name__)
 
 class SpacyModelManager:
     """

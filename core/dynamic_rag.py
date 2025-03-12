@@ -1,8 +1,12 @@
-import logging
-from typing import Dict, List, Any
-from psy_supabase.core.database import DatabaseManager
+from school_logging.log import ColoredLogger
+from typing import Dict, List, Any, TYPE_CHECKING
 
-logger = logging.getLogger(__name__)
+# Set up logging
+logger = ColoredLogger(__name__)
+
+# Use TYPE_CHECKING for type hints without runtime dependency
+if TYPE_CHECKING:
+    from psy_supabase.core.database import DatabaseManager
 
 class DynamicRAGRetriever:
     """
@@ -10,7 +14,7 @@ class DynamicRAGRetriever:
     This reduces the context size by only fetching information when needed.
     """
     
-    def __init__(self, db_manager: DatabaseManager, session_id: str, allow_dynamic_queries: bool = True):
+    def __init__(self, db_manager: 'DatabaseManager', session_id: str, allow_dynamic_queries: bool = True):
         """
         Initialize the dynamic retriever with database connection and session info.
         
@@ -26,32 +30,45 @@ class DynamicRAGRetriever:
         
     # For knowledge_by_query - use dynamic limits based on query complexity
     def get_knowledge_by_query(self, query: str, limit: int = None) -> str:
-        # Calculate appropriate limit based on query complexity
-        if limit is None:
-            # Simple queries need fewer results
-            if len(query.split()) <= 3:
-                limit = 2
-            # Complex queries might need more comprehensive information
-            elif len(query.split()) >= 8:
-                limit = 5
-            # Default for medium complexity
-            else:
-                limit = 3
-
-        if not self.allow_dynamic_queries:
-            return "Dynamic querying is disabled."
+        """
+        Get knowledge based on a query by retrieving similar documents from the database.
+        
+        Args:
+            query: The search query (topic) to look for
+            limit: Maximum number of documents to retrieve. If None, dynamically determined.
             
-        # Check cache first
-        cache_key = f"knowledge_{query}_{limit}"
-        if cache_key in self.query_cache:
-            logger.info(f"Using cached knowledge for query: {query}")
-            return self.query_cache[cache_key]
-            
+        Returns:
+            str: Combined content from retrieved documents
+        """
         try:
-            # Convert query to embedding
-            embedding = self.db_manager.create_embedding(query)
+            clean_query = query.replace('kb_', '') if isinstance(query, str) and query.startswith('kb_') else query
+            
+            # Calculate appropriate limit based on query complexity if not specified
+            if limit is None:
+                # Simple queries need fewer results
+                if len(clean_query.split()) <= 3:
+                    limit = 2
+                # Complex queries might need more comprehensive information
+                elif len(clean_query.split()) >= 8:
+                    limit = 5
+                # Default for medium complexity
+                else:
+                    limit = 3
+                    
+            if not self.allow_dynamic_queries:
+                return "Dynamic querying is disabled."
+                
+            # Check cache first - use clean query for cache key
+            cache_key = f"knowledge_{clean_query}_{limit}"
+            if cache_key in self.query_cache:
+                logger.info(f"Using cached knowledge for query: {clean_query}")
+                return self.query_cache[cache_key]
+                
+            # Get embeddings for the query
+            embedding = self.db_manager.create_embedding(clean_query)
             if not embedding:
-                return "Unable to create embedding for query."
+                logger.error(f"Failed to generate embedding for knowledge query: {clean_query}")
+                return ""
                 
             # Use schema-specific knowledge base search for better performance
             # This uses the specific schema's knowledge_base table with specialized pgvector indexes
@@ -63,38 +80,54 @@ class DynamicRAGRetriever:
             )
             
             if not results:
-                return f"No knowledge found for: {query}"
+                # Fallback to regular search if RPC fails
+                results = self.db_manager.find_similar_documents_by_embedding(
+                    embedding=embedding,
+                    threshold=0.5,
+                    limit=limit
+                )
                 
-            # Format the results
-            formatted_results = ""
-            for i, doc in enumerate(results):
-                # Handle both dictionary and string formats
-                if isinstance(doc, dict):
-                    content = doc.get('content', '')
-                    metadata = doc.get('metadata', {})
-                    similarity = doc.get('similarity', 0)
-                    
-                    # Include metadata if available
-                    meta_str = ""
-                    if metadata and isinstance(metadata, dict):
-                        if 'source' in metadata:
-                            meta_str = f" (Source: {metadata['source']})"
-                        elif 'category' in metadata:
-                            meta_str = f" (Category: {metadata['category']})"
-                            
-                    formatted_results += f"[{i+1}] {content}{meta_str} [relevance: {similarity:.2f}]\n\n"
-                else:
-                    content = str(doc)
-                    formatted_results += f"[{i+1}] {content}\n\n"
-                    
-            # Cache the results
-            self.query_cache[cache_key] = formatted_results
-            return formatted_results
+            if not results:
+                logger.warning(f"No similar documents found for query: {clean_query}")
+                return f"No knowledge found for: {clean_query}"
+                
+            # Combine the content - choose the format based on the first result's structure
+            if isinstance(results[0], dict) and "content" in results[0]:
+                # Simple format - just combine content fields
+                combined_content = "\n\n".join([doc.get("content", "") for doc in results])
+            else:
+                # Format the results with more details
+                combined_content = ""
+                for i, doc in enumerate(results):
+                    # Handle both dictionary and string formats
+                    if isinstance(doc, dict):
+                        content = doc.get('content', '')
+                        metadata = doc.get('metadata', {})
+                        similarity = doc.get('similarity', 0)
+                        
+                        # Include metadata if available
+                        meta_str = ""
+                        if metadata and isinstance(metadata, dict):
+                            if 'source' in metadata:
+                                meta_str = f" (Source: {metadata['source']})"
+                            elif 'category' in metadata:
+                                meta_str = f" (Category: {metadata['category']})"
+                                
+                        combined_content += f"{content}{meta_str}\n\n"
+                    else:
+                        content = str(doc)
+                        combined_content += f"{content}\n\n"
+            
+            # Cache the result
+            self.query_cache[cache_key] = combined_content
+            
+            logger.info(f"Retrieved knowledge for '{clean_query}': {len(combined_content)} chars from {len(results)} docs")
+            return combined_content
             
         except Exception as e:
-            logger.error(f"Error retrieving knowledge: {e}")
+            logger.error(f"Error retrieving knowledge for query '{query}': {e}")
             return f"Error retrieving knowledge: {str(e)}"
-    
+
     def get_past_interactions(self, topic: str = None, limit: int = 3) -> str:
         """
         Dynamically retrieve past conversation interactions.

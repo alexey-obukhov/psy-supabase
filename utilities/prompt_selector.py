@@ -3,15 +3,15 @@ Prompt selector for therapeutic AI responses.
 Based on Alexey Obukhov's therapeutic prompt system.
 """
 import re
-import logging
 import traceback
 from typing import Dict, List, Tuple, Any
 
 from psy_supabase.utilities.text_utils import load_enhanced_mental_health_taxonomy
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.nlp_utils import get_spacy_model
+from school_logging.log import ColoredLogger
 
-logger = logging.getLogger(__name__)
+logger = ColoredLogger(__name__)
 
 class PromptSelector:
     """
@@ -110,7 +110,7 @@ class PromptSelector:
             A dictionary mapping categories to descriptions, without any empty categories.
         """
         if not question:
-            return {"Others": "General therapeutic support"}
+            return {"Others": "therapeutic support"}
         
         # Clean and normalize the question text for NLP processing
         cleaned_question = self.clean_text(question).lower()
@@ -157,7 +157,7 @@ class PromptSelector:
         
         # ALWAYS ensure we have at least one category
         if not category_info:
-            category_info["Others"] = "General therapeutic support"
+            category_info["Others"] = "therapeutic support"
         
         return {cat: description for cat, description in category_info.items() if description.strip()}
 

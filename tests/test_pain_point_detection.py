@@ -4,9 +4,8 @@ import uuid
 from school_logging.log import ColoredLogger
 from collections import Counter
 from typing import List, Dict, Any
-from datetime import datetime
 from dotenv import load_dotenv
-import torch
+from psy_supabase.utilities.text_utils import cleanup_memory
 
 
 # Load environment variables
@@ -357,13 +356,7 @@ class PainPointDetectionTester:
     def cleanup(self):
         """Clean up test environment to avoid cluttering the database."""
         logger.info("Cleaning up test environment...")
-        
-        try:
-            # Drop the test schema
-            self.db_manager.drop_schema(self.test_session_id)
-            logger.info(f"Dropped test schema: {self.db_manager.schema_name}")
-        except Exception as e:
-            logger.error(f"Error cleaning up: {e}")
+        cleanup_memory()
 
 def analyze_test_results(results: List[Dict[str, Any]]):
     """

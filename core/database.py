@@ -1,4 +1,3 @@
-import logging
 from supabase import create_client
 from typing import List, Dict, Any, Optional
 import json
@@ -6,12 +5,12 @@ import re
 import traceback
 from datetime import datetime
 
+from school_logging.log import ColoredLogger
 from psy_supabase.utilities.text_utils import clean_text
 from psy_supabase.core.model_manager import get_embedding_provider
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = ColoredLogger(__name__)
 
 
 class DatabaseManager:
@@ -1958,19 +1957,27 @@ class DatabaseManager:
             question: User's question
             answer: Generated answer
             metadata: Optional metadata about the interaction
-            session_id: Session identifier (schema)
+            session_id: Session identifier (will be stored in metadata, NOT used as schema)
             
         Returns:
             bool: Success or failure
         """
         try:
-            # Use provided session_id or self.schema_name
-            schema_name = session_id if session_id else self.schema_name
-            schema_name = self._sanitize_schema_name(schema_name)
+            # CRITICAL FIX: Check if session_id is a device name and never use it as schema
+            if session_id in ["cuda", "cpu", "mps"]:
+                logger.warning(f"Device name '{session_id}' detected as session_id. Using 'default_session' instead.")
+                session_id = "default_session"
+            
+            # IMPORTANT: Always use the user's schema, never use session_id as schema
+            schema_name = self._sanitize_schema_name(self.schema_name)
             
             # Prepare metadata as JSON string
             if metadata is None:
                 metadata = {}
+                
+            # Add session_id to metadata if provided
+            if session_id:
+                metadata['session_id'] = session_id
                 
             # Convert metadata to string if it's a dict
             if isinstance(metadata, dict):
@@ -2417,3 +2424,204 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error analyzing pain points over time: {e}")
             return []
+
+    def find_similar_documents_by_embedding(self, embedding, threshold=0.5, limit=5):
+        """
+        Find documents similar to the provided embedding vector.
+        
+        Args:
+            embedding: The embedding vector to compare against
+            threshold: Minimum similarity threshold (0-1)
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of dictionaries containing similar documents
+        """
+        try:
+            # Ensure we have a valid embedding
+            if not embedding or not isinstance(embedding, list):
+                logger.error("Invalid embedding provided to find_similar_documents_by_embedding")
+                return []
+                
+            # Get the schema for this session
+            schema_name = self._sanitize_schema_name()
+            
+            # Use the pgvector extension to find similar documents
+            # The <=> operator is the cosine distance operator (lower is more similar)
+            query = f"""
+            WITH embedding_vector AS (
+                SELECT '{str(embedding).replace(' ', '')}'::vector as embedding
+            )
+            SELECT 
+                id, 
+                content, 
+                metadata,
+                1 - (embedding <=> (SELECT embedding FROM embedding_vector)) as similarity
+            FROM 
+                {schema_name}.knowledge_base
+            WHERE 
+                1 - (embedding <=> (SELECT embedding FROM embedding_vector)) > {threshold}
+            ORDER BY 
+                similarity DESC
+            LIMIT {limit};
+            """
+            
+            # Execute the query using RPC
+            response = self.supabase.rpc('sql', {'command': query}).execute()
+            
+            if not response.data:
+                logger.warning(f"No similar documents found with threshold {threshold}")
+                return []
+                
+            # Format the results
+            results = []
+            for item in response.data:
+                if isinstance(item, dict):
+                    # Well-formed response
+                    results.append({
+                        'id': item.get('id'),
+                        'content': item.get('content', ''),
+                        'metadata': item.get('metadata', {}),
+                        'similarity': item.get('similarity', 0)
+                    })
+                elif isinstance(item, str):
+                    # Fallback for string response format
+                    parts = item.split(',', 3)
+                    if len(parts) >= 3:
+                        results.append({
+                            'id': parts[0],
+                            'content': parts[1],
+                            'metadata': {},
+                            'similarity': float(parts[2]) if len(parts) > 2 else 0
+                        })
+                        
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error finding similar documents by embedding: {e}")
+            return []
+
+    def get_emotional_signals(self, session_id):
+        """
+        Analyze emotional signals from user interactions in the current session.
+        
+        Args:
+            session_id: The session ID to analyze
+            
+        Returns:
+            Dictionary with emotional signals and their frequencies
+        """
+        try:
+            # Ensure we have a valid session
+            if not session_id:
+                return {"error": "No session ID provided"}
+                
+            # Get the schema name
+            schema_name = self._sanitize_schema_name(session_id)
+            
+            # Query to analyze emotional content across user messages
+            query = f"""
+            WITH user_messages AS (
+                SELECT 
+                    question as text,
+                    created_at
+                FROM 
+                    {schema_name}.interactions
+                WHERE 
+                    question IS NOT NULL AND question != ''
+                ORDER BY 
+                    created_at DESC
+                LIMIT 10
+            ),
+            emotion_words AS (
+                SELECT word, category FROM (
+                    VALUES 
+                    ('happy', 'joy'),
+                    ('joy', 'joy'),
+                    ('excited', 'joy'),
+                    ('pleased', 'joy'),
+                    ('sad', 'sadness'),
+                    ('unhappy', 'sadness'),
+                    ('depressed', 'sadness'),
+                    ('miserable', 'sadness'),
+                    ('angry', 'anger'),
+                    ('frustrated', 'anger'),
+                    ('annoyed', 'anger'),
+                    ('furious', 'anger'),
+                    ('anxious', 'anxiety'),
+                    ('worried', 'anxiety'),
+                    ('nervous', 'anxiety'),
+                    ('scared', 'anxiety'),
+                    ('confused', 'confusion'),
+                    ('uncertain', 'confusion'),
+                    ('lost', 'confusion'),
+                    ('hopeful', 'hope'),
+                    ('optimistic', 'hope'),
+                    ('grateful', 'gratitude'),
+                    ('thankful', 'gratitude'),
+                    ('lonely', 'loneliness'),
+                    ('alone', 'loneliness'),
+                    ('isolated', 'loneliness'),
+                    ('ashamed', 'shame'),
+                    ('embarrassed', 'shame'),
+                    ('guilty', 'guilt')
+                ) AS t(word, category)
+            ),
+            word_matches AS (
+                SELECT 
+                    e.category,
+                    COUNT(*) as frequency
+                FROM 
+                    user_messages m,
+                    emotion_words e
+                WHERE 
+                    m.text ILIKE '%' || e.word || '%'
+                GROUP BY 
+                    e.category
+                ORDER BY 
+                    frequency DESC
+            )
+            SELECT 
+                category,
+                frequency
+            FROM 
+                word_matches
+            ORDER BY 
+                frequency DESC
+            LIMIT 5;
+            """
+            
+            # Execute the query
+            response = self.supabase.rpc('sql', {'command': query}).execute()
+            
+            if not response.data:
+                # No emotional signals detected
+                return {"signals": [], "primary_emotion": "neutral"}
+                
+            # Format the results
+            signals = []
+            for item in response.data:
+                if isinstance(item, dict):
+                    signals.append({
+                        'emotion': item.get('category', 'unknown'),
+                        'frequency': item.get('frequency', 0)
+                    })
+                elif isinstance(item, str):
+                    parts = item.split(',')
+                    if len(parts) >= 2:
+                        signals.append({
+                            'emotion': parts[0],
+                            'frequency': int(parts[1]) if parts[1].isdigit() else 0
+                        })
+            
+            # Determine primary emotion
+            primary_emotion = signals[0]['emotion'] if signals else "neutral"
+            
+            return {
+                "signals": signals,
+                "primary_emotion": primary_emotion
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing emotional signals: {e}")
+            return {"error": str(e), "signals": [], "primary_emotion": "neutral"}

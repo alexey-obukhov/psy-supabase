@@ -7,6 +7,7 @@ import random
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, g
 from psy_supabase.utilities.text_utils import cleanup_memory
+from school_logging.log import ColoredLogger
 import spacy
 
 # Configure logging first thing
@@ -20,8 +21,7 @@ import torch
 import multiprocessing as mp
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = ColoredLogger(__name__)
 
 # Memory management variables
 last_memory_cleanup = time.time()
@@ -370,6 +370,7 @@ def free_memory():
         return jsonify({'error': f'Failed to free memory: {str(e)}'}), 500
 
 if __name__ == '__main__':
+    logger = ColoredLogger("psy_supabase")
     if mp.get_start_method(allow_none=True) is None:
         mp.set_start_method('spawn')
 
