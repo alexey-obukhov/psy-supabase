@@ -6,6 +6,7 @@ import traceback
 
 from school_logging.log import ColoredLogger
 from psy_supabase.core.database import DatabaseManager
+from psy_supabase.utilities.keep_words import keep_words
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.safety_handler import SafetyHandler
@@ -642,21 +643,7 @@ class RAGProcessor:
         
         recurring_terms = original_terms.intersection(current_terms)
         
-        # Remove common stopwords from recurring terms
-        stopwords = {'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 
-                    "you're", "you've", "you'll", "you'd", 'your', 'yours', 'yourself', 
-                    'yourselves', 'he', 'him', 'his', 'himself', 'she', "she's", 'her', 
-                    'hers', 'herself', 'it', "it's", 'its', 'itself', 'they', 'them', 
-                    'their', 'theirs', 'themselves', 'what', 'which', 'who', 'whom', 
-                    'this', 'that', "that'll", 'these', 'those', 'am', 'is', 'are', 
-                    'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 
-                    'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 
-                    'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 
-                    'with', 'about', 'against', 'between', 'into', 'through', 'during', 
-                    'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 
-                    'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once'}
-        
-        significant_terms = [term for term in recurring_terms if term not in stopwords and len(term) > 2]
+        significant_terms = [term for term in recurring_terms if term not in keep_words and len(term) > 2]
         
         return {
             'count': high_similarity_count,

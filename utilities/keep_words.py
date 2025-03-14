@@ -13,16 +13,17 @@ Usage:
     from utilities.keep_words import keep_words
 """
 
-keep_words = ("these", "shouldn't", "i'll", "isn't", "i'd",
-              "you've", "hasn't", "doesn't", "or",
-              "what", "she'd", "where", "won't", "cannot", "who",
-              "he'd", "those", "tought", "didn't", "because",
-              "that", "he's", "he'll", "had", "are", "we'll",
-              "why", "i'm", "if", "they'd", "could", "hadn't",
-              "you'll", "did", "when", "be", "they're", "as",
-              "do", "they'll", "we're", "should", "have", "you'd",
-              "a", "does", "being", "you're", "we've", "whom", "wouldn't",
-              "the", "couldn't", "haven't", "which", "but", "i've", "am", "this",
-              "it's", "she's", "was", "weren't", "can't", "having", "were", "been",
-              "doing", "don't", "they've", "an", "is", "wasn't", "and", "we'd", "she'll",
-              "mustn't", "shan't", "would", "has", "aren't", "how")
+keep_words = ('a', 'about', 'above', 'after', 'again', 'against', 'am', 'an', 'and', 'are',
+              "aren't", 'as', 'at', 'be', 'because', 'been', 'before', 'being', 'below', 'between',
+              'but', 'by', "can't", 'cannot', 'could', "couldn't", 'did', "didn't", 'do', 'does',
+              "doesn't", 'doing', "don't", 'down', 'during', 'for', 'from', 'further', 'had',
+              "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd", "he'll", "he's",
+              'her', 'hers', 'herself', 'him', 'himself', 'his', 'how', 'i', "i'd", "i'll", "i'm",
+              "i've", 'if', 'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', 'me', "mustn't",
+              'my', 'myself', 'of', 'off', 'on', 'once', 'or', 'our', 'ours', 'ourselves', 'out', 'over',
+              "shan't", 'she', "she'd", "she'll", "she's", 'should', "shouldn't", 'that', "that'll", 'the',
+              'their', 'theirs', 'them', 'themselves', 'then', 'these', 'they', "they'd", "they'll", "they're",
+              "they've", 'this', 'those', 'through', 'to', 'tought', 'under', 'until', 'up', 'was', "wasn't",
+              'we', "we'd", "we'll", "we're", "we've", 'were', "weren't", 'what', 'when', 'where', 'which',
+              'while', 'who', 'whom', 'why', 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
+              "you're", "you've", 'your', 'yours', 'yourself', 'yourselves')
