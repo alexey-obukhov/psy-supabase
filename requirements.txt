@@ -13,7 +13,6 @@ cymem==2.0.11
 deprecation==2.1.0
 dill==0.3.9
 emoji==1.6.3
-en-core-web-sm==3.7.1
 exceptiongroup==1.2.2
 filelock==3.16.1
 Flask==3.0.3
@@ -65,8 +64,6 @@ platformdirs==4.3.6
 pluggy==1.5.0
 postgrest==0.16.11
 preshed==3.0.9
-# Editable install with no version control (psy-supabase==0.1.0)
--e /home/vertok/git-projects/psy_supabase_pkg
 pydantic==2.10.6
 pydantic_core==2.27.2
 Pygments==2.19.1
@@ -119,3 +116,8 @@ websockets==12.0
 Werkzeug==3.0.6
 wrapt==1.17.2
 zipp==3.20.2
+
+# Include the own colorfull school-logging module from Git
+# download logging package: git+https://github.com/vertok/school_logging.git@main#egg=school-logging
+# install language db for spacy:python -m spacy download en_core_web_sm
+
