@@ -5,6 +5,7 @@ import traceback
 from typing import List, Optional, Dict, Any, ClassVar
 from school_logging.log import ColoredLogger
 from psy_supabase.core.text_generator import TextGenerator
+from typeguard import typechecked
 
 # Create a model manager class to handle loading/unloading
 class ModelManager:
@@ -12,7 +13,8 @@ class ModelManager:
     _instances: ClassVar[Dict[str, 'ModelManager']] = {}
     
     @classmethod
-    def get_instance(cls, model_name: str = "microsoft/phi-1_5", device: str = None) -> 'ModelManager':
+    @typechecked
+    def get_instance(cls, model_name: str = "microsoft/phi-1_5", device: Optional[str] = None) -> 'ModelManager':
         """
         Get or create a ModelManager instance.
         
@@ -229,7 +231,8 @@ class ModelManager:
         return [self.generate_embedding(text) for text in texts]
 
 
-def get_model_manager(model_name: str = "microsoft/phi-1_5", device: str = None) -> ModelManager:
+@typechecked
+def get_model_manager(model_name: str = "microsoft/phi-1_5", device: Optional[str] = None) -> ModelManager:
     """
     Get a ModelManager instance.
     
@@ -273,8 +276,22 @@ class EmbeddingProviderAdapter:
         # return 768  # If using BERT-base or similar
         # return 1536  # If using OpenAI embeddings
 
+    def set_device(self, device: Optional[str]) -> None:
+        """
+        Set the device for the embedding provider.
+        
+        Args:
+            device: Device to use (cuda or cpu)
+        """
+        if device is not None and self.manager:
+            self.manager.preferred_device = device
+            # If we have a sentence transformer, update its device too
+            if hasattr(self.manager, 'sentence_transformer') and self.manager.sentence_transformer is not None:
+                self.manager.sentence_transformer = self.manager.sentence_transformer.to(device)
 
-def get_embedding_provider(model_name: str = None):
+
+@typechecked
+def get_embedding_provider(model_name: Optional[str] = None) -> EmbeddingProviderAdapter:
     """
     Get embedding provider compatible with ai_providers.py interface.
     This provides a bridge to the ModelManager for code that expects

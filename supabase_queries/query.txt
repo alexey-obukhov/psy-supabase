@@ -1,11 +1,13 @@
 -- First, drop all existing functions 
 DROP FUNCTION IF EXISTS get_schema_exists(text);
 DROP FUNCTION IF EXISTS get_conversation_history(text);
+DROP FUNCTION IF EXISTS get_conversation_history(text, text);
 DROP FUNCTION IF EXISTS create_new_schema(text);
 DROP FUNCTION IF EXISTS sql(text, text);
 DROP FUNCTION IF EXISTS create_user_schema_and_tables(text);
 DROP FUNCTION IF EXISTS get_knowledge_base_documents(text);
 DROP FUNCTION IF EXISTS get_topic_interactions(text, text, integer);
+DROP FUNCTION IF EXISTS get_topic_interactions(text, text, text, integer);
 DROP FUNCTION IF EXISTS add_interaction(text, text, text, text, jsonb);
 DROP FUNCTION IF EXISTS find_similar_documents(text, text, integer);
 DROP FUNCTION IF EXISTS add_vector_index_to_knowledge_base(text);
@@ -14,7 +16,9 @@ DROP FUNCTION IF EXISTS connect_psychological_concepts(text, integer, integer, t
 DROP FUNCTION IF EXISTS get_psychological_connections(text, integer, text);
 DROP FUNCTION IF EXISTS mark_therapeutic_insight(text, integer, text);
 DROP FUNCTION IF EXISTS find_psychological_memories(text, text, integer, float);
+DROP FUNCTION IF EXISTS find_psychological_memories(text, text, text, integer, float);
 DROP FUNCTION IF EXISTS analyze_theme_clusters(text, float, integer);
+DROP FUNCTION IF EXISTS analyze_theme_clusters(text, text, float, integer);
 DROP FUNCTION IF EXISTS analyze_emotional_vector_trajectory(text);
 DROP FUNCTION IF EXISTS find_concept_connections(text, integer, float);
 DROP FUNCTION IF EXISTS find_cross_session_patterns(text, text[]);
@@ -28,6 +32,9 @@ DROP FUNCTION IF EXISTS find_similar_interactions(text, text, int);
 DROP FUNCTION IF EXISTS analyze_conversation_themes(text, int);
 DROP FUNCTION IF EXISTS analyze_emotional_trajectory(text, int);
 DROP FUNCTION IF EXISTS initialize_knowledge_base(text, jsonb);
+DROP FUNCTION IF EXISTS analyze_conversation_topics(text, int);
+DROP FUNCTION IF EXISTS optimize_vector_queries(text);
+
 
 -- Enable the vector extension
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -160,8 +167,11 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to get conversation history
-CREATE OR REPLACE FUNCTION get_conversation_history(schema_name TEXT)
+-- Function to get conversation history with session_id filter
+CREATE OR REPLACE FUNCTION get_conversation_history(
+    p_schema_name TEXT,
+    p_session_id TEXT DEFAULT NULL
+)
 RETURNS TABLE (
     interactionID INTEGER,
     context TEXT,
@@ -171,10 +181,20 @@ RETURNS TABLE (
     created_at TIMESTAMP WITH TIME ZONE
 ) AS $$
 BEGIN
-    RETURN QUERY EXECUTE format('
-        SELECT interactionID, context, question, answer, metadata, created_at
-        FROM "%s".interactions
-        ORDER BY created_at;', schema_name);
+    IF p_session_id IS NOT NULL THEN
+        -- Filter by session_id in metadata
+        RETURN QUERY EXECUTE format('
+            SELECT interactionID, context, question, answer, metadata, created_at
+            FROM "%s".interactions i
+            WHERE i.metadata->>''session_id'' = %L
+            ORDER BY created_at;', p_schema_name, p_session_id);
+    ELSE
+        -- Return all interactions if no session_id provided
+        RETURN QUERY EXECUTE format('
+            SELECT interactionID, context, question, answer, metadata, created_at
+            FROM "%s".interactions
+            ORDER BY created_at;', p_schema_name);
+    END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -193,7 +213,12 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to get topic-specific interactions
-CREATE OR REPLACE FUNCTION get_topic_interactions(schema_name TEXT, topic_name TEXT, max_limit INTEGER DEFAULT 5)
+CREATE OR REPLACE FUNCTION get_topic_interactions(
+    p_schema_name TEXT, 
+    p_topic_name TEXT, 
+    p_session_id TEXT DEFAULT NULL,
+    p_max_limit INTEGER DEFAULT 5
+)
 RETURNS TABLE (
     interactionID INTEGER,
     context TEXT,
@@ -203,12 +228,22 @@ RETURNS TABLE (
     created_at TIMESTAMP WITH TIME ZONE
 ) AS $$
 BEGIN
-    RETURN QUERY EXECUTE format('
-        SELECT interactionID, context, question, answer, metadata, created_at
-        FROM "%s".interactions
-        WHERE metadata->>''topic'' = %L
-        ORDER BY created_at DESC
-        LIMIT %s;', schema_name, topic_name, max_limit);
+    IF p_session_id IS NOT NULL THEN
+        RETURN QUERY EXECUTE format('
+            SELECT interactionID, context, question, answer, metadata, created_at
+            FROM "%s".interactions i
+            WHERE i.metadata->>''topic'' = %L AND
+                  i.metadata->>''session_id'' = %L
+            ORDER BY created_at DESC
+            LIMIT %s;', p_schema_name, p_topic_name, p_session_id, p_max_limit);
+    ELSE
+        RETURN QUERY EXECUTE format('
+            SELECT interactionID, context, question, answer, metadata, created_at
+            FROM "%s".interactions
+            WHERE metadata->>''topic'' = %L
+            ORDER BY created_at DESC
+            LIMIT %s;', p_schema_name, p_topic_name, p_max_limit);
+    END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -419,7 +454,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION find_psychological_memories(
     p_schema_name TEXT,
     p_embedding TEXT,
-    p_limit INTEGER DEFAULT 5,
+    p_session_id TEXT,
+    p_limit INT DEFAULT 5,
     p_threshold FLOAT DEFAULT 0.6
 )
 RETURNS TABLE (
@@ -431,29 +467,44 @@ RETURNS TABLE (
     similarity FLOAT
 ) AS $$
 BEGIN
+    -- Create a session-specific GIN index on metadata->>'session_id' if needed
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS %I_session_idx 
+            ON %I.interactions ((metadata->>''session_id''));
+        ', p_schema_name, p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Session index creation failed: %', SQLERRM;
+    END;
+    
+    -- Use ORDER BY for vector search (faster than filtering with WHERE)
     RETURN QUERY EXECUTE format('
         SELECT 
-            interactionid, 
-            question, 
-            answer, 
-            context, 
-            metadata::jsonb, 
-            (1 - (embedding <=> %L::vector)) AS similarity
-        FROM "%s".interactions
-        WHERE embedding IS NOT NULL 
-          AND (1 - (embedding <=> %L::vector)) > %s
-        ORDER BY similarity DESC
+            i.interactionid,
+            i.question,
+            i.answer,
+            i.context,
+            i.metadata,
+            1 - (ie.embedding <=> %L::vector) as similarity
+        FROM 
+            %I.interactions i
+        JOIN 
+            %I.interaction_embeddings ie
+        ON 
+            i.interactionid = ie.interaction_id
+        WHERE 
+            i.metadata->>''session_id'' = %L
+        ORDER BY 
+            ie.embedding <=> %L::vector
         LIMIT %s;
-    ', p_embedding, p_schema_name, p_embedding, p_threshold, p_limit);
-EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Error in find_psychological_memories: %', SQLERRM;
-    RETURN;
+    ', p_embedding, p_schema_name, p_schema_name, p_session_id, p_embedding, p_limit);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to analyze psychological theme clusters in vector space
 CREATE OR REPLACE FUNCTION analyze_theme_clusters(
     p_schema_name TEXT,
+    p_session_id TEXT DEFAULT NULL,
     p_min_similarity FLOAT DEFAULT 0.7,
     p_max_clusters INTEGER DEFAULT 5
 )
@@ -464,49 +515,97 @@ RETURNS TABLE (
     sample_questions TEXT[]
 ) AS $$
 BEGIN
-    RETURN QUERY EXECUTE format('
-        WITH psychological_data AS (
-            SELECT 
-                interactionid,
-                question,
-                embedding,
-                metadata->''topic'' AS theme
-            FROM "%s".interactions
-            WHERE embedding IS NOT NULL
-        ),
-        -- Calculate similarity matrix between interactions
-        similarity_matrix AS (
-            SELECT 
-                a.interactionid as id1,
-                b.interactionid as id2,
-                a.theme,
-                (1 - (a.embedding <=> b.embedding)) AS similarity
-            FROM psychological_data a
-            JOIN psychological_data b ON a.interactionid < b.interactionid
-            WHERE (1 - (a.embedding <=> b.embedding)) > %s
-        ),
-        -- Group by theme and calculate average similarity
-        theme_clusters AS (
-            SELECT 
-                theme,
-                AVG(similarity) AS avg_similarity,
-                COUNT(*) AS cluster_size,
-                ARRAY_AGG(DISTINCT pd.question) FILTER (WHERE pd.question IS NOT NULL) AS sample_questions
-            FROM similarity_matrix sm
-            JOIN psychological_data pd ON sm.id1 = pd.interactionid
-            GROUP BY theme
-            HAVING COUNT(*) > 1
-            ORDER BY AVG(similarity) DESC
-            LIMIT %s
-        )
-        SELECT
-            ROW_NUMBER() OVER (ORDER BY avg_similarity DESC)::INTEGER AS cluster_id,
-            theme::TEXT,
-            avg_similarity,
-            sample_questions
-        FROM theme_clusters
-        WHERE theme IS NOT NULL
-    ', p_schema_name, p_min_similarity, p_max_clusters);
+    -- Add conditional session_id filter
+    IF p_session_id IS NOT NULL THEN
+        RETURN QUERY EXECUTE format('
+            WITH psychological_data AS (
+                SELECT 
+                    interactionid,
+                    question,
+                    embedding,
+                    metadata->''topic'' AS theme
+                FROM "%s".interactions i
+                WHERE embedding IS NOT NULL
+                AND i.metadata->>''session_id'' = %L
+            ),
+            -- Calculate similarity matrix between interactions
+            similarity_matrix AS (
+                SELECT 
+                    a.interactionid as id1,
+                    b.interactionid as id2,
+                    a.theme,
+                    (1 - (a.embedding <=> b.embedding)) AS similarity
+                FROM psychological_data a
+                JOIN psychological_data b ON a.interactionid < b.interactionid
+                WHERE (1 - (a.embedding <=> b.embedding)) > %s
+            ),
+            -- Group by theme and calculate average similarity
+            theme_clusters AS (
+                SELECT 
+                    theme,
+                    AVG(similarity) AS avg_similarity,
+                    COUNT(*) AS cluster_size,
+                    ARRAY_AGG(DISTINCT pd.question) FILTER (WHERE pd.question IS NOT NULL) AS sample_questions
+                FROM similarity_matrix sm
+                JOIN psychological_data pd ON sm.id1 = pd.interactionid
+                GROUP BY theme
+                HAVING COUNT(*) > 1
+                ORDER BY AVG(similarity) DESC
+                LIMIT %s
+            )
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY avg_similarity DESC)::INTEGER AS cluster_id,
+                theme::TEXT,
+                avg_similarity,
+                sample_questions
+            FROM theme_clusters
+            WHERE theme IS NOT NULL
+        ', p_schema_name, p_session_id, p_min_similarity, p_max_clusters);
+    ELSE
+        RETURN QUERY EXECUTE format('
+            WITH psychological_data AS (
+                SELECT 
+                    interactionid,
+                    question,
+                    embedding,
+                    metadata->''topic'' AS theme
+                FROM "%s".interactions
+                WHERE embedding IS NOT NULL
+            ),
+            -- Calculate similarity matrix between interactions
+            similarity_matrix AS (
+                SELECT 
+                    a.interactionid as id1,
+                    b.interactionid as id2,
+                    a.theme,
+                    (1 - (a.embedding <=> b.embedding)) AS similarity
+                FROM psychological_data a
+                JOIN psychological_data b ON a.interactionid < b.interactionid
+                WHERE (1 - (a.embedding <=> b.embedding)) > %s
+            ),
+            -- Group by theme and calculate average similarity
+            theme_clusters AS (
+                SELECT 
+                    theme,
+                    AVG(similarity) AS avg_similarity,
+                    COUNT(*) AS cluster_size,
+                    ARRAY_AGG(DISTINCT pd.question) FILTER (WHERE pd.question IS NOT NULL) AS sample_questions
+                FROM similarity_matrix sm
+                JOIN psychological_data pd ON sm.id1 = pd.interactionid
+                GROUP BY theme
+                HAVING COUNT(*) > 1
+                ORDER BY AVG(similarity) DESC
+                LIMIT %s
+            )
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY avg_similarity DESC)::INTEGER AS cluster_id,
+                theme::TEXT,
+                avg_similarity,
+                sample_questions
+            FROM theme_clusters
+            WHERE theme IS NOT NULL
+        ', p_schema_name, p_min_similarity, p_max_clusters);
+    END IF;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error in analyze_theme_clusters: %', SQLERRM;
     RETURN;
@@ -732,34 +831,95 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to create and maintain vector indexes for session tables
+-- Function to ensure optimized vector indexes for session tables
 CREATE OR REPLACE FUNCTION ensure_vector_indexes(
     p_schema_name TEXT
 )
 RETURNS BOOLEAN AS $$
 BEGIN
-    -- Create index on interactions table if it exists
+    -- Create index on interactions table with HNSW (faster)
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS %s_interactions_embedding_idx 
-            ON "%s".interactions 
-            USING ivfflat (embedding vector_cosine_ops)
-            WITH (lists = 100);
+            CREATE INDEX IF NOT EXISTS %I_interactions_hnsw_idx 
+            ON "%I".interactions 
+            USING hnsw (embedding vector_cosine_ops)
+            WITH (ef_construction = 200, m = 16);
         ', p_schema_name, p_schema_name);
     EXCEPTION WHEN OTHERS THEN
-        RAISE NOTICE 'Failed to create interactions index: %', SQLERRM;
+        -- Fall back to IVFFlat if HNSW failed
+        BEGIN
+            EXECUTE format('
+                CREATE INDEX IF NOT EXISTS %I_interactions_ivf_idx 
+                ON "%I".interactions 
+                USING ivfflat (embedding vector_cosine_ops)
+                WITH (lists = 100);
+            ', p_schema_name, p_schema_name);
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Failed to create interactions index: %', SQLERRM;
+        END;
     END;
     
-    -- Create index on knowledge_base table if it exists
+    -- Create index on interaction_embeddings table with HNSW
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS %s_knowledge_base_embedding_idx 
-            ON "%s".knowledge_base 
-            USING ivfflat (embedding vector_cosine_ops)
-            WITH (lists = 100);
+            CREATE INDEX IF NOT EXISTS %I_interaction_embeddings_hnsw_idx 
+            ON "%I".interaction_embeddings 
+            USING hnsw (embedding vector_cosine_ops)
+            WITH (ef_construction = 200, m = 16);
         ', p_schema_name, p_schema_name);
     EXCEPTION WHEN OTHERS THEN
-        RAISE NOTICE 'Failed to create knowledge_base index: %', SQLERRM;
+        -- Fall back to IVFFlat if HNSW failed
+        BEGIN
+            EXECUTE format('
+                CREATE INDEX IF NOT EXISTS %I_interaction_embeddings_ivf_idx 
+                ON "%I".interaction_embeddings 
+                USING ivfflat (embedding vector_cosine_ops)
+                WITH (lists = 100);
+            ', p_schema_name, p_schema_name);
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Failed to create interaction_embeddings index: %', SQLERRM;
+        END;
+    END;
+    
+    -- Create index on knowledge_base table with HNSW
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS %I_knowledge_base_hnsw_idx 
+            ON "%I".knowledge_base 
+            USING hnsw (embedding vector_cosine_ops)
+            WITH (ef_construction = 200, m = 16);
+        ', p_schema_name, p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        -- Fall back to IVFFlat if HNSW failed
+        BEGIN
+            EXECUTE format('
+                CREATE INDEX IF NOT EXISTS %I_knowledge_base_ivf_idx 
+                ON "%I".knowledge_base 
+                USING ivfflat (embedding vector_cosine_ops)
+                WITH (lists = 100);
+            ', p_schema_name, p_schema_name);
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Failed to create knowledge_base index: %', SQLERRM;
+        END;
+    END;
+    
+    -- Create session filter index for better filtering performance
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS %I_session_metadata_idx
+            ON "%I".interactions ((metadata->>''session_id''));
+        ', p_schema_name, p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Failed to create session metadata index: %', SQLERRM;
+    END;
+    
+    -- Update statistics for better query planning
+    BEGIN
+        EXECUTE format('ANALYZE "%I".interactions;', p_schema_name);
+        EXECUTE format('ANALYZE "%I".interaction_embeddings;', p_schema_name);
+        EXECUTE format('ANALYZE "%I".knowledge_base;', p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Failed to update table statistics: %', SQLERRM;
     END;
     
     RETURN TRUE;
@@ -812,32 +972,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to add embedding column to interactions table
-CREATE OR REPLACE FUNCTION add_embedding_to_interactions(p_schema_name TEXT)
-RETURNS BOOLEAN AS $$
-BEGIN
-    -- Check if column exists
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_schema = p_schema_name 
-        AND table_name = 'interactions' 
-        AND column_name = 'embedding'
-    ) THEN
-        -- Add embedding column
-        EXECUTE format('
-            ALTER TABLE "%s".interactions 
-            ADD COLUMN embedding vector(2048);
-        ', p_schema_name);
-    END IF;
-    
-    RETURN TRUE;
-EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Error adding embedding column: %', SQLERRM;
-    RETURN FALSE;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- Function to add embedding to an interaction
 CREATE OR REPLACE FUNCTION add_embedding_to_interaction(
     p_schema_name TEXT,
@@ -846,22 +980,21 @@ CREATE OR REPLACE FUNCTION add_embedding_to_interaction(
 )
 RETURNS BOOLEAN AS $$
 BEGIN
-    -- Make sure embedding column exists
-    BEGIN
-        EXECUTE format('
-            ALTER TABLE "%s".interactions 
-            ADD COLUMN IF NOT EXISTS embedding vector(2048);
-        ', p_schema_name);
-    EXCEPTION WHEN OTHERS THEN
-        RAISE NOTICE 'Error adding embedding column: %', SQLERRM;
-    END;
-    
-    -- Update the interaction with the embedding
+    -- Update the embedding in interactions table
     EXECUTE format('
         UPDATE "%s".interactions 
         SET embedding = %L::vector 
         WHERE interactionid = %s
     ', p_schema_name, p_embedding, p_interaction_id);
+    
+    -- Insert or update the embedding in interaction_embeddings table
+    EXECUTE format('
+        INSERT INTO "%s".interaction_embeddings 
+        (interaction_id, embedding)
+        VALUES (%s, %L::vector)
+        ON CONFLICT (interaction_id) 
+        DO UPDATE SET embedding = %L::vector
+    ', p_schema_name, p_interaction_id, p_embedding, p_embedding);
     
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
@@ -1090,5 +1223,189 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error initializing knowledge base: %', SQLERRM;
     RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- analyze_conversation_topics
+CREATE OR REPLACE FUNCTION analyze_conversation_topics(
+    p_schema_name TEXT,
+    p_session_id TEXT DEFAULT NULL,
+    p_min_count INT DEFAULT 1
+)
+RETURNS TABLE (
+    topic TEXT,
+    frequency INTEGER
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    has_embeddings BOOLEAN;
+BEGIN
+    -- Check if we have enough embeddings to analyze
+    EXECUTE format('
+        SELECT EXISTS (
+            SELECT 1 FROM %I.interaction_embeddings 
+            LIMIT 3
+        )', p_schema_name) INTO has_embeddings;
+    
+    IF NOT has_embeddings THEN
+        RETURN QUERY SELECT 'Not enough conversation data for analysis'::TEXT, 0::INTEGER;
+        RETURN;
+    END IF;
+    
+    -- Use pgvector to cluster similar questions
+    IF p_session_id IS NOT NULL THEN
+        -- Use session_id filter in metadata
+        RETURN QUERY EXECUTE format('
+            WITH embedding_clusters AS (
+                SELECT 
+                    i.question,
+                    ie.embedding,
+                    COALESCE(i.metadata->>''topic'', ''general'')::TEXT as base_topic
+                FROM %I.interaction_embeddings ie
+                JOIN %I.interactions i ON ie.interaction_id = i.interactionID
+                WHERE i.question IS NOT NULL 
+                  AND LENGTH(i.question) > 10
+                  AND i.metadata->>''session_id'' = %L
+            ),
+            vector_similarity_groups AS (
+                SELECT 
+                    a.base_topic,
+                    a.question,
+                    -- Use cosine similarity to find questions with similar embeddings
+                    1 - (a.embedding <=> b.embedding) AS similarity
+                FROM embedding_clusters a
+                JOIN embedding_clusters b ON a.question != b.question
+                WHERE 1 - (a.embedding <=> b.embedding) > 0.7  -- Similarity threshold
+            ),
+            topic_clusters AS (
+                SELECT
+                    base_topic as topic,
+                    COUNT(DISTINCT question) as frequency
+                FROM vector_similarity_groups
+                GROUP BY base_topic
+                HAVING COUNT(DISTINCT question) >= %L
+            )
+            SELECT 
+                topic::TEXT,
+                frequency::INTEGER
+            FROM topic_clusters
+            ORDER BY frequency DESC
+            
+            -- Add fallback topic if no clusters detected
+            UNION ALL
+            SELECT 
+                CASE WHEN NOT EXISTS (SELECT 1 FROM topic_clusters) 
+                    THEN ''No significant topics identified''::TEXT
+                    ELSE NULL
+                END as topic,
+                0::INTEGER as frequency
+            WHERE NOT EXISTS (SELECT 1 FROM topic_clusters)
+        ', p_schema_name, p_schema_name, p_session_id, p_min_count);
+    ELSE
+        -- No session filter - use all interactions
+        RETURN QUERY EXECUTE format('
+            WITH embedding_clusters AS (
+                SELECT 
+                    i.question,
+                    ie.embedding,
+                    COALESCE(i.metadata->>''topic'', ''general'')::TEXT as base_topic
+                FROM %I.interaction_embeddings ie
+                JOIN %I.interactions i ON ie.interaction_id = i.interactionID
+                WHERE i.question IS NOT NULL AND LENGTH(i.question) > 10
+            ),
+            vector_similarity_groups AS (
+                SELECT 
+                    a.base_topic,
+                    a.question,
+                    -- Use cosine similarity to find questions with similar embeddings
+                    1 - (a.embedding <=> b.embedding) AS similarity
+                FROM embedding_clusters a
+                JOIN embedding_clusters b ON a.question != b.question
+                WHERE 1 - (a.embedding <=> b.embedding) > 0.7  -- Similarity threshold
+            ),
+            topic_clusters AS (
+                SELECT
+                    base_topic as topic,
+                    COUNT(DISTINCT question) as frequency
+                FROM vector_similarity_groups
+                GROUP BY base_topic
+                HAVING COUNT(DISTINCT question) >= %L
+            )
+            SELECT 
+                topic::TEXT,
+                frequency::INTEGER
+            FROM topic_clusters
+            ORDER BY frequency DESC
+            
+            -- Add fallback topic if no clusters detected
+            UNION ALL
+            SELECT 
+                CASE WHEN NOT EXISTS (SELECT 1 FROM topic_clusters) 
+                    THEN ''No significant topics identified''::TEXT
+                    ELSE NULL
+                END as topic,
+                0::INTEGER as frequency
+            WHERE NOT EXISTS (SELECT 1 FROM topic_clusters)
+        ', p_schema_name, p_schema_name, p_min_count);
+    END IF;
+    
+EXCEPTION WHEN OTHERS THEN
+    RETURN QUERY SELECT ('Error: ' || SQLERRM)::TEXT, 0::INTEGER;
+END;
+$$;
+
+-- Function to improve vector query planning
+CREATE OR REPLACE FUNCTION optimize_vector_queries(p_schema_name TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Update statistics for more accurate query planning
+    EXECUTE format('ALTER TABLE %I.interaction_embeddings ALTER COLUMN embedding SET STATISTICS 1000;', p_schema_name);
+    EXECUTE format('ANALYZE %I.interaction_embeddings;', p_schema_name);
+    RETURN TRUE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Failed to optimize vector queries: %', SQLERRM;
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION get_psychological_connections(
+    p_schema_name TEXT,
+    p_concept_id INTEGER,
+    p_relationship_type TEXT DEFAULT NULL,
+    p_session_id TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+    id INTEGER,
+    source_id INTEGER,
+    target_id INTEGER,
+    relationship_type TEXT,
+    strength FLOAT,
+    created_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    IF p_session_id IS NOT NULL THEN
+        -- Filter by session ID in metadata
+        RETURN QUERY EXECUTE format('
+            SELECT 
+                id, source_id, target_id, relationship_type, strength, created_at
+            FROM "%s".concept_connections c
+            WHERE (source_id = %s OR target_id = %s)
+                AND (c.metadata->>''session_id'' = %L)
+                AND (%L IS NULL OR relationship_type = %L)
+            ORDER BY strength DESC;
+        ', p_schema_name, p_concept_id, p_concept_id, p_session_id, p_relationship_type, p_relationship_type);
+    ELSE
+        -- No session filter
+        RETURN QUERY EXECUTE format('
+            SELECT 
+                id, source_id, target_id, relationship_type, strength, created_at
+            FROM "%s".concept_connections
+            WHERE (source_id = %s OR target_id = %s)
+                AND (%L IS NULL OR relationship_type = %L)
+            ORDER BY strength DESC;
+        ', p_schema_name, p_concept_id, p_concept_id, p_relationship_type, p_relationship_type);
+    END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

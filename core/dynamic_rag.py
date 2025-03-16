@@ -1,5 +1,5 @@
 from school_logging.log import ColoredLogger
-from typing import Dict, List, Any, TYPE_CHECKING
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
 
 # Set up logging
 logger = ColoredLogger(__name__)
@@ -27,9 +27,16 @@ class DynamicRAGRetriever:
         self.session_id = session_id
         self.allow_dynamic_queries = allow_dynamic_queries
         self.query_cache = {}  # Cache to avoid repeated identical queries
-        
+
+    def _standardize_cache_key(self, text):
+        """Standardize text for consistent cache keys."""
+        if not text:
+            return "none"
+        # Replace spaces with underscores, lowercase everything
+        return text.lower().replace(' ', '_')
+
     # For knowledge_by_query - use dynamic limits based on query complexity
-    def get_knowledge_by_query(self, query: str, limit: int = None) -> str:
+    def get_knowledge_by_query(self, query: str, limit: Optional[int] = None) -> str:
         """
         Get knowledge based on a query by retrieving similar documents from the database.
         
@@ -41,15 +48,13 @@ class DynamicRAGRetriever:
             str: Combined content from retrieved documents
         """
         try:
-            clean_query = query.replace('kb_', '') if isinstance(query, str) and query.startswith('kb_') else query
-            
             # Calculate appropriate limit based on query complexity if not specified
             if limit is None:
                 # Simple queries need fewer results
-                if len(clean_query.split()) <= 3:
+                if len(query.split()) <= 3:
                     limit = 2
                 # Complex queries might need more comprehensive information
-                elif len(clean_query.split()) >= 8:
+                elif len(query.split()) >= 8:
                     limit = 5
                 # Default for medium complexity
                 else:
@@ -59,15 +64,15 @@ class DynamicRAGRetriever:
                 return "Dynamic querying is disabled."
                 
             # Check cache first - use clean query for cache key
-            cache_key = f"knowledge_{clean_query}_{limit}"
+            cache_key = f"knowledge_{self._standardize_cache_key(query)}_{limit}"
             if cache_key in self.query_cache:
-                logger.info(f"Using cached knowledge for query: {clean_query}")
+                logger.info(f"Using cached knowledge for query: {query}")
                 return self.query_cache[cache_key]
                 
             # Get embeddings for the query
-            embedding = self.db_manager.create_embedding(clean_query)
+            embedding = self.db_manager.create_embedding(query)
             if not embedding:
-                logger.error(f"Failed to generate embedding for knowledge query: {clean_query}")
+                logger.error(f"Failed to generate embedding for knowledge query: {query}")
                 return ""
                 
             # Use schema-specific knowledge base search for better performance
@@ -88,8 +93,8 @@ class DynamicRAGRetriever:
                 )
                 
             if not results:
-                logger.warning(f"No similar documents found for query: {clean_query}")
-                return f"No knowledge found for: {clean_query}"
+                logger.warning(f"No similar documents found for query: {query}")
+                return f"No knowledge found for: {query}"
                 
             # Combine the content - choose the format based on the first result's structure
             if isinstance(results[0], dict) and "content" in results[0]:
@@ -121,14 +126,14 @@ class DynamicRAGRetriever:
             # Cache the result
             self.query_cache[cache_key] = combined_content
             
-            logger.info(f"Retrieved knowledge for '{clean_query}': {len(combined_content)} chars from {len(results)} docs")
+            logger.info(f"Retrieved knowledge for '{query}': {len(combined_content)} chars from {len(results)} docs")
             return combined_content
             
         except Exception as e:
             logger.error(f"Error retrieving knowledge for query '{query}': {e}")
             return f"Error retrieving knowledge: {str(e)}"
 
-    def get_past_interactions(self, topic: str = None, limit: int = 3) -> str:
+    def get_past_interactions(self, topic: Optional[str] = None, limit: int = 3) -> str:
         """
         Dynamically retrieve past conversation interactions.
         
@@ -143,7 +148,7 @@ class DynamicRAGRetriever:
             return "Dynamic querying is disabled."
             
         # Check cache first
-        cache_key = f"interactions_{topic}_{limit}"
+        cache_key = f"interactions_{self._standardize_cache_key(topic)}_{limit}"
         if cache_key in self.query_cache:
             logger.info(f"Using cached interactions for topic: {topic}")
             return self.query_cache[cache_key]
@@ -199,57 +204,6 @@ class DynamicRAGRetriever:
         except Exception as e:
             logger.error(f"Error retrieving past interactions: {e}")
             return f"Error retrieving past interactions: {str(e)}"
-    
-    def get_pain_point(self) -> Dict:
-        """
-        Retrieve current pain point information for the user.
-        
-        Returns:
-            Dict: Pain point information
-        """
-        if not self.allow_dynamic_queries:
-            return {"pain_point": "Dynamic querying is disabled."}
-            
-        cache_key = "pain_point"
-        if cache_key in self.query_cache:
-            return self.query_cache[cache_key]
-            
-        try:
-            # First, create an embedding of the recent conversation to analyze
-            # Get the most recent user question from the conversation history
-            recent_history = self.db_manager.get_conversation_history(self.session_id)
-            
-            if not recent_history or len(recent_history) == 0:
-                return {"pain_point": None}
-                
-            # Get the most recent question
-            recent_question = recent_history[-1].get('questionText', '') if len(recent_history) > 0 else ""
-            
-            if not recent_question:
-                return {"pain_point": None}
-                
-            # Create embedding for the question
-            question_embedding = self.db_manager.create_embedding(recent_question)
-            
-            if not question_embedding:
-                return {"pain_point": None}
-                
-            # Now properly call identify_potential_pain_points with all required arguments
-            pain_points = self.db_manager.identify_potential_pain_points(
-                question_text=recent_question,
-                question_embedding=question_embedding,
-                session_id=self.session_id
-            )
-            
-            if pain_points and len(pain_points) > 0:
-                self.query_cache[cache_key] = pain_points
-                return pain_points
-            else:
-                return {"pain_point": None}
-                
-        except Exception as e:
-            logger.error(f"Error retrieving pain point: {e}")
-            return {"pain_point": f"Error: {str(e)}"}
             
     def reset_cache(self):
         """Clear the query cache."""
@@ -269,7 +223,7 @@ class DynamicRAGRetriever:
         if not self.allow_dynamic_queries:
             return "Dynamic querying is disabled."
             
-        cache_key = f"concepts_{concept}_{limit}"
+        cache_key = f"concepts_{self._standardize_cache_key(concept)}_{limit}"
         if cache_key in self.query_cache:
             return self.query_cache[cache_key]
             
@@ -280,7 +234,7 @@ class DynamicRAGRetriever:
                 return f"No related concepts found for {concept}."
                 
             # Find conceptually similar knowledge entries using pgvector
-            schema_name = self._sanitize_schema_name(self.session_id)
+            schema_name = self.db_manager.schema_name
             
             # Use an SQL query that specifically targets psychological concepts
             query = f"""
@@ -326,16 +280,10 @@ class DynamicRAGRetriever:
             # Cache the results
             self.query_cache[cache_key] = formatted_results
             return formatted_results
-            
+
         except Exception as e:
             logger.error(f"Error finding related concepts: {e}")
             return f"Error finding related concepts: {str(e)}"
-            
-    def _sanitize_schema_name(self, schema_name: str) -> str:
-        """Sanitize schema name by replacing dashes with underscores."""
-        if schema_name:
-            return schema_name.replace('-', '_')
-        return 'default'
 
     def analyze_emotion(self, text: str) -> Dict[str, Any]:
         """
@@ -349,11 +297,11 @@ class DynamicRAGRetriever:
         """
         if not self.allow_dynamic_queries:
             return {"analysis": "Dynamic querying is disabled."}
-            
-        cache_key = f"emotion_{text[:50]}"  # Use first 50 chars as key to avoid huge cache keys
+
+        cache_key = f"emotion_{self._standardize_cache_key(text[:50])}"
         if cache_key in self.query_cache:
             return self.query_cache[cache_key]
-            
+
         try:
             # Create embedding for the text
             embedding = self.db_manager.create_embedding(text)
@@ -365,14 +313,14 @@ class DynamicRAGRetriever:
                 text_embedding=embedding,
                 session_id=self.session_id
             )
-            
+
             if not emotions:
                 return {"primary_emotion": "neutral", "intensity": 0.0, "spectrum": []}
-                
+
             # Cache the results
             self.query_cache[cache_key] = emotions
             return emotions
-            
+
         except Exception as e:
             logger.error(f"Error analyzing emotion: {e}")
             return {"error": f"Error analyzing emotion: {str(e)}"}
@@ -387,24 +335,34 @@ class DynamicRAGRetriever:
         if not self.allow_dynamic_queries:
             return [{"topic": "Dynamic querying is disabled.", "frequency": 0}]
             
-        cache_key = "topics_analysis"
+        cache_key = f"topics_analysis_{self.session_id}"
         if cache_key in self.query_cache:
             return self.query_cache[cache_key]
             
         try:
-            # Call the pgvector-powered topic analysis function
-            topics = self.db_manager.analyze_conversation_topics(
-                session_id=self.session_id, 
-                min_count=1
-            )
+            # Call the RPC function directly - consistent with your codebase
+            response = self.db_manager.supabase.rpc(
+                'analyze_conversation_topics', 
+                {
+                    'p_schema_name': self.db_manager.schema_name,
+                    'p_min_count': 1
+                }
+            ).execute()
             
-            if not topics:
+            if response.data:
+                topics = []
+                for item in response.data:
+                    topics.append({
+                        "topic": item.get('topic', 'Unknown topic'),
+                        "frequency": item.get('frequency', 0)
+                    })
+                
+                # Cache the results
+                self.query_cache[cache_key] = topics
+                return topics
+            else:
                 return [{"topic": "No significant topics identified", "frequency": 0}]
                 
-            # Cache the results
-            self.query_cache[cache_key] = topics
-            return topics
-            
         except Exception as e:
             logger.error(f"Error analyzing topics: {e}")
             return [{"topic": f"Error: {str(e)}", "frequency": 0}]
@@ -420,6 +378,11 @@ class DynamicRAGRetriever:
             if not self.session_id:
                 logger.warning("Cannot check for pain points without session_id")
                 return None
+            
+            # Check cache first
+            cache_key = f"pain_point_{self._standardize_cache_key(self.session_id)}"
+            if cache_key in self.query_cache:
+                return self.query_cache[cache_key]
             
             # Use the new method from database.py
             pain_points = self.db_manager.detect_pain_points(
@@ -447,6 +410,9 @@ class DynamicRAGRetriever:
                 'first_detected_at': pain_points['first_detected_at'],
                 'approach': approach
             }
+            
+            # Cache the result
+            self.query_cache[cache_key] = result
             
             logger.info(f"Detected pain point: {result['pain_point']} (severity: {result['severity']})")
             return result

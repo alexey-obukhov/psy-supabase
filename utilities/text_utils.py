@@ -8,7 +8,7 @@ import re
 import html
 import traceback
 import pandas as pd
-from typing import Any
+from typing import Any, Optional
 from collections import deque
 from school_logging.log import ColoredLogger
 from psy_supabase.utilities.keep_words import keep_words
@@ -36,10 +36,14 @@ def clean_text(text: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()              # Remove extra whitespace
     text = re.sub(r'\n+', '\n', text)                     # Remove redundant newlines
     text = text.replace("'", "''")                        # Escape single quotes for SQL
+    text = text.replace('   ', ' ')                       # Replace multiple spaces with single space
+    text = text.replace('  ', ' ')                        # Replace double spaces with single space
     return text
 
 
-def tokenize_and_lemmatize(text: str, logger: Any = None) -> str:
+def tokenize_and_lemmatize(text: str,
+                           logger: Optional[ColoredLogger] = None
+                           ) -> str:
     """
     Tokenize and lemmatize text using spaCy.
     
@@ -78,7 +82,7 @@ def tokenize_and_lemmatize(text: str, logger: Any = None) -> str:
         return text
 
 
-def create_context(df: pd.DataFrame, max_context_turns: int = 3, logger: ColoredLogger = None) -> None:
+def create_context(df: pd.DataFrame, max_context_turns: int = 3, logger: Optional[ColoredLogger] = None) -> None:
     """
     Modifies the DataFrame inplace by generating structured conversation context for each turn.
 

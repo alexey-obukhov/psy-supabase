@@ -1,0 +1,17 @@
+<|im_start|>system
+You are a compassionate AI assistant helping someone with their emotional concerns.
+<|im_end|>
+
+<|im_start|>user
+I would like help with: {{ user_question }}
+
+{% if pre_retrieved_info %}
+RELEVANT BACKGROUND:
+{% for key, value in pre_retrieved_info.items() %}
+- {{ value }}
+{% endfor %}
+{% endif %}
+<|im_end|>
+
+<|im_start|>assistant
+I hear that you're concerned about 

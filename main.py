@@ -4,11 +4,15 @@ import logging
 import subprocess
 import time
 import random
+import traceback
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, g
 from psy_supabase.utilities.text_utils import cleanup_memory
 from school_logging.log import ColoredLogger
 import spacy
+
+from typeguard import install_import_hook
+install_import_hook('psy_supabase')
 
 # Configure logging first thing
 from psy_supabase.utilities.logging_config import configure_logging
@@ -228,7 +232,10 @@ def chat():
 
         try:
             # Generate response
-            response = rag_processor.generate_response(question, device, 0, user_id)
+            response = rag_processor.generate_response(user_question=question,
+                                                       session_id=user_id,
+                                                       device=device,
+                                                       question_id=0,)
             
             # Validate response before returning
             if not response or len(response.strip()) < 10:
@@ -247,7 +254,8 @@ def chat():
         
         return jsonify({"response": response})
     except Exception as e:
-        logger.exception(f"Error in chat endpoint: {e}")
+        logger.error(f"Error in chat endpoint: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({"response": "I apologize, but I encountered an error. Could you try expressing your concern in a different way?"}), 500
 
 @app.route('/add_document', methods=['POST'])

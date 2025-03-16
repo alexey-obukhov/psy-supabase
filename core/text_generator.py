@@ -39,26 +39,26 @@ response = generator.generate_therapeutic_response(
     }
 )
 """
-from typing import Dict
-import logging
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
-import logging
-import traceback
-from typing import Dict, List, Any
-from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
-from psy_supabase.utilities.text_utils import clean_text
 import os
+import torch
+import traceback
+from dotenv import load_dotenv
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
+from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
+from psy_supabase.utilities.utils_mapping import map_approach_to_template
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from psy_supabase.utilities.prompt_selector import PromptSelector
-from dotenv import load_dotenv
+from school_logging.log import ColoredLogger
 
+if TYPE_CHECKING:
+    from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
+    from psy_supabase.utilities.prompt_selector import PromptSelector
 
 # Load environment variables
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = ColoredLogger(__name__)
 
 class TextGenerator:
     def __init__(self, model_name: str, device: str, use_bfloat16: bool = False):
@@ -189,22 +189,36 @@ class TextGenerator:
                 prompt_end = prompt[-100:]
                 logger.debug(f"Truncated prompt starts with: {prompt_start}...")
                 logger.debug(f"Truncated prompt ends with: ...{prompt_end}")
+                
+            # CRITICAL FIX: Check for phi-1.5 templating pattern in prompt
+            if "<|im_start|>assistant" in prompt and prompt.endswith("<|im_start|>assistant\n"):
+                # Force a different response starter to avoid the template pattern
+                prompt = prompt + "I understand your concern about "
+                logger.info("Added prompt starter text to avoid template response pattern")
+            
+            # Fix any "I understand your feelings about" patterns with blank spaces
+            if "I understand your feelings about" in prompt:
+                prompt = prompt.replace("I understand your feelings about", "I hear your concerns about")
+                logger.info("Fixed known problematic pattern in prompt")
             
             # Generate text with the prepared prompt
-            logger.info(f"Generating text with prompt of length {len(prompt)} (tokens: {token_count if token_count <= max_context_tokens else 'truncated'})")
+            logger.info(f"Generating text with prompt of length {len(prompt)} (tokens: {token_count})")
             
             with torch.no_grad():
                 input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.device)
                 
                 # Check if input fits on device
                 try:
+                    # CRITICAL FIX: Modified params for phi-1.5 to avoid templating issues
                     output = self.model.generate(
                         input_ids,
                         max_new_tokens=max_new_tokens,
-                        temperature=temperature,
-                        top_p=top_p,
-                        do_sample=True if temperature > 0 else False,
-                        pad_token_id=self.tokenizer.eos_token_id
+                        temperature=0.6,  # Slightly lower temperature
+                        top_p=0.9,
+                        do_sample=True,
+                        pad_token_id=self.tokenizer.eos_token_id,
+                        repetition_penalty=1.2,  # Higher penalty to reduce repetition
+                        no_repeat_ngram_size=3  # Specifically for phi-1.5
                     )
                 except RuntimeError as e:
                     if "out of memory" in str(e).lower():
@@ -231,6 +245,7 @@ class TextGenerator:
                 response = output_text[len(prompt):]
                 
                 logger.info(f"Generated text of length {len(response)}")
+                logger.debug(f"Generated text: {response}")
                 return response
                 
         except Exception as e:
@@ -244,6 +259,8 @@ class TextGenerator:
         Removes artifacts while preserving therapeutic content.
         """
         import re
+
+        text = re.sub(r"_{2,}", "", text)
 
         # Check for direct instruction patterns like "Your therapeutic response should be:"
         instruction_prefixes = [
@@ -273,12 +290,19 @@ class TextGenerator:
             r"def\s+\w+\s*\(",
             r"function\s+\w+\s*\(",
             r"class\s+\w+\s*\{",
+            r"Illustration paragraph:",
         ]
         
         for pattern in code_exercise_patterns:
             if re.search(pattern, text, re.IGNORECASE):
-                logger.error(f"Code exercise pattern detected in response: {pattern}")
-                return self._get_emergency_fallback()
+                if pattern == r"Illustration paragraph:":
+                    # Special handling for illustration paragraphs - just cut off at that point
+                    logger.warning("Found 'Illustration paragraph' pattern - truncating response")
+                    return text.split("Illustration paragraph:")[0].strip()
+                else:
+                    # For other code patterns, use emergency fallback
+                    logger.error(f"Code exercise pattern detected in response: {pattern}")
+                    return self._get_emergency_fallback()
 
         # 1. Remove complete instructional sections
         instruction_patterns = [
@@ -624,7 +648,7 @@ class TextGenerator:
 
     def generate_therapeutic_response(self, user_question: str, template_name: str, 
                                       context: Dict[str, Any], 
-                                      conversation_history: List[Dict] = None) -> str:
+                                      conversation_history: Optional[List[Dict]] = None) -> str:
         """
         Generate a therapeutic response using a specific template.
         
@@ -927,7 +951,7 @@ class TextGenerator:
         # If no instructions found, return the original
         return response
 
-    def _clean_response(self, response: str, question: str = None) -> str:
+    def _clean_response(self, response: str, question: Optional[str] = None) -> str:
         """
         Less aggressive cleaning method to preserve valid therapeutic responses.
         """
@@ -1119,7 +1143,7 @@ class TextGenerator:
                 return self.generate_therapeutic_response(user_question, template_name, context, conversation_history)
             
             # Get the retriever object
-            retriever = context['dynamic_retriever']
+            retriever: DynamicRAGRetriever = context['dynamic_retriever']
             
             # Use PromptSelector to analyze the question and extract psychological topics
             # This gives us better topic detection than hardcoded keyword matching
@@ -1173,7 +1197,18 @@ class TextGenerator:
             # Limit to top 3 topics
             extracted_topics = extracted_topics[:3]
             logger.info(f"Extracted topics for RAG retrieval: {extracted_topics}")
-            
+
+            # Extract therapeutic approach from pain points if available
+            therapeutic_approach = None
+            if 'pain_point' in context and context.get('pain_point', {}).get('detected', False):
+                # Get the approach_type from the pain point
+                approach_type = context.get('pain_point', {}).get('suggested_approach', {}).get('approach_type')
+                
+                # Map the approach_type to a therapeutic template name using the utility function
+                if approach_type:
+                    therapeutic_approach = map_approach_to_template(approach_type)
+                    logger.info(f"Using therapeutic approach '{therapeutic_approach}' from pain point approach type '{approach_type}'")
+
             # Add psychological context to the template context
             template_context = context.copy()
             template_context['extracted_topics'] = extracted_topics
@@ -1182,6 +1217,10 @@ class TextGenerator:
                 'emotion': emotion,
                 'categories': category_names
             }
+
+            # Add the therapeutic_approach if we have one
+            if therapeutic_approach:
+                template_context['therapeutic_approach'] = therapeutic_approach
             
             # Load the template
             try:
@@ -1261,7 +1300,7 @@ class TextGenerator:
                         first_topic = extracted_topics[0]
                         kb_info = retriever.get_knowledge_by_query(first_topic, limit=2)
                         if kb_info and len(kb_info) > 20:
-                            pre_retrieved_info[f"kb_{first_topic}"] = kb_info
+                            pre_retrieved_info[first_topic] = kb_info
                     except Exception as e:
                         logger.warning(f"Error pre-retrieving knowledge: {e}")
                 

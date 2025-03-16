@@ -3,8 +3,10 @@ import sys
 import uuid
 from school_logging.log import ColoredLogger
 from collections import Counter
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union, Set, ClassVar
+import json
 from dotenv import load_dotenv
+# import multiprocessing as mp
 from psy_supabase.utilities.text_utils import cleanup_memory
 
 
@@ -12,17 +14,17 @@ from psy_supabase.utilities.text_utils import cleanup_memory
 load_dotenv()
 
 # Set up logging
-logger = ColoredLogger("pain_point_detection_test")
+logger: ColoredLogger = ColoredLogger("pain_point_detection_test")
 
-device = "cpu"  # "cuda" if torch.cuda.is_available() else "cpu"
+device: str = "cpu"  # "cuda" if torch.cuda.is_available() else "cpu"
 logger.info(f"Using device: {device}")
 
 # Add parent directory to path to import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Require Supabase credentials from environment
-supabase_url = os.environ.get("SUPABASE_URL")
-supabase_key = os.environ.get("SUPABASE_KEY")
+supabase_url: Optional[str] = os.environ.get("SUPABASE_URL")
+supabase_key: Optional[str] = os.environ.get("SUPABASE_KEY")
 
 if not supabase_url or not supabase_key:
     logger.critical("SUPABASE_URL and SUPABASE_KEY must be set in environment or .env file")
@@ -31,104 +33,103 @@ if not supabase_url or not supabase_key:
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
-from psy_supabase.core.model_manager import ModelManager, EmbeddingProviderAdapter
 
 # Test conversation scenarios with recurring themes
-TEST_CONVERSATIONS = [
-    # {
-    #     "name": "Workplace Trauma Pattern",
-    #     "questions": [
-    #         "I had a really difficult day at work today. My boss criticized me in front of everyone again.",
-    #         "Why do I always feel so nervous before team meetings? I'm prepared but still worry about being called out.",
-    #         "Do you have any tips for handling workplace stress? I'm finding it hard to concentrate lately.",
-    #         "My manager humiliated me in the meeting yesterday and I can't stop thinking about it. I feel like I'm walking on eggshells at my job."
-    #     ],
-    #     "expected_pain_point": {
-    #         "themes": ["workplace", "criticism", "anxiety", "humiliation"],
-    #         "approach_types": ["subtle", "gentle", "direct"]
-    #     }
-    # },
+TEST_CONVERSATIONS: List[Dict[str, Any]] = [
     {
-        "name": "Relationship Confidence Pattern",
+        "name": "Workplace Trauma Pattern",
         "questions": [
-            "How do I know if someone really likes me or is just being nice?",
-            "I went on a date yesterday but I'm not sure if it went well. She haven't texted me back yet.",
-            "My friends tell me I'm attractive but I don't feel confident when meeting new people. Any advice?",
-            "I'm worried I'll be alone forever. Why do people never seem interested in me romantically?",
-            "She texted me back and asked me out again! I'm excited but also nervous. What if I mess it up?",
-            "Date went badly. She said she didn't feel a connection. I feel terrible."
+            "I had a really difficult day at work today. My boss criticized me in front of everyone again.",
+            "Why do I always feel so nervous before team meetings? I'm prepared but still worry about being called out.",
+            "Should I start looking for another job? I'm tired of feeling inadequate every day in this place.",
+            "How do I stop obsessing over every email my supervisor sends? I keep looking for hidden criticisms."
         ],
         "expected_pain_point": {
-            "themes": ["relationship", "confidence", "self-esteem", "rejection"],
-            "approach_types": ["subtle", "gentle", "direct"]
+            "themes": ["workplace", "criticism", "anxiety", "humiliation", "inadequacy"],
+            "approach_types": ["subtle", "gentle", "direct", "cognitive_behavioral"]
         }
     },
-    # {
-    #     "name": "Grief Processing Pattern",
-    #     "questions": [
-    #         "Today would have been my mom's birthday. I miss her.",
-    #         "Sometimes I think I hear my mom's voice even though she passed away last year. Is that normal?",
-    #         "How long does grief usually last? I thought I was doing better but then found myself crying in the grocery store.",
-    #         "I keep dreaming about my mom. In the dreams she's still alive and we're just doing normal things together. I wake up feeling terrible."
-    #     ],
-    #     "expected_pain_point": {
-    #         "themes": ["grief", "loss", "mom", "dreams"],
-    #         "approach_types": ["gentle", "direct"]
-    #     }
-    # },
-    # {
-    #     "name": "Self-Blame Pattern",
-    #     "questions": [
-    #         "How can I stop making so many mistakes at work?",
-    #         "I feel like I'm disappointing everyone around me lately.",
-    #         "What's wrong with me? I can never seem to get things right the first time.",
-    #         "My friend says I'm too hard on myself but I just have high standards."
-    #     ],
-    #     "expected_pain_point": {
-    #         "themes": ["mistake", "disappoint", "perfectionism", "self-criticism"],
-    #         "approach_types": ["subtle", "gentle"]
-    #     }
-    # },
-    # {
-    #     "name": "Hidden Trauma Reference Pattern",
-    #     "questions": [
-    #         "I've been having trouble sleeping lately. Any suggestions?",
-    #         "Sometimes I get really jumpy when I hear loud noises. Is that anxiety?",
-    #         "I had a panic attack when a car backfired near me yesterday.",
-    #         "Why do certain sounds make me feel like I'm in danger even when I'm safe?"
-    #     ],
-    #     "expected_pain_point": {
-    #         "themes": ["anxiety", "trauma", "trigger", "panic"],
-    #         "approach_types": ["subtle", "gentle", "direct"]
-    #     }
-    # }
+    {
+        "name": "Relationship Insecurity Pattern",
+        "questions": [
+            "My partner was texting someone and smiling, but wouldn't tell me who it was.",
+            "Is it normal to check your partner's phone when they're sleeping?",
+            "I can't stop thinking about who my partner might be talking to when we're apart.",
+            "Sometimes I make up excuses to call my partner just to check where they are."
+        ],
+        "expected_pain_point": {
+            "themes": ["jealousy", "insecurity", "trust", "relationship", "anxiety"],
+            "approach_types": ["gentle", "direct", "compassionate", "psychodynamic"]
+        }
+    },
+    {
+        "name": "Family Dynamics Conflict",
+        "questions": [
+            "My mother always favors my sister over me, no matter what I achieve.",
+            "I dread family gatherings because I always feel like an outsider.",
+            "Why do I still seek my parents' approval even though I'm in my 30s?",
+            "I find myself acting like a teenager again whenever I visit my childhood home."
+        ],
+        "expected_pain_point": {
+            "themes": ["family", "rejection", "childhood", "approval", "favoritism"],
+            "approach_types": ["psychodynamic", "insight_oriented", "compassionate"]
+        }
+    },
+    {
+        "name": "Health Anxiety Cycle",
+        "questions": [
+            "I found a small lump on my neck and I'm convinced it's cancer.",
+            "The doctor said my tests were normal but I still feel something is wrong with my body.",
+            "I spend hours researching symptoms online and always find something that matches.",
+            "How can I stop checking my pulse and blood pressure multiple times a day?"
+        ],
+        "expected_pain_point": {
+            "themes": ["health", "anxiety", "catastrophizing", "obsession", "control"],
+            "approach_types": ["cognitive_behavioral", "mindfulness", "practical"]
+        }
+    },
+    {
+        "name": "Self-Worth Struggle",
+        "questions": [
+            "Sometimes I feel like I'm just taking up space in this world.",
+            "Why do I always apologize for things that aren't my fault?",
+            "I turned down a promotion because I don't think I'm good enough for it.",
+            "I can't accept compliments without explaining why the person is actually wrong about me."
+        ],
+        "expected_pain_point": {
+            "themes": ["self-esteem", "worthlessness", "impostor syndrome", "shame"],
+            "approach_types": ["compassionate", "humanistic", "schema-focused", "gentle"]
+        }
+    }
 ]
 
 class PainPointDetectionTester:
     """Tests the pain point detection capabilities of the RAG system."""
-    
-    def __init__(self):
+
+    test_user_id: str
+    test_session_id: str
+    db_manager: DatabaseManager
+    generator: TextGenerator
+    rag_processor: RAGProcessor
+
+    def __init__(self) -> None:
         """Initialize test environment and components."""
         # Create a unique test user ID for this test run
         self.test_user_id = f"test_user_{uuid.uuid4().hex[:8]}"
         logger.info(f"Using test user ID: {self.test_user_id}")
-        
+
         # Create a unique schema name for testing based on the user ID
         self.test_session_id = f"test_pain_point_{uuid.uuid4().hex[:10]}"
-        logger.info(f"Using test session ID: {self.test_session_id}")
-        
-        # Initialize components
-        #self.model_manager = ModelManager()
-        #self.embedding_provider = EmbeddingProviderAdapter()
-        
+        #logger.info(f"Using test session ID: {self.test_session_id}")
+
         # Initialize database manager with Supabase credentials and test user
         self.db_manager = DatabaseManager(
             supabase_url=supabase_url,
             supabase_key=supabase_key,
             user_id=self.test_user_id
         )
-        
-        self.generator = TextGenerator(model_name = "microsoft/phi-1_5", device=device)
+
+        self.generator = TextGenerator(model_name="microsoft/phi-1_5", device=device)
 
         # Initialize RAG processor with the test schema
         self.rag_processor = RAGProcessor(
@@ -136,14 +137,14 @@ class PainPointDetectionTester:
             generator=self.generator,
             intelligent_processing_enabled=True
         )
-        
+
         # Ensure we can access the database
-        self.db_manager.schema_name = self.db_manager._sanitize_schema_name(self.test_session_id)
-        
+        self.db_manager.schema_name = self.db_manager.schema_name
+
         # Set up test environment
         self._setup_test_environment()
-    
-    def _setup_test_environment(self):
+
+    def _setup_test_environment(self) -> None:
         """Set up the test environment, creating necessary tables."""
         logger.info("Setting up test environment...")
         
@@ -170,7 +171,7 @@ class PainPointDetectionTester:
         """
         logger.info(f"Testing conversation: {conversation['name']}")
         
-        results = {
+        results: Dict[str, Any] = {
             "name": conversation["name"],
             "exchanges": [],
             "pain_points_detected": 0,
@@ -183,41 +184,48 @@ class PainPointDetectionTester:
             logger.info(f"Question {i+1}: {question[:50]}...")
             
             # Generate response through the RAG processor
-            response = self.rag_processor.generate_response(
+            response: str = self.rag_processor.generate_response(
                 user_question=question,
+                session_id=self.test_session_id,
                 device=device,
-                question_id=i,
-                session_id=self.test_session_id
+                question_id=i
             )
             
             # Get the most recent interaction's metadata
             try:
-                history = self.db_manager.get_conversation_history(self.test_session_id)
-                latest_interaction = history[-1] if history else {}
+                history: List[Dict[str, Any]] = self.db_manager.get_conversation_history(self.test_session_id)
+                latest_interaction: Dict[str, Any] = history[-1] if history else {}
                 
                 # Convert metadata from string to dict if needed
-                metadata = latest_interaction.get("metadata", {})
+                metadata: Dict[str, Any] = latest_interaction.get("metadata", {})
                 if isinstance(metadata, str):
                     try:
-                        import json
                         metadata = json.loads(metadata)
                     except Exception as e:
                         logger.error(f"Error parsing metadata JSON: {e}")
                         metadata = {}
                 
                 # Extract pain point information
-                pain_point_detected = metadata.get("pain_point_detected", False)
-                therapeutic_approach = metadata.get("therapeutic_approach", "none")
-                template_used = metadata.get("template_used", "unknown")
-                similarity = metadata.get("pain_point_similarity", 0)
-                recurring_themes = metadata.get("recurring_themes", [])
+                pain_point_detected: bool = metadata.get("pain_point_detected", False)
+                therapeutic_approach: str = metadata.get("therapeutic_approach", "none")
+                template_used: str = metadata.get("template_used", "unknown")
+                similarity: float = metadata.get("pain_point_similarity", 0)
+                recurring_themes: List[str] = metadata.get("recurring_themes", [])
+                
+                # Check for both formats that might appear in the metadata
+                approach_type: Optional[str] = None
+                if "approach_type" in metadata:
+                    approach_type = metadata.get("approach_type")
+                elif "suggested_approach" in metadata and isinstance(metadata["suggested_approach"], dict):
+                    approach_type = metadata["suggested_approach"].get("approach_type")
                 
                 # Record results
-                exchange_result = {
+                exchange_result: Dict[str, Any] = {
                     "question": question,
-                    "response": response[:100] + "..." if response and len(response) > 100 else response if response else "No response",
+                    "response": response if response else "No response",
                     "pain_point_detected": pain_point_detected,
                     "therapeutic_approach": therapeutic_approach,
+                    "approach_type": approach_type,
                     "template_used": template_used,
                     "similarity": similarity,
                     "recurring_themes": recurring_themes
@@ -234,7 +242,7 @@ class PainPointDetectionTester:
                 results["templates_used"].append(template_used)
                 
                 logger.info(f"Response generated. Pain point detected: {pain_point_detected}, " +
-                           f"Approach: {therapeutic_approach}, Template: {template_used}")
+                            f"Approach: {therapeutic_approach}, Template: {template_used}")
                 
             except Exception as e:
                 logger.error(f"Error processing results: {e}")
@@ -248,15 +256,15 @@ class PainPointDetectionTester:
                 # More robust handling for different response types
                 try:
                     # Try to process even if we get strings instead of dictionaries
-                    pain_point_detected = False
-                    therapeutic_approach = "none"
-                    template_used = "unknown"
-                    similarity = 0
-                    recurring_themes = []
+                    pain_point_detected: bool = False
+                    therapeutic_approach: str = "none"
+                    template_used: str = "unknown"
+                    similarity: float = 0
+                    recurring_themes: List[str] = []
                     
                     # Check if history exists and is a list
                     if history and isinstance(history, list) and len(history) > 0:
-                        last_item = history[-1]
+                        last_item: Union[Dict[str, Any], str] = history[-1]
                         
                         # Handle string type
                         if isinstance(last_item, str):
@@ -264,8 +272,7 @@ class PainPointDetectionTester:
                             # Try to parse if it looks like JSON
                             if last_item.startswith('{') and last_item.endswith('}'):
                                 try:
-                                    import json
-                                    parsed_item = json.loads(last_item)
+                                    parsed_item: Dict[str, Any] = json.loads(last_item)
                                     if isinstance(parsed_item, dict):
                                         metadata = parsed_item.get("metadata", {})
                                         if isinstance(metadata, str):
@@ -283,7 +290,6 @@ class PainPointDetectionTester:
                             # Handle metadata as string
                             if isinstance(metadata, str):
                                 try:
-                                    import json
                                     metadata = json.loads(metadata)
                                 except:
                                     metadata = {}
@@ -295,9 +301,9 @@ class PainPointDetectionTester:
                             recurring_themes = metadata.get("recurring_themes", []) if isinstance(metadata, dict) else []
                     
                     # Record results with the data we could extract
-                    exchange_result = {
+                    exchange_result: Dict[str, Any] = {
                         "question": question,
-                        "response": response[:100] + "..." if len(response) > 100 else response,
+                        "response": response,
                         "pain_point_detected": pain_point_detected,
                         "therapeutic_approach": therapeutic_approach,
                         "template_used": template_used,
@@ -320,10 +326,9 @@ class PainPointDetectionTester:
                     # Simple fallback with just the question and response
                     results["exchanges"].append({
                         "question": question,
-                        "response": response[:100] + "..." if response and len(response) > 100 else response if response else "No response",
+                        "response": response if response else "No response",
                         "error": str(e)
                     })
-        
         return results
     
     def run_tests(self) -> List[Dict[str, Any]]:
@@ -333,15 +338,19 @@ class PainPointDetectionTester:
         Returns:
             List of result dictionaries for each conversation
         """
-        all_results = []
+        all_results: List[Dict[str, Any]] = []
         
         for conversation in TEST_CONVERSATIONS:
             # Add a small delay between conversations
             logger.info(f"Starting test for: {conversation['name']}")
             
             # Simulate the conversation
-            result = self._simulate_conversation(conversation)
+            result: Dict[str, Any] = self._simulate_conversation(conversation)
             all_results.append(result)
+            
+            # Run topic analysis after the conversation is complete
+            logger.info("Performing vector-based topic analysis...")
+            result["vector_topics"] = self.analyze_conversation_topics()
             
             # Log summary of this conversation test
             logger.info(f"Completed test for: {conversation['name']}")
@@ -349,16 +358,59 @@ class PainPointDetectionTester:
             if result["first_detection_at"]:
                 logger.info(f"  First detected at question #{result['first_detection_at']}")
             logger.info(f"  Templates used: {', '.join(result['templates_used'])}")
+            
+            # Log topic analysis results
+            if result["vector_topics"]:
+                topic_str = ", ".join([f"{t['topic']}({t['frequency']})" for t in result["vector_topics"] 
+                                      if not t["topic"].startswith("Error") and not t["topic"].startswith("No ")])
+                if topic_str:
+                    logger.info(f"  Vector topics identified: {topic_str}")
+            
             logger.info("----------------------------------------")
         
         return all_results
     
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up test environment to avoid cluttering the database."""
         logger.info("Cleaning up test environment...")
         cleanup_memory()
 
-def analyze_test_results(results: List[Dict[str, Any]]):
+    def analyze_conversation_topics(self) -> List[Dict[str, Any]]:
+        """
+        Analyze topics in the test conversation using pgvector clustering.
+        
+        Returns:
+            List of topic dictionaries with topic name and frequency
+        """
+        try:
+            # Call the pgvector-powered topic analysis function via RPC
+            response = self.db_manager.supabase.rpc(
+                'analyze_conversation_topics',
+                {
+                    'p_schema_name': self.db_manager.schema_name,
+                    'p_session_id': self.test_session_id,
+                    'p_min_count': 1
+                }
+            ).execute()
+            
+            if response.data:
+                topics = []
+                for item in response.data:
+                    topics.append({
+                        "topic": item.get('topic', 'Unknown topic'),
+                        "frequency": item.get('frequency', 0)
+                    })
+                logger.info(f"Topic analysis found {len(topics)} topics")
+                return topics
+            else:
+                logger.info("No significant topics identified")
+                return [{"topic": "No significant topics identified", "frequency": 0}]
+                
+        except Exception as e:
+            logger.error(f"Error analyzing topics: {e}")
+            return [{"topic": f"Error: {str(e)}", "frequency": 0}]
+
+def analyze_test_results(results: List[Dict[str, Any]]) -> None:
     """
     Analyze and print summary of test results.
     
@@ -369,9 +421,9 @@ def analyze_test_results(results: List[Dict[str, Any]]):
     logger.info(f"Conversations tested: {len(results)}")
     
     # Overall statistics
-    total_exchanges = sum(len(r["exchanges"]) for r in results)
-    total_detected = sum(r["pain_points_detected"] for r in results)
-    detection_rate = (total_detected / total_exchanges) * 100 if total_exchanges > 0 else 0
+    total_exchanges: int = sum(len(r["exchanges"]) for r in results)
+    total_detected: int = sum(r["pain_points_detected"] for r in results)
+    detection_rate: float = (total_detected / total_exchanges) * 100 if total_exchanges > 0 else 0
     
     logger.info(f"Total exchanges: {total_exchanges}")
     logger.info(f"Total pain points detected: {total_detected}")
@@ -379,26 +431,95 @@ def analyze_test_results(results: List[Dict[str, Any]]):
     
     # Analyze each conversation
     logger.info("\nDetailed results by conversation:")
-    for result in results:
+    for i, result in enumerate(results):
         logger.info(f"\n{result['name']}:")
         logger.info(f"  Detection rate: {(result['pain_points_detected'] / len(result['exchanges'])) * 100:.2f}%")
         logger.info(f"  First detected at: Question #{result['first_detection_at'] if result['first_detection_at'] else 'N/A'}")
         
+        # Analyze approach types detected
+        all_approach_types: List[str] = []
+        for exchange in result["exchanges"]:
+            if exchange.get("pain_point_detected") and exchange.get("approach_type"):
+                all_approach_types.append(exchange.get("approach_type"))
+        
+        # Analyze approach types
+        if all_approach_types:
+            approach_type_counts: Counter = Counter(all_approach_types)
+            logger.info(f"  Detected approach types: {', '.join([f'{t}({c})' for t, c in approach_type_counts.most_common()])}")
+            
+            # Check against expected approach types if defined in test case
+            expected_conversation: Dict[str, Any] = TEST_CONVERSATIONS[i]
+            if "expected_pain_point" in expected_conversation and "approach_types" in expected_conversation["expected_pain_point"]:
+                expected_types: Set[str] = set(expected_conversation["expected_pain_point"]["approach_types"])
+                detected_types: Set[str] = set(all_approach_types)
+                
+                # Normalize approach types for comparison (convert to lowercase, replace underscores with spaces)
+                normalized_expected: Set[str] = {t.lower().replace('_', ' ') for t in expected_types}
+                normalized_detected: Set[str] = {(t.lower().replace('_', ' ') if t else "") for t in detected_types}
+                
+                # Find matches and misses
+                matches: Set[str] = normalized_expected.intersection(normalized_detected)
+                misses: Set[str] = normalized_expected - normalized_detected
+                
+                # Report matches and misses
+                match_percentage: float = (len(matches) / len(normalized_expected)) * 100 if normalized_expected else 0
+                logger.info(f"  Approach type match: {match_percentage:.2f}% ({len(matches)}/{len(normalized_expected)})")
+                if matches:
+                    logger.info(f"    Matched types: {', '.join(matches)}")
+                if misses:
+                    logger.info(f"    Missed types: {', '.join(misses)}")
+        
         # Analyze themes detected
-        all_themes = []
+        all_themes: List[str] = []
         for exchange in result["exchanges"]:
             if exchange.get("recurring_themes"):
                 all_themes.extend(exchange["recurring_themes"])
         
         if all_themes:
-            theme_counts = Counter(all_themes)
+            theme_counts: Counter = Counter(all_themes)
             logger.info(f"  Top detected themes: {', '.join([f'{t}({c})' for t, c in theme_counts.most_common(3)])}")
         
         # Check templates used
-        template_counts = Counter(result["templates_used"])
+        template_counts: Counter = Counter(result["templates_used"])
         logger.info(f"  Templates used: {', '.join([f'{t}({c})' for t, c in template_counts.most_common()])}")
+        
+        # Add vector-based topic analysis results
+        if "vector_topics" in result and result["vector_topics"]:
+            meaningful_topics = [t for t in result["vector_topics"] 
+                               if not t["topic"].startswith("Error") and 
+                               not t["topic"].startswith("No ")]
+            
+            if meaningful_topics:
+                logger.info(f"  Vector-based topic analysis:")
+                for topic in sorted(meaningful_topics, key=lambda x: x["frequency"], reverse=True):
+                    logger.info(f"    - {topic['topic']} (frequency: {topic['frequency']})")
+                
+                # Compare with expected themes
+                expected_conversation: Dict[str, Any] = TEST_CONVERSATIONS[i]
+                if "expected_pain_point" in expected_conversation and "themes" in expected_conversation["expected_pain_point"]:
+                    expected_themes: Set[str] = set(expected_conversation["expected_pain_point"]["themes"])
+                    detected_topics: Set[str] = set(t["topic"].lower() for t in meaningful_topics)
+                    
+                    # Check for partial matches (substring matching)
+                    matches = set()
+                    for expected in expected_themes:
+                        for detected in detected_topics:
+                            if expected in detected or detected in expected:
+                                matches.add(expected)
+                                break
+                    
+                    misses = expected_themes - matches
+                    
+                    match_percentage = (len(matches) / len(expected_themes)) * 100 if expected_themes else 0
+                    logger.info(f"  Vector topic match: {match_percentage:.2f}% ({len(matches)}/{len(expected_themes)})")
+                    if matches:
+                        logger.info(f"    Matched themes: {', '.join(matches)}")
+                    if misses:
+                        logger.info(f"    Missed themes: {', '.join(misses)}")
+            else:
+                logger.info(f"  Vector-based topic analysis: No significant topics identified")
 
-def main():
+def main() -> None:
     """Run the pain point detection tests."""
     logger.info("Starting pain point detection tests")
 
@@ -408,8 +529,8 @@ def main():
         return
 
     try:
-        tester = PainPointDetectionTester()
-        results = tester.run_tests()
+        tester: PainPointDetectionTester = PainPointDetectionTester()
+        results: List[Dict[str, Any]] = tester.run_tests()
         analyze_test_results(results)
         tester.cleanup()
     except Exception as e:
@@ -418,4 +539,5 @@ def main():
         logger.error(traceback.format_exc())
 
 if __name__ == "__main__":
+    logger = ColoredLogger("psy_supabase")
     main()

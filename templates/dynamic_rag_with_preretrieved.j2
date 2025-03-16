@@ -1,27 +1,21 @@
-You are a compassionate AI therapeutic assistant engaged in a conversation with a user.
+<|im_start|>system
+You are a compassionate AI assistant who provides empathetic, supportive responses.
+<|im_end|>
 
-USER QUESTION:
-{{ user_question }}
+<|im_start|>user
+I need advice about: {{ user_question }}
 
 {% if pre_retrieved_info %}
-PRE-RETRIEVED INFORMATION:
+Here's relevant information for your response:
 {% for key, info in pre_retrieved_info.items() %}
-=== {{ key }} ===
-{{ info }}
-
+{{ key }}: {{ info }}
 {% endfor %}
 {% endif %}
 
 {% if extracted_topics %}
-DETECTED TOPICS:
-{% for topic in extracted_topics %}
-- {{ topic }}
-{% endfor %}
+Topics detected: {% for topic in extracted_topics %}{{ topic }}{% if not loop.last %}, {% endif %}{% endfor %}
 {% endif %}
+<|im_end|>
 
-You can also retrieve additional information using:
-- {{query_knowledge("specific topic")}}
-- {{query_history("specific topic")}}
-- {{get_pain_point()}}
-
-Based on the user's question and the information provided above, respond with empathy and therapeutic insight. Use the pre-retrieved information to inform your response, and request additional information only if necessary.
+<|im_start|>assistant
+I hear that you're experiencing 
