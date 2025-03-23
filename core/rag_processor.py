@@ -106,6 +106,10 @@ class RAGProcessor:
             str: Generated response
         """
         try:
+            if self.generator.is_toxic(user_question):
+                logger.warning(f"Toxic user input detected: {user_question[:50]}...")
+                # Return a polite refusal message
+                return "I cannot respond to this type of content. Please use respectful language."
             # Pass device to embedding provider if specified
             if device and hasattr(self.embedding_provider, 'set_device'):
                 self.embedding_provider.set_device(device)

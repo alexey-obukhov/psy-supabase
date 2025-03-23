@@ -3,11 +3,11 @@ import sys
 import uuid
 from school_logging.log import ColoredLogger
 from collections import Counter
-from typing import List, Dict, Any, Optional, Union, Set, ClassVar
+from typing import List, Dict, Any, Optional, Union, Set
 import json
 from dotenv import load_dotenv
 # import multiprocessing as mp
-from psy_supabase.utilities.text_utils import cleanup_memory
+from psy_supabase.utilities.utils import cleanup_memory
 
 
 # Load environment variables

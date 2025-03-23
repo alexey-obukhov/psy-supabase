@@ -1,9 +1,11 @@
 import gc
+import os
 import torch
 import torch.cuda
 import traceback
 from typing import List, Optional, Dict, Any, ClassVar
 from school_logging.log import ColoredLogger
+from psy_supabase.utilities.utils import get_dir
 from psy_supabase.core.text_generator import TextGenerator
 from typeguard import typechecked
 
@@ -11,16 +13,19 @@ from typeguard import typechecked
 class ModelManager:
     # Class variable to store instances (no global variables)
     _instances: ClassVar[Dict[str, 'ModelManager']] = {}
+    # Add models directory path
+    MODELS_DIR = get_dir("models")
     
     @classmethod
     @typechecked
-    def get_instance(cls, model_name: str = "microsoft/phi-1_5", device: Optional[str] = None) -> 'ModelManager':
+    def get_instance(cls, model_name: str = "microsoft/phi-1_5", device: Optional[str] = None, quantize: bool = False) -> 'ModelManager':
         """
         Get or create a ModelManager instance.
         
         Args:
             model_name: Model name to use
             device: Device to use (None for auto-detection)
+            quantize: Whether to use 8-bit quantization for large models
             
         Returns:
             ModelManager instance
@@ -29,12 +34,12 @@ class ModelManager:
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             
-        # Use model_name as key
-        instance_key = f"{model_name}_{device}"
+        # Use model_name as key (include quantization setting)
+        instance_key = f"{model_name}_{device}_quant={quantize}"
         
         # Create if doesn't exist
         if instance_key not in cls._instances:
-            cls._instances[instance_key] = cls(model_name, device)
+            cls._instances[instance_key] = cls(model_name, device, quantize)
             
         # Get the instance
         instance = cls._instances[instance_key]
@@ -45,30 +50,143 @@ class ModelManager:
             
         return instance
 
-    def __init__(self, model_name, device="cpu"):
+    def __init__(self, model_name, device="cpu", quantize=False):
         self.model_name = model_name
         self.preferred_device = device
+        self.quantize = quantize  # New parameter
         self.generator = None
         self.embedding_model = None
         self.sentence_transformer = None
+        self.current_device = None
         self.logger = ColoredLogger(__name__)
-        self.logger.info(f"ModelManager initialized with model: {model_name} and device: {device}")
+
+        # Preload toxicity model (add this line)
+        self.get_toxicity_model()
+
+        self.logger.info(f"ModelManager initialized with model: {model_name}, device: {device}, quantize: {quantize}")
+        
+    def get_local_model_path(self):
+        """Get the local path for the model"""
+        # Use just the model name without organization prefix for folder
+        model_folder = self.model_name.split('/')[-1] if '/' in self.model_name else self.model_name
+        return os.path.join(self.MODELS_DIR, model_folder)
+
+    def is_model_downloaded(self):
+        """Check if the model is already downloaded locally"""
+        model_path = self.get_local_model_path()
+        
+        # Check if folder exists and is not empty
+        if os.path.exists(model_path) and os.path.isdir(model_path):
+            # Check if directory has any files
+            return len(os.listdir(model_path)) > 0
+        
+        return False
         
     def get_generator(self):
+        """Get or initialize text generator with local model caching."""
         # Initialize on first use
         if self.generator is None:
-            self.logger.info(f"Creating new TextGenerator on {self.preferred_device}")
-            self.generator = TextGenerator(self.model_name, self.preferred_device)
+            # Create models dir if it doesn't exist
+            os.makedirs(self.MODELS_DIR, exist_ok=True)
+            
+            # Get local model path
+            local_path = self.get_local_model_path()
+            
+            # Check if model exists locally
+            if self.is_model_downloaded():
+                # Use local model
+                self.logger.info(f"Loading model from local path: {local_path}")
+                self.generator = TextGenerator(local_path, self.preferred_device, quantize=self.quantize)
+            else:
+                # We need to download the model regardless of quantization
+                self.logger.info(f"Model not found locally. Downloading {self.model_name} to {local_path}")
+                
+                # First, download the full model files explicitly before initializing TextGenerator
+                # This ensures the model is saved even when using quantization
+                from transformers import AutoTokenizer, AutoModelForCausalLM
+                
+                # Create directory
+                os.makedirs(local_path, exist_ok=True)
+                
+                # Download and save tokenizer
+                tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                tokenizer.save_pretrained(local_path)
+                self.logger.info(f"Tokenizer saved to {local_path}")
+                
+                try:
+                    # Download and save full model (without quantization)
+                    self.logger.info(f"Downloading full model weights to {local_path}")
+                    model = AutoModelForCausalLM.from_pretrained(self.model_name)
+                    model.save_pretrained(local_path)
+                    self.logger.info(f"Full model saved to {local_path}")
+                    
+                    # Now create the generator, using quantization if requested
+                    self.generator = TextGenerator(local_path, self.preferred_device, quantize=self.quantize)
+                except Exception as e:
+                    self.logger.error(f"Error downloading full model: {e}")
+                    # If full model download fails, try direct initialization
+                    self.generator = TextGenerator(self.model_name, self.preferred_device, quantize=self.quantize)
+                
             self.current_device = self.preferred_device
         else:
             # Make sure model is fully on the right device
             self.logger.info(f"Moving existing model to {self.preferred_device}")
             if hasattr(self.generator, 'model'):
-                self.generator.model = self.generator.model.to(self.preferred_device)
+                # Only try to move model if not using device_map='auto'
+                if not (self.quantize and hasattr(self.generator, 'using_device_map') and self.generator.using_device_map):
+                    self.generator.model = self.generator.model.to(self.preferred_device)
                 self.generator.device = self.preferred_device
                 self.current_device = self.preferred_device
         return self.generator
+
+    @typechecked
+    def get_toxicity_model(self):
+        """Get or initialize toxicity detection model with local model caching."""
+        if not hasattr(self, 'toxicity_model') or self.toxicity_model is None:
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+            
+            # Define toxicity model name
+            toxicity_model_name = "facebook/roberta-hate-speech-dynabench-r4-target"
+            
+            # Get local model path
+            model_folder = toxicity_model_name.split('/')[-1]
+            local_path = os.path.join(self.MODELS_DIR, model_folder)
+            
+            # Create models dir if it doesn't exist
+            os.makedirs(self.MODELS_DIR, exist_ok=True)
+            
+            # Check if model exists locally
+            if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
+                # Use local model
+                self.logger.info(f"Loading toxicity model from local path: {local_path}")
+                self.toxicity_tokenizer = AutoTokenizer.from_pretrained(local_path)
+                self.toxicity_model = AutoModelForSequenceClassification.from_pretrained(
+                    local_path,
+                    torch_dtype=torch.float32
+                )
+            else:
+                # Download model and save locally
+                self.logger.info(f"Downloading toxicity model to {local_path}")
+                os.makedirs(local_path, exist_ok=True)
+                
+                # Download and save tokenizer
+                self.toxicity_tokenizer = AutoTokenizer.from_pretrained(toxicity_model_name)
+                self.toxicity_tokenizer.save_pretrained(local_path)
+                
+                # Download and save model
+                self.toxicity_model = AutoModelForSequenceClassification.from_pretrained(
+                    toxicity_model_name,
+                    torch_dtype=torch.float32
+                )
+                self.toxicity_model.save_pretrained(local_path)
+                self.logger.info(f"Toxicity model saved to {local_path}")
+            
+            # Always keep toxicity model on CPU for efficiency
+            self.toxicity_model = self.toxicity_model.to("cpu")
+            self.toxicity_model.eval()
         
+        return self.toxicity_model, self.toxicity_tokenizer
+
     def free_memory(self):
         if self.generator and hasattr(self.generator, 'model'):
             self.logger.info(f"Freeing GPU memory - moving model to CPU")
@@ -199,8 +317,30 @@ class ModelManager:
                 # Initialize sentence transformer if needed
                 if self.sentence_transformer is None:
                     from sentence_transformers import SentenceTransformer
-                    model_name = "sentence-transformers/all-mpnet-base-v2"
-                    self.sentence_transformer = SentenceTransformer(model_name)
+                    
+                    # Get path to models directory
+                    os.makedirs(self.MODELS_DIR, exist_ok=True)
+                    
+                    # Define the model name and local path
+                    st_model_name = "all-mpnet-base-v2"
+                    local_path = os.path.join(self.MODELS_DIR, "sentence-transformers_" + st_model_name)
+                    
+                    # Check if model exists locally
+                    if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
+                        # Use local model
+                        self.logger.info(f"Loading SentenceTransformer from local path: {local_path}")
+                        self.sentence_transformer = SentenceTransformer(local_path)
+                    else:
+                        # Download model and save locally
+                        self.logger.info(f"Downloading SentenceTransformer to {local_path}")
+                        os.makedirs(local_path, exist_ok=True)
+                        
+                        # Download and save model
+                        self.sentence_transformer = SentenceTransformer("sentence-transformers/" + st_model_name)
+                        self.sentence_transformer.save(local_path)
+                        self.logger.info(f"SentenceTransformer saved to {local_path}")
+                    
+                    # Move to the right device
                     if self.preferred_device == "cuda" and torch.cuda.is_available():
                         self.sentence_transformer = self.sentence_transformer.to(self.preferred_device)
                 
@@ -232,18 +372,19 @@ class ModelManager:
 
 
 @typechecked
-def get_model_manager(model_name: str = "microsoft/phi-1_5", device: Optional[str] = None) -> ModelManager:
+def get_model_manager(model_name: str = "microsoft/phi-1_5", device: Optional[str] = None, quantize: bool = False) -> ModelManager:
     """
     Get a ModelManager instance.
     
     Args:
         model_name: Model name to use
         device: Device to use (None for auto-detection)
+        quantize: Whether to use 8-bit quantization for large models
         
     Returns:
         ModelManager instance
     """
-    return ModelManager.get_instance(model_name, device)
+    return ModelManager.get_instance(model_name, device, quantize)
 
 
 # Adapter class for compatibility with ai_providers.py interface
@@ -252,9 +393,9 @@ class EmbeddingProviderAdapter:
     Adapter class that provides the same interface as ai_providers.py.
     Uses ModelManager internally.
     """
-    def __init__(self, model_name: str = "microsoft/phi-1_5"):
+    def __init__(self, model_name: str = "microsoft/phi-1_5", quantize: bool = False):
         self.model_name = model_name
-        self.manager = get_model_manager(model_name)
+        self.manager = get_model_manager(model_name, quantize=quantize)
         
     def generate_embedding(self, text: str) -> Optional[List[float]]:
         """Generate embedding for text"""

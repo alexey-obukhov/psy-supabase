@@ -7,7 +7,7 @@ import random
 import traceback
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, g
-from psy_supabase.utilities.text_utils import cleanup_memory
+from psy_supabase.utilities.utils import cleanup_memory
 from school_logging.log import ColoredLogger
 import spacy
 

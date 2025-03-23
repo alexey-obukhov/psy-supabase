@@ -45,11 +45,13 @@ import traceback
 from dotenv import load_dotenv
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
+from psy_supabase.utilities.utils import get_dir
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from school_logging.log import ColoredLogger
+from detoxify import Detoxify
 
 if TYPE_CHECKING:
     from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
@@ -61,10 +63,13 @@ load_dotenv()
 logger = ColoredLogger(__name__)
 
 class TextGenerator:
-    def __init__(self, model_name: str, device: str, use_bfloat16: bool = False):
+    MODELS_DIR = get_dir("models")
+
+    def __init__(self, model_name: str, device: str, use_bfloat16: bool = False, quantize: bool = False):
         self.device = device
         self.model_name = model_name
         self.use_bfloat16 = use_bfloat16
+        self.quantize = quantize
         self.tokenizer = None
         self.model = None
         self.toxic_tokenizer = None
@@ -73,6 +78,12 @@ class TextGenerator:
         
         # Load the model immediately on initialization
         self._load_model()
+
+        # Set cache directory for Detoxify to use our models directory
+        os.environ["TRANSFORMERS_CACHE"] = self.MODELS_DIR
+        
+        # Initialize Detoxify once
+        self.detoxify = Detoxify("original-small")
         
         logger.info(f"TextGenerator initialized with model: {model_name} on device: {device}")
 
@@ -87,13 +98,44 @@ class TextGenerator:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
                 
             # Configure model loading
-            load_config = {"torch_dtype": torch.bfloat16 if self.use_bfloat16 else torch.float32}
+            load_config = {}
             
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                **load_config
-            )
-            self.model.to(self.device)
+            # Add quantization if requested
+            if self.quantize and self.device == "cuda":
+                try:
+                    # Try to import bitsandbytes
+                    import bitsandbytes
+                    logger.info("Using 8-bit quantization with bitsandbytes")
+                    load_config["load_in_8bit"] = True
+                    load_config["device_map"] = "auto"
+                    
+                    # Only add bfloat16 if specifically requested AND the GPU supports it
+                    if self.use_bfloat16 and torch.cuda.is_bf16_supported():
+                        logger.info("Using bfloat16 with 8-bit quantization")
+                        load_config["torch_dtype"] = torch.bfloat16
+                        
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        self.model_name,
+                        **load_config
+                    )
+                    self.using_device_map = True
+                except ImportError:
+                    logger.warning("bitsandbytes not installed, falling back to standard loading")
+                    load_config["torch_dtype"] = torch.bfloat16 if self.use_bfloat16 else torch.float32
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        self.model_name,
+                        **load_config
+                    )
+                    self.model.to(self.device)
+            else:
+                # Standard loading without quantization
+                load_config["torch_dtype"] = torch.bfloat16 if self.use_bfloat16 else torch.float32
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    self.model_name,
+                    **load_config
+                )
+                self.model.to(self.device)
+
             self.model.eval()  # Set to evaluation mode
             
             logger.info(f"Model loaded successfully: {self.model_name}")
@@ -121,14 +163,44 @@ class TextGenerator:
             torch.cuda.empty_cache()  # Clear GPU cache
 
     def _load_toxicity_model(self):
-        """Loads the toxicity model and tokenizer."""
+        """Loads the toxicity model and tokenizer with local caching."""
         logger.info("Loading toxicity model: facebook/roberta-hate-speech-dynabench-r4-target")
         try:
-            self.toxic_tokenizer = AutoTokenizer.from_pretrained("facebook/roberta-hate-speech-dynabench-r4-target")
-            self.toxic_model = AutoModelForSequenceClassification.from_pretrained(
-                "facebook/roberta-hate-speech-dynabench-r4-target",
-                 torch_dtype=torch.float32, # Use float32 for CPU
-            )
+            # Define model name and paths
+            toxicity_model_name = "facebook/roberta-hate-speech-dynabench-r4-target"
+            model_folder = toxicity_model_name.split('/')[-1]
+            
+            local_path = os.path.join(self.MODELS_DIR, model_folder)
+            
+            # Create models dir if it doesn't exist
+            os.makedirs(self.MODELS_DIR, exist_ok=True)
+            
+            # Check if model exists locally
+            if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
+                # Use local model
+                logger.info(f"Loading toxicity model from local path: {local_path}")
+                self.toxic_tokenizer = AutoTokenizer.from_pretrained(local_path)
+                self.toxic_model = AutoModelForSequenceClassification.from_pretrained(
+                    local_path,
+                    torch_dtype=torch.float32  # Use float32 for CPU
+                )
+            else:
+                # Download model and save locally
+                logger.info(f"Downloading toxicity model to {local_path}")
+                os.makedirs(local_path, exist_ok=True)
+                
+                # Download and save tokenizer
+                self.toxic_tokenizer = AutoTokenizer.from_pretrained(toxicity_model_name)
+                self.toxic_tokenizer.save_pretrained(local_path)
+                
+                # Download and save model
+                self.toxic_model = AutoModelForSequenceClassification.from_pretrained(
+                    toxicity_model_name,
+                    torch_dtype=torch.float32  # Use float32 for CPU
+                )
+                self.toxic_model.save_pretrained(local_path)
+                logger.info(f"Toxicity model saved to {local_path}")
+                
             # ALWAYS keep the toxicity model on CPU
             self.toxic_model.to("cpu")  # Explicitly on CPU
             self.toxic_model.eval()
@@ -478,32 +550,62 @@ class TextGenerator:
         ]
         return random.choice(fallbacks)
 
+    def get_toxicity_model(self):
+        """Get or initialize toxicity detection model with local model caching."""
+        if not hasattr(self, 'toxicity_model') or self.toxicity_model is None:
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+            
+            # Define toxicity model name
+            toxicity_model_name = "facebook/roberta-hate-speech-dynabench-r4-target"
+            
+            # Get local model path
+            model_folder = toxicity_model_name.split('/')[-1]
+            local_path = os.path.join(self.MODELS_DIR, model_folder)
+            
+            # Create models dir if it doesn't exist
+            os.makedirs(self.MODELS_DIR, exist_ok=True)
+            
+            # Check if model exists locally
+            if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
+                # Use local model
+                self.logger.info(f"Loading toxicity model from local path: {local_path}")
+                self.toxicity_tokenizer = AutoTokenizer.from_pretrained(local_path)
+                self.toxicity_model = AutoModelForSequenceClassification.from_pretrained(
+                    local_path,
+                    torch_dtype=torch.float32
+                )
+            else:
+                # Download model and save locally
+                self.logger.info(f"Downloading toxicity model to {local_path}")
+                os.makedirs(local_path, exist_ok=True)
+                
+                # Download and save tokenizer
+                self.toxicity_tokenizer = AutoTokenizer.from_pretrained(toxicity_model_name)
+                self.toxicity_tokenizer.save_pretrained(local_path)
+                
+                # Download and save model
+                self.toxicity_model = AutoModelForSequenceClassification.from_pretrained(
+                    toxicity_model_name,
+                    torch_dtype=torch.float32
+                )
+                self.toxicity_model.save_pretrained(local_path)
+                self.logger.info(f"Toxicity model saved to {local_path}")
+            
+            # Always keep toxicity model on CPU for efficiency
+            self.toxicity_model = self.toxicity_model.to("cpu")
+            self.toxicity_model.eval()
+        
+        return self.toxicity_model, self.toxicity_tokenizer
+
     def is_toxic(self, text: str) -> bool:
         """Checks if text is toxic."""
         try:
-            # Skip toxicity check for short responses
-            if len(text.split()) < 5:
-                return False
-                
-            # Load model if not already loaded
-            if self.toxic_tokenizer is None or self.toxic_model is None:
-                self._load_toxicity_model()
-                
-            # Process the text
-            inputs = self.toxic_tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=1024)
-            
-            # Run inference without gradients
-            with torch.no_grad():
-                # Make sure to specify we're using CPU
-                outputs = self.toxic_model(**inputs)
-                
-            # Get probability of toxic class
-            probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
-            toxic_score = probs[0, 1].item()  # Assuming index 1 is toxic class
-            
-            logger.debug(f"Toxicity score: {toxic_score}")
-            return toxic_score > 0.7
-            
+            # Use the pre-initialized Detoxify instance
+            results = self.detoxify.predict(text)
+            toxic_score = results["toxicity"]
+            logger.info(f"Toxicity score: {toxic_score} - Text: {text[:50]}...")
+            return toxic_score > 0.8
+
         except Exception as e:
             logger.error(f"Error during toxicity check: {e}\n{traceback.format_exc()}")
             # Don't block the response on toxicity check failure

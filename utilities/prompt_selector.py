@@ -6,7 +6,7 @@ import re
 import traceback
 from typing import Dict, List, Tuple, Any
 
-from psy_supabase.utilities.text_utils import load_enhanced_mental_health_taxonomy
+from psy_supabase.utilities.utils import load_enhanced_mental_health_taxonomy
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.nlp_utils import get_spacy_model
 from school_logging.log import ColoredLogger

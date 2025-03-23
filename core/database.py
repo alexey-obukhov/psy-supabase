@@ -8,7 +8,7 @@ from typeguard import typechecked
 from datetime import datetime
 
 from school_logging.log import ColoredLogger
-from psy_supabase.utilities.text_utils import clean_text
+from psy_supabase.utilities.utils import clean_text
 from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.utilities.embedding_utils import format_embedding_for_db
 from psy_supabase.utilities.utils_mapping import map_theme_to_approach_type, map_approach_name
