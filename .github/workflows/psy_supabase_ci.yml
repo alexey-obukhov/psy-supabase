@@ -24,7 +24,12 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
+        # First upgrade for all Python versions
+        if [[ "${{ matrix.python-version }}" == "3.8" ]]; then
+          python -m pip install --upgrade pip wheel "setuptools<60.0.0"
+        else
+          python -m pip install --upgrade pip wheel setuptools
+        fi
 
         # Install Git dependency first
         pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
@@ -44,11 +49,13 @@ jobs:
 
     - name: Install package in development mode
       run: |
+        # Force setuptools update again before installing package
         pip install -e .
 
     - name: Run tests
       run: |
-        pytest
+        # Run tests with more verbosity to see what's failing
+        pytest -v
 
     - name: Build package
       run: |
