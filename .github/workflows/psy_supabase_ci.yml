@@ -47,11 +47,30 @@ jobs:
         echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
         echo "USER_ID=${{ secrets.USER_ID }}" >> $GITHUB_ENV
 
+    - name: Install and verify school_logging
+      run: |
+        # Install the dependency
+        pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
+        
+        # Verify it's installed correctly
+        python -c "import pkg_resources; print(pkg_resources.get_distribution('school-logging').version)"
+        
+        # Check the module structure
+        python -c "import pkgutil; print([p for p in pkgutil.iter_modules() if 'school' in p.name])"
+        
+        # Try importing the specific module that's failing
+        python -c "import importlib; print(dir(importlib.import_module('school_logging')))"
+        
+        # If the module is actually called something else, show what's available
+        pip show school-logging
+
     - name: Install package in development mode
       run: |
-        # Force setuptools update again before installing package
+        # Make sure the package is installed before running tests
         pip install -e .
-
+        # Verify our own package has the right structure
+        python -c "import pkgutil; print([p for p in pkgutil.iter_modules() if 'psy' in p.name])"
+    
     - name: Run tests
       run: |
         # Run tests with more verbosity to see what's failing
