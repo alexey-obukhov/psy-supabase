@@ -44,7 +44,7 @@ class RAGProcessor:
         self.VECTOR_CACHE_ENABLED = True      # Enable vector caching for similar questions
 
     @typechecked
-    def get_relevant_documents(self, query_embedding: List[float], table_name: str = "knowledge_base", top_k: int = 5) -> List[Dict]:
+    def get_relevant_documents(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:
         """
         Retrieves the most relevant documents using pgvector similarity.
 
@@ -54,7 +54,6 @@ class RAGProcessor:
             # Let pgvector handle the similarity calculation in the database
             similar_docs = self.db_manager.find_similar_documents(
                 embedding=query_embedding,
-                table_name=table_name,
                 limit=top_k,
                 min_similarity=self.SIMILARITY_THRESHOLD  # Apply similarity threshold filter
             )

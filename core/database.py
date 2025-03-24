@@ -456,7 +456,6 @@ class DatabaseManager:
     @typechecked
     def find_similar_documents(self,
                                embedding: List[float],
-                               table_name: str = "knowledge_base",
                                limit: int = 5,
                                min_similarity: float = 0.7
                                ) -> List[Dict]:
@@ -465,7 +464,6 @@ class DatabaseManager:
         
         Args:
             embedding: Vector embedding to compare against
-            table_name: Name of the table to search (e.g., "knowledge_base")
             limit: Maximum number of documents to return
             min_similarity: Minimum cosine similarity threshold
             
@@ -474,38 +472,24 @@ class DatabaseManager:
         """
         try:
             # Format embedding for PostgreSQL pgvector format
-            if isinstance(embedding, np.ndarray):
-                embedding = embedding.tolist()
-
             vector_str = format_embedding_for_db(embedding)
 
-            query = f"""
-            SELECT 
-                id, 
-                content, 
-                1 - (embedding <=> '{vector_str}'::vector) as similarity
-            FROM 
-                {self.schema_name}.{table_name}
-            WHERE 
-                1 - (embedding <=> '{vector_str}'::vector) > {min_similarity}
-            ORDER BY 
-                similarity DESC
-            LIMIT {limit};
-            """
+            # Call the SQL function via RPC
+            response = self.supabase.rpc('find_similar_documents', {
+                'p_schema_name': self.schema_name,
+                'p_embedding': vector_str,
+                'p_limit': limit,
+                'p_min_similarity': min_similarity  # Pass the min_similarity parameter
+            }).execute()
 
-            logger.info("Finding similar documents in schema: %s", self.schema_name)
-            
-            response = self.supabase.rpc('sql', {'command': query}).execute()
             if response.data:
-                logger.info(f"Found {len(response.data)} similar documents")
                 return response.data
             else:
-                logger.warning("No similar documents found in knowledge base for schema %s", self.schema_name)
+                logger.warning("No similar documents found.")
                 return []
                 
         except Exception as e:
             logger.error(f"Error finding similar documents: {e}")
-            logger.error(traceback.format_exc())
             return []
 
     def find_similar_documents_via_rpc(self, session_id: str, embedding: List[float], 

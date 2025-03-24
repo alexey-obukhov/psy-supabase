@@ -136,17 +136,42 @@ class TestDatabaseManager:
 
     def test_get_conversation_history(self, db_manager):
         """Test retrieving conversation history."""
-        # Configure mock
+
+        # Sample data for mock response
+        SAMPLE_HISTORY = [
+            {
+                'interactionid': 1,
+                'context': 'Session context 1',
+                'question': 'What is anxiety?',
+                'answer': 'Anxiety is a feeling of worry...',
+                'metadata': {},
+                'created_at': '2023-01-01T12:00:00'
+            },
+            {
+                'interactionid': 2,
+                'context': 'Session context 2',
+                'question': 'How can I manage stress?',
+                'answer': 'Managing stress involves various techniques...',
+                'metadata': {},
+                'created_at': '2023-01-02T12:00:00'
+            }
+        ]
+
+        # Configure mock response
         mock_response = Mock()
         mock_response.data = SAMPLE_HISTORY
-        db_manager.supabase.rpc().execute.return_value = mock_response
+        db_manager.supabase.rpc.return_value.execute.return_value = mock_response
 
         # Call method
         result = db_manager.get_conversation_history(TEST_SESSION_ID)
 
         # Verify RPC call and result structure
-        db_manager.supabase.rpc.assert_called_with('get_conversation_history', {'schema_name': TEST_SCHEMA})
-        assert len(result) == 2
+        db_manager.supabase.rpc.assert_called_once_with('get_conversation_history', {
+            'p_schema_name': TEST_SCHEMA,
+            'p_session_id': TEST_SESSION_ID  # Ensure the session ID is passed correctly
+        })
+
+        assert len(result) == 2  # Expecting 2 interactions
         assert result[0]['questionText'] == SAMPLE_HISTORY[0]['question']
         assert result[0]['answerText'] == SAMPLE_HISTORY[0]['answer']
         assert 'interactionID' in result[0]
@@ -269,23 +294,42 @@ class TestDatabaseManager:
 
     def test_find_similar_documents(self, db_manager):
         """Test finding similar documents by vector similarity."""
-        # Configure mock
+
+        # Sample data for mock response
+        SAMPLE_SIMILAR_DOCUMENTS = [
+            {
+                'id': 1,
+                'content': 'Document 1 content',
+                'embedding': '[0.1, 0.2, 0.3]',
+                'similarity': 0.9
+            },
+            {
+                'id': 2,
+                'content': 'Document 2 content',
+                'embedding': '[0.2, 0.3, 0.4]',
+                'similarity': 0.85
+            }
+        ]
+
+        # Configure mock response
         mock_response = Mock()
         mock_response.data = SAMPLE_SIMILAR_DOCUMENTS
-        db_manager.supabase.rpc().execute.return_value = mock_response
+        db_manager.supabase.rpc.return_value.execute.return_value = mock_response
 
-        # Call method
-        result = db_manager.find_similar_documents([0.1, 0.2, 0.3], limit=2)
+        # Call method with min_similarity
+        result = db_manager.find_similar_documents([0.1, 0.2, 0.3], limit=2, min_similarity=0.8)
 
         # Verify result and RPC call
-        assert len(result) == 2
+        assert len(result) == 2  # Expecting 2 similar documents
         assert result[0]['content'] == SAMPLE_SIMILAR_DOCUMENTS[0]['content']
         assert result[0]['similarity'] == SAMPLE_SIMILAR_DOCUMENTS[0]['similarity']
 
-        db_manager.supabase.rpc.assert_called_with('find_similar_documents', {
-            'p_schema_name': TEST_SCHEMA,
+        # Verify that the expected RPC call was made
+        db_manager.supabase.rpc.assert_called_once_with('find_similar_documents', {
+            'p_schema_name': db_manager.schema_name,
             'p_embedding': str([0.1, 0.2, 0.3]).replace(' ', ''),
-            'p_limit': 2
+            'p_limit': 2,
+            'p_min_similarity': 0.8
         })
 
     def test_get_all_documents_and_embeddings(self, db_manager):

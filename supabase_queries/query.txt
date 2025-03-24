@@ -7,7 +7,7 @@ DROP FUNCTION IF EXISTS create_user_schema_and_tables(text);
 DROP FUNCTION IF EXISTS get_knowledge_base_documents(text);
 DROP FUNCTION IF EXISTS get_topic_interactions(text, text, text, integer);
 DROP FUNCTION IF EXISTS add_interaction(text, text, text, text, jsonb);
-DROP FUNCTION IF EXISTS find_similar_documents(text, text, integer);
+DROP FUNCTION IF EXISTS find_similar_documents(text, text, integer, float);
 DROP FUNCTION IF EXISTS add_vector_index_to_knowledge_base(text);
 DROP FUNCTION IF EXISTS create_concept_connections_table(text);
 DROP FUNCTION IF EXISTS connect_psychological_concepts(text, integer, integer, text, float);
@@ -271,7 +271,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION find_similar_documents(
     p_schema_name TEXT,
     p_embedding TEXT,
-    p_limit INT DEFAULT 5
+    p_limit INT DEFAULT 5,
+    p_min_similarity FLOAT DEFAULT 0.7
 )
 RETURNS TABLE (
     id BIGINT,
@@ -282,22 +283,18 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-    query TEXT;
 BEGIN
-    -- Convert the query string to dynamic SQL to avoid schema injection issues
-    query := format('
+    RETURN QUERY EXECUTE format('
         SELECT 
             id, 
             content, 
             embedding::text, 
             1 - (embedding <=> %s::vector) as similarity
         FROM %I.knowledge_base
+        WHERE 1 - (embedding <=> %s::vector) > %L  -- Ensure minimum similarity
         ORDER BY similarity DESC
         LIMIT %s
-    ', p_embedding, p_schema_name, p_limit);
-
-    RETURN QUERY EXECUTE query;
+    ', p_embedding, p_schema_name, p_embedding, p_min_similarity, p_limit);
 END;
 $$;
 
