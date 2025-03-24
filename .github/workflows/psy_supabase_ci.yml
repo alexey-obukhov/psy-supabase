@@ -1,0 +1,63 @@
+name: PsySupabase CI
+
+on:
+  push:
+    branches: [ psy-supabase-pkg ]
+  pull_request:
+    branches: [ psy-supabase-pkg ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.10"]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+
+        # Install Git dependency first
+        pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
+
+        # Install all other requirements
+        pip install -r requirements.txt
+
+        # Install spacy language model
+        python -m spacy download en_core_web_sm
+
+    - name: Setup Supabase environment
+      run: |
+        # Set up environment variables for Supabase
+        echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
+        echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
+        echo "USER_ID=${{ secrets.USER_ID }}" >> $GITHUB_ENV
+
+    - name: Install package in development mode
+      run: |
+        pip install -e .
+
+    - name: Run tests
+      run: |
+        pytest
+
+    - name: Build package
+      run: |
+        pip install build
+        python -m build
+
+    - name: Store build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist-${{ matrix.python-version }}
+        path: dist/
+        retention-days: 7
