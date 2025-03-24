@@ -72,6 +72,38 @@ class DatabaseManager:
     def get_conversation_history(self, session_id: str) -> List[Dict]:
         """Retrieves conversation history for a specific session."""
         try:
+            # Call the SQL function via RPC
+            response = self.supabase.rpc('get_conversation_history', {
+                'p_schema_name': self.schema_name,
+                'p_session_id': session_id
+            }).execute()
+
+            # Check if the response contains data
+            if response.data:
+                # Transform the data to have the expected field names
+                transformed_data = []
+                for item in response.data:
+                    transformed_item = {
+                        'interactionID': item.get('interactionid'),
+                        'questionText': self.clean_db_text(item.get('question')),  # in db it is question
+                        'answerText': self.clean_db_text(item.get('answer')),      # in db it is answer
+                        'context': self.clean_db_text(item.get('context')),
+                        'metadata': item.get('metadata'),
+                        'created_at': item.get('created_at')
+                    }
+                    transformed_data.append(transformed_item)
+                return transformed_data
+            else:
+                logger.warning(f"No conversation history found for session: {session_id}")
+                return []
+        except Exception as e:
+            # Log the error with additional context
+            logger.error(f"Error fetching conversation history for session {session_id}: {e}")
+            return []
+
+    def get_conversation_history_python(self, session_id: str) -> List[Dict]:
+        """Retrieves conversation history for a specific session."""
+        try:
             # Use SQL WHERE clause to filter by session_id in metadatas
             query = f"""
             SELECT * FROM {self.schema_name}.interactions i
@@ -117,7 +149,11 @@ class DatabaseManager:
                 metadata = data_point.get('metadata')
             else:
                 metadata = '{}'
-                
+
+            # Add session_id to metadata if provided
+            if session_id:
+                metadata['session_id'] = session_id
+
             # Clean and escape the values
             context = clean_text(data_point.get('context', ''))
             question = clean_text(data_point.get('question', ''))
@@ -181,7 +217,11 @@ class DatabaseManager:
                 metadata = data_point.get('metadata')  # Already a JSON string
             else:
                 metadata = '{}'  # Default empty JSON
-                
+
+            # Add session_id to metadata if provided
+            if session_id:
+                metadata['session_id'] = session_id
+
             # Clean and escape the values
             context = clean_text(data_point['context'])
             question = clean_text(data_point['question'])
@@ -360,33 +400,21 @@ class DatabaseManager:
             List of high-quality interactions
         """
         try:
-            # Build the WHERE clause
-            where_clauses = []
-            if topic_filter:
-                where_clauses.append(f"metadata->>'topic' = '{topic_filter}'")
-                
-            # Add effectiveness filter - parse the nested JSON structure
-            # This looks for term_overlap or other metrics in the effectiveness object
-            where_clauses.append(f"(CAST(metadata->'effectiveness'->>'term_overlap' AS FLOAT) >= {min_effectiveness} OR metadata->'effectiveness'->>'template_adherence' = 'high')")
-            
-            # Combine WHERE clauses
-            where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
-            
-            # Execute query
-            query = f"""
-            SELECT * FROM {self.schema_name}.interactions
-            WHERE {where_clause}
-            ORDER BY created_at DESC
-            LIMIT {limit};
-            """
-            
-            response = self.supabase.rpc('sql', {'command': query}).execute()
-            
-            if not response.data:
+            # Call the SQL function via RPC
+            response = self.supabase.rpc('get_high_quality_interactions', {
+                'p_schema_name': self.schema_name,
+                'p_topic_filter': topic_filter,
+                'p_min_effectiveness': min_effectiveness,
+                'p_limit': limit
+            }).execute()
+
+            # Check if the response contains data
+            if response.data:
+                return response.data
+            else:
+                logger.warning(f"No high-quality interactions found for topic: {topic_filter}")
                 return []
-                
-            return response.data
-            
+
         except Exception as e:
             logger.error(f"Error retrieving high-quality interactions: {e}")
             return []
@@ -579,7 +607,8 @@ class DatabaseManager:
                 'p_strength': strength
             }).execute()
             
-            if response.data is None:
+            # Check if the response contains data
+            if response.data is None or response.data == -1:
                 logger.error("Error creating psychological connection")
                 return False
             
@@ -763,7 +792,7 @@ class DatabaseManager:
             
             # Extract key data points
             themes = self.extract_psychological_themes(session_id, min_occurrences=1)
-            emotions = self.analyze_emotional_trajectory(session_id)
+            emotions = self.analyze_emotional_vector_trajectory(session_id)
             
             # Extract insights if marked in metadata
             insights = []
@@ -994,11 +1023,16 @@ class DatabaseManager:
             # Call the pgvector emotional trajectory function with session_id parameter
             response = self.supabase.rpc('analyze_emotional_vector_trajectory', {
                 'p_schema_name': self.schema_name,
-                'p_session_id': session_id  # Add this parameter
+                'p_session_id': session_id
             }).execute()
 
             if response.data is None:
                 logger.error("Error analyzing emotional vector trajectory")
+                return []
+
+            # Check for NULL values in the result
+            if response.data and all(value is None for value in response.data[0]):
+                logger.info("No emotional trajectory segments found.")
                 return []
 
             return response.data
@@ -2583,7 +2617,7 @@ class DatabaseManager:
                     {self.schema_name}.interactions
                 WHERE 
                     question IS NOT NULL AND question != ''
-                    AND metadata->>'session_id' = '{session_id}'  # Add this filter
+                    AND metadata->>'session_id' = '{session_id}'
                 ORDER BY 
                     created_at DESC
                 LIMIT 10

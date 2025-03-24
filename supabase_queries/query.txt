@@ -1,12 +1,10 @@
 -- First, drop all existing functions 
 DROP FUNCTION IF EXISTS get_schema_exists(text);
-DROP FUNCTION IF EXISTS get_conversation_history(text);
 DROP FUNCTION IF EXISTS get_conversation_history(text, text);
 DROP FUNCTION IF EXISTS create_new_schema(text);
 DROP FUNCTION IF EXISTS sql(text, text);
 DROP FUNCTION IF EXISTS create_user_schema_and_tables(text);
 DROP FUNCTION IF EXISTS get_knowledge_base_documents(text);
-DROP FUNCTION IF EXISTS get_topic_interactions(text, text, integer);
 DROP FUNCTION IF EXISTS get_topic_interactions(text, text, text, integer);
 DROP FUNCTION IF EXISTS add_interaction(text, text, text, text, jsonb);
 DROP FUNCTION IF EXISTS find_similar_documents(text, text, integer);
@@ -15,16 +13,13 @@ DROP FUNCTION IF EXISTS create_concept_connections_table(text);
 DROP FUNCTION IF EXISTS connect_psychological_concepts(text, integer, integer, text, float);
 DROP FUNCTION IF EXISTS get_psychological_connections(text, integer, text);
 DROP FUNCTION IF EXISTS mark_therapeutic_insight(text, integer, text);
-DROP FUNCTION IF EXISTS find_psychological_memories(text, text, integer, float);
 DROP FUNCTION IF EXISTS find_psychological_memories(text, text, text, integer, float);
-DROP FUNCTION IF EXISTS analyze_theme_clusters(text, float, integer);
 DROP FUNCTION IF EXISTS analyze_theme_clusters(text, text, float, integer);
-DROP FUNCTION IF EXISTS analyze_emotional_vector_trajectory(text);
+DROP FUNCTION IF EXISTS analyze_emotional_vector_trajectory(text, text);
 DROP FUNCTION IF EXISTS find_concept_connections(text, integer, float);
 DROP FUNCTION IF EXISTS find_cross_session_patterns(text, text[]);
 DROP FUNCTION IF EXISTS ensure_vector_indexes(text);
 DROP FUNCTION IF EXISTS find_psychological_patterns(text, integer);
-DROP FUNCTION IF EXISTS add_embedding_to_interactions(text);
 DROP FUNCTION IF EXISTS add_embedding_to_interaction(text, integer, text);
 DROP FUNCTION IF EXISTS get_interactions_without_embeddings(text, integer);
 DROP FUNCTION IF EXISTS update_table_statistics(text);
@@ -34,6 +29,7 @@ DROP FUNCTION IF EXISTS analyze_emotional_trajectory(text, int);
 DROP FUNCTION IF EXISTS initialize_knowledge_base(text, jsonb);
 DROP FUNCTION IF EXISTS analyze_conversation_topics(text, int);
 DROP FUNCTION IF EXISTS optimize_vector_queries(text);
+DROP FUNCTION IF EXISTS get_high_quality_interactions(text, text, float, integer);
 
 
 -- Enable the vector extension
@@ -378,10 +374,10 @@ BEGIN
     INTO new_id
     USING p_source_id, p_target_id, p_relationship_type, p_strength;
     
-    RETURN new_id;
+    RETURN new_id;  -- Return the new or updated ID
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error connecting concepts: %', SQLERRM;
-    RETURN -1;
+    RETURN -1;  -- Return -1 to indicate an error
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -614,7 +610,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to analyze emotional trajectory in vector space
 CREATE OR REPLACE FUNCTION analyze_emotional_vector_trajectory(
-    p_schema_name TEXT
+    p_schema_name TEXT,
+    p_session_id TEXT
 )
 RETURNS TABLE (
     segment_id INTEGER,
@@ -625,7 +622,7 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
     -- Create a positive emotional progress vector (this is a simplification)
-    EXECUTE format('
+    RETURN QUERY EXECUTE format('
         WITH emotional_states AS (
             SELECT 
                 interactionid,
@@ -635,42 +632,38 @@ BEGIN
                 created_at
             FROM "%s".interactions
             WHERE 
+                metadata->''session_id'' = %L AND
                 metadata->''emotional_state'' IS NOT NULL AND
                 embedding IS NOT NULL
             ORDER BY created_at
-        ),
-        -- Create segments between consecutive emotional states
-        emotional_segments AS (
-            SELECT 
-                ROW_NUMBER() OVER () AS segment_id,
-                curr.state AS start_state,
-                lead(curr.state) OVER (ORDER BY curr.created_at) AS end_state,
-                curr.intensity AS start_intensity,
-                lead(curr.intensity) OVER (ORDER BY curr.created_at) AS end_intensity,
-                -- Vector distance between consecutive states
-                1 - (curr.embedding <=> lead(curr.embedding) OVER (ORDER BY curr.created_at)) AS vector_movement,
-                -- This is a proxy for "therapeutic progress" - distance from negative to positive
-                CASE 
-                    WHEN curr.intensity > lead(curr.intensity) OVER (ORDER BY curr.created_at) THEN 1.0
-                    ELSE 0.5
-                END AS similarity_to_progress
-            FROM emotional_states curr
         )
         SELECT 
-            segment_id,
-            start_state::TEXT,
-            end_state::TEXT,
-            vector_movement,
-            similarity_to_progress
-        FROM emotional_segments
+            ROW_NUMBER() OVER (ORDER BY created_at) AS segment_id,
+            curr.state AS start_state,
+            lead(curr.state) OVER (ORDER BY curr.created_at) AS end_state,
+            curr.intensity AS start_intensity,
+            lead(curr.intensity) OVER (ORDER BY curr.created_at) AS end_intensity,
+            1 - (curr.embedding <=> lead(curr.embedding) OVER (ORDER BY curr.created_at)) AS vector_movement,
+            CASE 
+                WHEN curr.intensity > lead(curr.intensity) OVER (ORDER BY curr.created_at) THEN 1.0
+                ELSE 0.5
+            END AS similarity_to_progress
+        FROM emotional_states curr
         WHERE end_state IS NOT NULL
         ORDER BY segment_id;
-    ', p_schema_name) INTO segment_id, start_state, end_state, vector_movement, similarity_to_progress;
+    ', p_schema_name, p_session_id);
     
-    RETURN NEXT;
+    -- If no emotional states were found, return an empty result set
+    IF NOT FOUND THEN
+        RETURN QUERY SELECT NULL::INTEGER, NULL::TEXT, NULL::TEXT, NULL::FLOAT, NULL::FLOAT
+        WHERE FALSE;  -- This ensures an empty result set
+    END IF;
+
+
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error in analyze_emotional_vector_trajectory: %', SQLERRM;
-    RETURN;
+    RETURN QUERY SELECT NULL::INTEGER, NULL::TEXT, NULL::TEXT, NULL::FLOAT, NULL::FLOAT
+    WHERE FALSE;  -- Ensure an empty result set on error
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -1407,5 +1400,32 @@ BEGIN
             ORDER BY strength DESC;
         ', p_schema_name, p_concept_id, p_concept_id, p_relationship_type, p_relationship_type);
     END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+CREATE OR REPLACE FUNCTION get_high_quality_interactions(
+    p_schema_name TEXT,
+    p_topic_filter TEXT DEFAULT NULL,
+    p_min_effectiveness FLOAT DEFAULT 0.7,
+    p_limit INT DEFAULT 100
+)
+RETURNS TABLE (
+    interactionID INTEGER,
+    context TEXT,
+    question TEXT,
+    answer TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    -- Build the query dynamically
+    RETURN QUERY EXECUTE format('
+        SELECT * FROM %I.interactions
+        WHERE (%L IS NULL OR metadata->>''topic'' = %L)
+        AND (CAST(metadata->''effectiveness''->>''term_overlap'' AS FLOAT) >= %L OR metadata->''effectiveness''->>''template_adherence'' = ''high'')
+        ORDER BY created_at DESC
+        LIMIT %s;
+    ', p_schema_name, p_topic_filter, p_topic_filter, p_min_effectiveness, p_limit);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
