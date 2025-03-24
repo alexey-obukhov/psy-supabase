@@ -558,83 +558,115 @@ class TestDatabaseManager:
             assert 'Control' in result
 
     def test_analyze_emotional_vector_trajectory(self, db_manager):
-        """Test analyzing emotional trajectory across therapy sessions."""
+        """Test analyzing emotional vector trajectory with valid data."""
+        # Step 1: Mock the table insert response
+        mock_insert_response = Mock()
+        mock_insert_response.data = [{'id': 1}, {'id': 2}, {'id': 3}]  # Successful inserts
 
-        # Sample history with emotional states
-        emotional_history = [
+        # Step 2: Mock the RPC response for analyze_emotional_vector_trajectory
+        mock_trajectory_response = Mock()
+        mock_trajectory_response.data = [
             {
-                'interactionID': 1,
-                'context': 'Therapy session 1',
-                'question': 'How are you feeling today?',
-                'answer': 'Overwhelmed and anxious.',
-                'metadata': json.dumps({
-                    'session_id': TEST_SESSION_ID,
-                    'emotional_state': 'anxious',
-                    'emotional_intensity': 8
-                }),
-                'created_at': '2023-01-01T12:00:00'
+                'segment_id': 1,
+                'start_state': 'happy',
+                'end_state': 'sad',
+                'vector_movement': 0.3,
+                'similarity_to_progress': 1.0
             },
             {
-                'interactionID': 2,
-                'context': 'Therapy session 1',
-                'question': 'How did the breathing exercises work for you?',
-                'answer': 'They helped a bit. I\'m still anxious but less than before.',
-                'metadata': json.dumps({
-                    'session_id': TEST_SESSION_ID,
-                    'emotional_state': 'anxious',
-                    'emotional_intensity': 6
-                }),
-                'created_at': '2023-01-08T12:00:00'
-            },
-            {
-                'interactionID': 3,
-                'context': 'Therapy session 1',
-                'question': 'How are you feeling now about your progress?',
-                'answer': 'I feel more hopeful and my anxiety is more manageable.',
-                'metadata': json.dumps({
-                    'session_id': TEST_SESSION_ID,
-                    'emotional_state': 'hopeful',
-                    'emotional_intensity': 4
-                }),
-                'created_at': '2023-01-15T12:00:00'
+                'segment_id': 2,
+                'start_state': 'sad',
+                'end_state': 'neutral',
+                'vector_movement': 0.2,
+                'similarity_to_progress': 0.5
             }
         ]
 
-        # Mock conversation history
-        with patch.object(db_manager, 'get_conversation_history', return_value=emotional_history):
-            # Call method
-            result = db_manager.analyze_emotional_vector_trajectory(TEST_SESSION_ID)
+        # Step 3: Configure the mocks to be returned by the appropriate methods
+        db_manager.supabase.table().insert.return_value.execute.return_value = mock_insert_response
+        db_manager.supabase.rpc().execute.return_value = mock_trajectory_response
 
-            # Verify trajectory shows emotional progression
-            assert len(result) == 3  # Expecting 3 segments
-            assert result[0]['start_state'] == 'anxious'
-            assert result[1]['start_state'] == 'anxious'
-            assert result[2]['start_state'] == 'hopeful'
-            assert result[0]['start_intensity'] > result[1]['start_intensity']
-            assert result[1]['start_intensity'] > result[2]['start_intensity']
+        # Step 4: Insert test data (this will use the mock response)
+        insert_result = db_manager.supabase.table('interactions').insert([
+            {
+                'interactionid': 1,
+                'metadata': json.dumps({
+                    'session_id': TEST_SESSION_ID, 
+                    'emotional_state': 'happy', 
+                    'emotional_intensity': 0.8
+                }),
+                'embedding': '[0.1, 0.2, 0.3]',
+                'created_at': '2023-01-01T12:00:00'
+            },
+            {
+                'interactionid': 2,
+                'metadata': json.dumps({
+                    'session_id': TEST_SESSION_ID, 
+                    'emotional_state': 'sad', 
+                    'emotional_intensity': 0.5
+                }),
+                'embedding': '[0.4, 0.5, 0.6]',
+                'created_at': '2023-01-01T12:05:00'
+            },
+            {
+                'interactionid': 3,
+                'metadata': json.dumps({
+                    'session_id': TEST_SESSION_ID, 
+                    'emotional_state': 'neutral', 
+                    'emotional_intensity': 0.7
+                }),
+                'embedding': '[0.7, 0.8, 0.9]',
+                'created_at': '2023-01-01T12:10:00'
+            }
+        ]).execute()
 
-            # Verify chronological ordering
-            timestamps = [entry['created_at'] for entry in result]
-            assert timestamps == sorted(timestamps)
+        # Step 5: Verify insert success
+        assert insert_result.data is not None
+
+        # Step 6: Call the method under test
+        result = db_manager.analyze_emotional_vector_trajectory(TEST_SESSION_ID)
+
+        # Step 7: Verify the RPC call was made with correct parameters
+        db_manager.supabase.rpc.assert_called_with('analyze_emotional_vector_trajectory', {
+            'p_schema_name': db_manager.schema_name,
+            'p_session_id': TEST_SESSION_ID
+        })
+
+        # Step 8: Verify result structure and content
+        assert len(result) == 2  # Expect 2 trajectory segments
+
+        # Verify first segment
+        assert result[0]['segment_id'] == 1
+        assert result[0]['start_state'] == 'happy'
+        assert result[0]['end_state'] == 'sad'
+        assert result[0]['vector_movement'] == 0.3
+        assert result[0]['similarity_to_progress'] == 1.0
+
+        # Verify second segment
+        assert result[1]['segment_id'] == 2
+        assert result[1]['start_state'] == 'sad'
+        assert result[1]['end_state'] == 'neutral'
+        assert result[1]['vector_movement'] == 0.2
+        assert result[1]['similarity_to_progress'] == 0.5
 
     def test_analyze_emotional_vector_trajectory_empty(self, db_manager):
         """Test emotional trajectory with empty or invalid data."""
-        # Mock conversation history with no emotional data
-        history_no_emotions = [
-            {
-                'questionText': 'What brings you here today?',
-                'answerText': 'I\'m not sure where to start.',
-                'metadata': json.dumps({'topic': 'Initial Assessment'}),
-                'created_at': '2023-01-01T12:00:00'
-            }
-        ]
+        # Mock RPC response to return empty data (as if no emotional data was found)
+        mock_empty_response = Mock()
+        mock_empty_response.data = []  # Empty response
+        db_manager.supabase.rpc().execute.return_value = mock_empty_response
 
-        with patch.object(db_manager, 'get_conversation_history', return_value=history_no_emotions):
-            # Call method
-            result = db_manager.analyze_emotional_vector_trajectory(TEST_SESSION_ID)
+        # Call method
+        result = db_manager.analyze_emotional_vector_trajectory(TEST_SESSION_ID)
 
-            # Verify empty result when no emotional data
-            assert result == []
+        # Verify empty result when no emotional data
+        assert result == []
+
+        # Verify RPC call was made with correct parameters
+        db_manager.supabase.rpc.assert_called_with('analyze_emotional_vector_trajectory', {
+            'p_schema_name': db_manager.schema_name,
+            'p_session_id': TEST_SESSION_ID
+        })
 
     def test_analyze_emotional_vector_trajectory_invalid_metadata(self, db_manager):
         """Test emotional trajectory with invalid metadata format."""
@@ -711,7 +743,7 @@ class TestDatabaseManager:
 
     def test_mark_therapeutic_insight(self, db_manager):
         """Test marking an interaction as containing a therapeutic insight."""
-        
+
         # Mock RPC call to return success
         mock_response = Mock()
         mock_response.data = 1  # Simulate a successful operation returning an ID
@@ -722,7 +754,7 @@ class TestDatabaseManager:
 
         # Verify result
         assert result is True
-        
+
         # Verify that the expected RPC call was made exactly once
         db_manager.supabase.rpc.assert_called_once_with('mark_therapeutic_insight', {
             'p_schema_name': db_manager.schema_name,

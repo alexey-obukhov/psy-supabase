@@ -141,14 +141,14 @@ class DatabaseManager:
         try:
             # Make sure schema exists first
             self.create_user_schema_sync()
-            
+
             # Handle metadata properly
             if isinstance(data_point.get('metadata'), dict):
-                metadata = json.dumps(data_point.get('metadata'))
+                metadata = data_point.get('metadata')  # Keep it as a dict
             elif isinstance(data_point.get('metadata'), str):
-                metadata = data_point.get('metadata')
+                metadata = json.loads(data_point.get('metadata'))  # Parse JSON string to dict
             else:
-                metadata = '{}'
+                metadata = {}
 
             # Add session_id to metadata if provided
             if session_id:
@@ -161,7 +161,7 @@ class DatabaseManager:
 
             # Log what we're trying to do
             logger.debug(f"Adding interaction to schema: {self.schema_name}")
-            
+
             try:
                 # Try using RPC function first - this is more reliable
                 response = self.supabase.rpc('add_interaction', {
@@ -169,16 +169,16 @@ class DatabaseManager:
                     'p_context': context,
                     'p_question': question,
                     'p_answer': answer,
-                    'p_metadata': metadata
+                    'p_metadata': json.dumps(metadata)  # Convert dict back to JSON string for the RPC call
                 }).execute()
-                
+
                 if response.data is None:
                     logger.error("RPC add_interaction failed")
                     raise Exception("RPC call failed")
-                    
+
                 logger.info(f"Successfully added interaction via RPC")
                 return True
-                
+
             except Exception as inner_e:
                 logger.error(f"Error in RPC call: {str(inner_e)}")
                 # Fall back to direct table insert
@@ -188,20 +188,20 @@ class DatabaseManager:
                         'context': context,
                         'question': question,
                         'answer': answer,
-                        'metadata': metadata
+                        'metadata': json.dumps(metadata)  # Convert dict back to JSON string for the table insert
                     }).execute()
-                    
+
                     # Check for error using the new pattern
                     if response.data is None:
                         logger.error("Table insert failed - no data in response")
                         return False
-                        
+
                     logger.info(f"Successfully added interaction via table insert")
                     return True
                 except Exception as table_e:
                     logger.error(f"Table insert also failed: {str(table_e)}")
                     raise table_e
-                
+
         except Exception as e:
             logger.error(f"Error adding interaction: {str(e)}")
             logger.error(traceback.format_exc())
@@ -775,11 +775,11 @@ class DatabaseManager:
                     'session_id': session_id,
                     'error': 'No conversation history found'
                 }
-            
+
             # Extract key data points
             themes = self.extract_psychological_themes(session_id, min_occurrences=1)
             emotions = self.analyze_emotional_vector_trajectory(session_id)
-            
+
             # Extract insights if marked in metadata
             insights = []
             for interaction in history:
@@ -1012,18 +1012,14 @@ class DatabaseManager:
                 'p_session_id': session_id
             }).execute()
 
-            if response.data is None:
-                logger.error("Error analyzing emotional vector trajectory")
-                return []
-
-            # Check for NULL values in the result
-            if response.data and all(value is None for value in response.data[0]):
-                logger.info("No emotional trajectory segments found.")
+            # Check if the response contains data
+            if response.data is None or len(response.data) == 0:
+                logger.info("No emotional trajectory segments found for session: %s", session_id)
                 return []
 
             return response.data
         except Exception as e:
-            logger.error("Error analyzing emotional vector trajectory %s", e)
+            logger.error("Error analyzing emotional vector trajectory for session %s: %s", session_id, e)
             return []
 
     def find_concept_connections(self, concept_id: int, session_id: Optional[str] = None, threshold: float = 0.7):

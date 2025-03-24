@@ -649,18 +649,6 @@ BEGIN
         WHERE end_state IS NOT NULL
         ORDER BY segment_id;
     ', p_schema_name, p_session_id);
-    
-    -- If no emotional states were found, return an empty result set
-    IF NOT FOUND THEN
-        RETURN QUERY SELECT NULL::INTEGER, NULL::TEXT, NULL::TEXT, NULL::FLOAT, NULL::FLOAT
-        WHERE FALSE;  -- This ensures an empty result set
-    END IF;
-
-
-EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Error in analyze_emotional_vector_trajectory: %', SQLERRM;
-    RETURN QUERY SELECT NULL::INTEGER, NULL::TEXT, NULL::TEXT, NULL::FLOAT, NULL::FLOAT
-    WHERE FALSE;  -- Ensure an empty result set on error
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
