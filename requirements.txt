@@ -61,7 +61,7 @@ nvidia-nvtx-cu12==12.1.105
 packaging==24.2
 pandas==2.0.3
 pillow==10.4.0
-pkg_resources==0.0.0
+# pkg_resources==0.0.0
 platformdirs==4.3.6
 pluggy==1.5.0
 postgrest==0.16.11
@@ -97,6 +97,7 @@ StrEnum==0.4.15
 supabase==2.6.0
 supafunc==0.5.1
 sympy==1.13.3
+testresources==2.0.1
 text2emotion==0.0.5
 thinc==8.2.5
 threadpoolctl==3.5.0
