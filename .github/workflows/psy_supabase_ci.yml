@@ -22,7 +22,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install critical dependencies
+    - name: Install all dependencies
       run: |
         # Setup Python environment properly first
         if [[ "${{ matrix.python-version }}" == "3.8" ]]; then
@@ -30,23 +30,18 @@ jobs:
         else
           python -m pip install --upgrade pip wheel setuptools
         fi
-        
-        # Install school_logging ONCE and verify it immediately
-        pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
-        python -c "import school_logging; print('✓ school_logging imported successfully')"
 
-    - name: Install package in development mode
-      run: |
-        # Install your package BEFORE other requirements
+        # Install your package in development mode
         pip install -e .
 
-    - name: Install remaining dependencies
-      run: |
-        # Now install requirements (which might depend on your package)
+        # Install all dependencies from requirements.txt (including school_logging)
         pip install -r requirements.txt
-        
+
         # Install spacy language model
         python -m spacy download en_core_web_sm
+
+        # Verify important dependencies
+        python -c "import school_logging; print('✓ school_logging imported successfully')"
 
     - name: Setup Supabase environment
       run: |
@@ -59,16 +54,16 @@ jobs:
       run: |
         # Install the dependency
         pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
-        
+
         # Verify it's installed correctly
         python -c "import pkg_resources; print(pkg_resources.get_distribution('school-logging').version)"
-        
+
         # Check the module structure
         python -c "import pkgutil; print([p for p in pkgutil.iter_modules() if 'school' in p.name])"
-        
+
         # Try importing the specific module that's failing
         python -c "import importlib; print(dir(importlib.import_module('school_logging')))"
-        
+
         # If the module is actually called something else, show what's available
         pip show school-logging
 
