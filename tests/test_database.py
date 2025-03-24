@@ -711,25 +711,24 @@ class TestDatabaseManager:
 
     def test_mark_therapeutic_insight(self, db_manager):
         """Test marking an interaction as containing a therapeutic insight."""
+        
         # Mock RPC call to return success
         mock_response = Mock()
-        mock_response.error = None
-        db_manager.supabase.rpc().execute.return_value = mock_response
+        mock_response.data = 1  # Simulate a successful operation returning an ID
+        db_manager.supabase.rpc.return_value.execute.return_value = mock_response
 
         # Call method
-        result = db_manager.mark_therapeutic_insight(1, "high", TEST_SESSION_ID)
+        result = db_manager.mark_therapeutic_insight(1, "high")
 
-        # Verify result and RPC call
+        # Verify result
         assert result is True
-        db_manager.supabase.rpc.assert_called_with('execute_sql', {'command': ANY})
-
-        # Verify SQL contains correct values
-        command = db_manager.supabase.rpc.call_args[1]['command']
-        assert f'"{TEST_SESSION_ID}".interactions' in command
-        assert 'SET metadata = jsonb_set' in command
-        assert "'insight_level'" in command
-        assert '"high"' in command
-        assert 'WHERE interactionid = 1' in command
+        
+        # Verify that the expected RPC call was made exactly once
+        db_manager.supabase.rpc.assert_called_once_with('mark_therapeutic_insight', {
+            'p_schema_name': db_manager.schema_name,
+            'p_interaction_id': 1,
+            'p_insight_level': "high"
+        })
 
     def test_mark_therapeutic_insight_null_metadata(self, db_manager):
         """Test marking an interaction that has null metadata."""

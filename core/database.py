@@ -686,7 +686,9 @@ class DatabaseManager:
             logger.error(f"Error starting therapy session: {e}")
             return False
 
-    def mark_therapeutic_insight(self, interaction_id: int, insight_level: str, session_id: Optional[str] = None):
+    def mark_therapeutic_insight(self,
+                                 interaction_id: int,
+                                 insight_level: str):
         """
         Marks an interaction as containing a significant therapeutic insight.
         """
@@ -696,12 +698,12 @@ class DatabaseManager:
                 'p_interaction_id': interaction_id,
                 'p_insight_level': insight_level
             }).execute()
-            
+
             return response.data is not None
         except Exception as e:
             logger.error(f"Error marking therapeutic insight: {e}")
             return False
-            
+
     def get_psychological_connections(self, concept_id: int, relationship_type: Optional[str] = None, session_id: Optional[str] = None):
         """
         Retrieves psychological connections for a given concept.
