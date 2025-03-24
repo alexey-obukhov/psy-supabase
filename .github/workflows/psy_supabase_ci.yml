@@ -56,7 +56,7 @@ jobs:
         python -m build
 
     - name: Store build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392  # v4.0.0
       with:
         name: dist-${{ matrix.python-version }}
         path: dist/
