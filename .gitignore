@@ -1,6 +1,19 @@
 .venv/
+.vscode/
 *__pycache__/
 security_files/
+test/logging/*
 logging/
+
+# Supabase login data
 .env
+
+# Python packaging
 psy_supabase.egg-info/*
+build/
+dist/
+
+# Exclude model files but keep directory structure
+models/*
+!models/.gitkeep
+!models/README.md

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psy-supabase"
+version = "0.1.0"
+description = "Psychological AI with Supabase Integration"
+readme = "README.md"
+authors = [{name = "Alexey Obukhov", email = "alexey.obukhov@hotmail.com"}]
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+
+# Dependencies can also be specified here if you prefer
+# dependencies = [
+#    "torch>=2.4.1",
+#    "transformers>=4.46.3",
+#    "supabase>=2.6.0",
+#    "spacy>=3.7.5"
+# ]
+
+[project.urls]
+repository = "https://github.com/alexey-obukhov/psy-supabase.git"
+
+[project.scripts]
+psy-supabase = "psy_supabase.__main__:main"
+
+# Development tool configurations
+[tool.black]
+line-length = 88
+target-version = ["py38"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
