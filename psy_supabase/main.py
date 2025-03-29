@@ -107,7 +107,7 @@ initialize_app()
 
 def should_cleanup_memory():
     """Determine if we should clean up GPU memory based on request count and time."""
-    global REQUEST_COUNTER, last_memory_cleanup
+    global REQUEST_COUNTER, last_memory_cleanup  # pylint: disable=global-statement
 
     REQUEST_COUNTER += 1
     current_time = time.time()

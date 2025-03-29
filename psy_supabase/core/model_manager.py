@@ -15,9 +15,9 @@ from typeguard import typechecked
 import torch
 import torch.cuda
 from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from school_logging.log import ColoredLogger
-from psy_supabase.utilities.common import get_models_dir, ensure_dir_exists
+from psy_supabase.utilities.common import get_models_dir, load_toxicity_model as common_load_toxicity_model
 from psy_supabase.core.text_generator import TextGenerator
 
 # Create a model manager class to handle loading/unloading
@@ -93,7 +93,7 @@ class ModelManager:
         self.logger = ColoredLogger(__name__)
 
         # Preload toxicity model
-        self.get_toxicity_model()
+        self.load_toxicity_model()
 
         self.logger.info(f"ModelManager initialized with model: {model_name}, device: {device}, quantize: {quantize}")
 
@@ -168,53 +168,15 @@ class ModelManager:
         return self.generator
 
     @typechecked
-    def get_toxicity_model(self, toxicity_model_name="facebook/roberta-hate-speech-dynabench-r4-target"):
-        """
-        Get or initialize the toxicity detection model with local model caching.
-
-        Returns:
-            Tuple of (toxicity_model, toxicity_tokenizer)
-        """
-        if not hasattr(self, 'toxicity_model') or self.toxicity_model is None:
-
-            # Get local model path
-            model_folder = toxicity_model_name.rsplit('/', maxsplit=1)[-1]
-            local_path = os.path.join(self.MODELS_DIR, model_folder)
-
-            # Create models dir if it doesn't exist
-            ensure_dir_exists(self.MODELS_DIR)
-
-            # Check if model exists locally
-            if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
-                # Use local model
-                self.logger.info(f"Loading toxicity model from local path: {local_path}")
-                self.toxicity_tokenizer = AutoTokenizer.from_pretrained(local_path)
-                self.toxicity_model = AutoModelForSequenceClassification.from_pretrained(
-                    local_path,
-                    torch_dtype=torch.float32
-                )
-            else:
-                # Download model and save locally
-                self.logger.info(f"Downloading toxicity model to {local_path}")
-                os.makedirs(local_path, exist_ok=True)
-
-                # Download and save tokenizer
-                self.toxicity_tokenizer = AutoTokenizer.from_pretrained(toxicity_model_name)
-                self.toxicity_tokenizer.save_pretrained(local_path)
-
-                # Download and save model
-                self.toxicity_model = AutoModelForSequenceClassification.from_pretrained(
-                    toxicity_model_name,
-                    torch_dtype=torch.float32
-                )
-                self.toxicity_model.save_pretrained(local_path)
-                self.logger.info(f"Toxicity model saved to {local_path}")
-
-            # Always keep toxicity model on CPU for efficiency
-            self.toxicity_model = self.toxicity_model.to("cpu")
-            self.toxicity_model.eval()
-
-        return self.toxicity_model, self.toxicity_tokenizer
+    def load_toxicity_model(self):
+        """Load the toxicity detection model with local caching support."""
+        try:
+            # Use the shared function to load toxicity model
+            self.toxicity_model, self.toxicity_tokenizer = common_load_toxicity_model(self.logger)
+            return self.toxicity_model, self.toxicity_tokenizer
+        except Exception as e:
+            self.logger.error(f"Error loading toxicity model: {e}")
+            raise
 
     def free_memory(self):
         """Free up GPU memory by moving model to CPU and releasing CUDA memory."""
