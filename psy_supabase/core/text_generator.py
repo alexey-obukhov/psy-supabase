@@ -68,10 +68,9 @@ import traceback
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from jinja2 import Template
-from psy_supabase.utilities.common import is_github_actions
+from psy_supabase.utilities.common import is_github_actions, get_models_dir, ensure_dir_exists, load_toxicity_model
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
-from psy_supabase.utilities.common import get_models_dir, ensure_dir_exists
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from school_logging.log import ColoredLogger
 from detoxify import Detoxify
@@ -285,66 +284,6 @@ class TextGenerator:
         if self.device == "cuda":
             torch.cuda.empty_cache()  # Clear GPU cache
 
-    def _load_toxicity_model(self):
-        """
-        Load the toxicity detection model with local caching support.
-
-        This method handles loading the toxicity classification model used to
-        ensure responses are appropriate. Features:
-        1. Local model caching to avoid repeated downloads
-        2. Explicit CPU placement for efficiency
-        3. Proper error handling and logging
-
-        The implementation uses Facebook's RoBERTa hate speech detection model
-        with dynamic paths to support different deployment environments.
-
-        Raises:
-            Exception: If model loading fails, with detailed error logging
-        """
-        logger.info("Loading toxicity model: facebook/roberta-hate-speech-dynabench-r4-target")
-        try:
-            # Define model name and paths
-            toxicity_model_name = "facebook/roberta-hate-speech-dynabench-r4-target"
-            model_folder = toxicity_model_name.split('/')[-1]
-
-            local_path = os.path.join(self.MODELS_DIR, model_folder)
-
-            # Create models dir if it doesn't exist
-            os.makedirs(self.MODELS_DIR, exist_ok=True)
-
-            # Check if model exists locally
-            if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
-                # Use local model
-                logger.info(f"Loading toxicity model from local path: {local_path}")
-                self.toxic_tokenizer = AutoTokenizer.from_pretrained(local_path)
-                self.toxic_model = AutoModelForSequenceClassification.from_pretrained(
-                    local_path,
-                    torch_dtype=torch.float32  # Use float32 for CPU
-                )
-            else:
-                # Download model and save locally
-                logger.info(f"Downloading toxicity model to {local_path}")
-                os.makedirs(local_path, exist_ok=True)
-
-                # Download and save tokenizer
-                self.toxic_tokenizer = AutoTokenizer.from_pretrained(toxicity_model_name)
-                self.toxic_tokenizer.save_pretrained(local_path)
-
-                # Download and save model
-                self.toxic_model = AutoModelForSequenceClassification.from_pretrained(
-                    toxicity_model_name,
-                    torch_dtype=torch.float32  # Use float32 for CPU
-                )
-                self.toxic_model.save_pretrained(local_path)
-                logger.info(f"Toxicity model saved to {local_path}")
-
-            # ALWAYS keep the toxicity model on CPU
-            self.toxic_model.to("cpu")  # Explicitly on CPU
-            self.toxic_model.eval()
-        except Exception as e:
-            logger.error(f"Error loading toxicity model: {e}\n{traceback.format_exc()}")
-            raise
-
     def _unload_toxicity_model(self):
         """Unloads the toxicity model and tokenizer from memory."""
         logger.info("Unloading toxicity model")
@@ -479,23 +418,23 @@ class TextGenerator:
             "user_question": user_input,
             # Add other context variables based on kwargs
         }
-        
+
         # Determine which template to use based on content
         template_name = self._select_appropriate_template(user_input, **kwargs)
-        
+
         # Render the template
         template_parts = self._render_template(template_name, context)
-        
+
         # Generate using the system prompt and assistant template
         response = self._generate_with_template_parts(
             system_prompt=template_parts["system_prompt"],
             assistant_template=template_parts["assistant_template"],
             user_input=user_input
         )
-        
+
         # Clean the response
         cleaned_response = self._clean_therapeutic_response(response)
-        
+
         return cleaned_response
 
     def _render_template(self, template_name, context):
@@ -504,17 +443,17 @@ class TextGenerator:
             template_content = self._load_template(template_name)
             template = Template(template_content)
             rendered = template.render(**context)
-            
+
             # Split the rendered template to extract system and assistant parts
             parts = rendered.split("<|assistant|>")
             if len(parts) > 1:
                 system_prompt = parts[0].replace("<|system|>", "").strip()
                 assistant_response = parts[1].strip()
-                
+
                 # Log the lengths for debugging
                 logger.info(f"System prompt: {len(system_prompt)} chars")
                 logger.info(f"Assistant response template: {len(assistant_response)} chars")
-                
+
                 # Use the split parts in your generation function
                 # This depends on how your text generation works
                 return {"system_prompt": system_prompt, "assistant_template": assistant_response}
@@ -531,31 +470,31 @@ class TextGenerator:
         Used when content filtering detects problematic responses.
         """
         import random
-        
+
         # Multi-category fallback system for diverse, natural responses
         fallback_categories = {
             "reflective": [
                 "I notice you're reaching out. I'm here to listen and support you. Would you like to share more about what's on your mind?",
-                
+
                 "Thank you for your message. I'm here to provide a supportive space where we can explore what you're experiencing. What would be most helpful to discuss today?"
             ],
             "empathetic": [
                 "I can see you're trying to communicate something important. This is a safe space to express yourself, and I'm here to support you whenever you're ready to share more.",
-                
+
                 "I understand that expressing feelings can sometimes be challenging. I'm here to listen without judgment when you're ready to talk about what you're experiencing."
             ],
             "encouraging": [
                 "Sometimes finding the right words can be difficult. I'm here to support you through whatever you might be going through. Would you like to tell me a bit more?",
-                
+
                 "Thank you for reaching out. I'm here to help and support you. Feel free to share what's on your mind at your own pace."
             ],
             "curious": [
                 "I'm wondering what brought you here today. I'm here to listen and support you through whatever you might be experiencing.",
-                
+
                 "I'm here to provide support and would like to understand better what you're experiencing. Would you feel comfortable sharing more about what's on your mind?"
             ]
         }
-        
+
         # First select a category, then select a response from that category
         category = random.choice(list(fallback_categories.keys()))
         return random.choice(fallback_categories[category])
@@ -563,20 +502,20 @@ class TextGenerator:
     def _clean_therapeutic_response(self, response: str) -> str:
         """
         Enterprise-grade cleaning function for therapeutic responses using a multi-stage filtering approach.
-        
+
         This implements industry best practices for ensuring responses remain therapeutic
         while removing educational, instructional, or inappropriate content.
-        
+
         Args:
             response: Raw model response text
-            
+
         Returns:
             A cleaned therapeutic response or appropriate fallback
         """
         import re
-        
+
         logger.debug(f"Cleaning therapeutic response of length {len(response)}")
-        
+
         # STAGE 1: CRITICAL PATTERN DETECTION - Educational/instructional content
         educational_patterns = [
             # Document structure markers
@@ -594,13 +533,13 @@ class TextGenerator:
             # Instructional patterns
             r"in this (manual|guide|book)", r"let us embark", r"let's explore"
         ]
-        
+
         # Check for educational patterns with logging
         for pattern in educational_patterns:
             if re.search(pattern, response.lower(), re.IGNORECASE):
                 logger.warning(f"Educational pattern detected: {pattern}")
                 return self._get_supportive_fallback()
-        
+
         # STAGE 2: CONTENT TYPE CLASSIFICATION
         # Check for prompt leakage (instructions that should never reach users)
         instruction_markers = [
@@ -609,18 +548,18 @@ class TextGenerator:
             "when responding", "do not include", "following the therapeutic",
             "use the following"
         ]
-        
+
         for marker in instruction_markers:
             if marker in response.lower():
                 logger.warning(f"Instruction leakage detected: {marker}")
                 return self._get_supportive_fallback()
-        
+
         # STAGE 3: SPECIAL CHARACTER & FORMATTING HANDLING
         # Check if response starts with special characters
         if response.strip() and any(response.strip().startswith(char) for char in "_+-=[]{};:',.<>/?\"\\"):
             logger.warning("Response starts with special character - using supportive fallback")
             return self._get_supportive_fallback()
-        
+
         # STAGE 4: EXTRACT DIRECT THERAPIST RESPONSES
         dialogue_extraction = [
             # Extract therapist speech from roleplay
@@ -628,7 +567,7 @@ class TextGenerator:
             # Extract quoted responses
             r'Your (?:therapeutic )?response should be:\s*"([^"]+)"',
         ]
-        
+
         for pattern in dialogue_extraction:
             match = re.search(pattern, response, re.IGNORECASE)
             if match:
@@ -636,27 +575,27 @@ class TextGenerator:
                 if len(extracted) > 50:  # Ensure it's substantial
                     logger.info(f"Extracted direct therapeutic response ({len(extracted)} chars)")
                     response = extracted
-        
+
         # STAGE 5: STRUCTURAL CLEANING
         # Remove ending prompt markers
         response = response.replace("<|endoftext|>", "").strip()
-        
+
         # Remove common therapist opener phrases for more natural flow
         response = re.sub(r"^(?:As a therapist|As your therapist|In my role as a therapist),?\s+", "", response, flags=re.IGNORECASE)
-        
+
         # STAGE 6: VALIDATION & QUALITY CONTROL
         # Ensure response has therapeutic language
-        supportive_terms = ["feel", "understand", "support", "help", "listen", "share", 
+        supportive_terms = ["feel", "understand", "support", "help", "listen", "share",
                             "experience", "emotion", "thought", "challenge"]
-        
+
         has_supportive_language = any(term in response.lower() for term in supportive_terms)
-        
+
         # Check length constraints
         if len(response) < 50 or len(response) > 1500 or not has_supportive_language:
-            logger.warning(f"Response fails quality check: length={len(response)}, " 
+            logger.warning(f"Response fails quality check: length={len(response)}, "
                         f"has_supportive_language={has_supportive_language}")
             return self._get_supportive_fallback()
-        
+
         logger.info(f"Cleaned response passed all quality checks, final length: {len(response)}")
         return response
 
@@ -698,50 +637,14 @@ class TextGenerator:
 
     def get_toxicity_model(self):
         """Get or initialize toxicity detection model with local model caching."""
-        if not hasattr(self, 'toxicity_model') or self.toxicity_model is None:
-            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        # Standardize variable names (use toxic_model for consistency with other references)
+        if not hasattr(self, 'toxic_model') or self.toxic_model is None:
+            # Use the shared function from common.py
+            self.toxic_model, self.toxic_tokenizer = load_toxicity_model(
+                logger_instance=self.logger if hasattr(self, 'logger') else logger
+            )
 
-            # Define toxicity model name
-            toxicity_model_name = "facebook/roberta-hate-speech-dynabench-r4-target"
-
-            # Get local model path
-            model_folder = toxicity_model_name.split('/')[-1]
-            local_path = os.path.join(self.MODELS_DIR, model_folder)
-
-            # Create models dir if it doesn't exist
-            os.makedirs(self.MODELS_DIR, exist_ok=True)
-
-            # Check if model exists locally
-            if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
-                # Use local model
-                self.logger.info(f"Loading toxicity model from local path: {local_path}")
-                self.toxicity_tokenizer = AutoTokenizer.from_pretrained(local_path)
-                self.toxicity_model = AutoModelForSequenceClassification.from_pretrained(
-                    local_path,
-                    torch_dtype=torch.float32
-                )
-            else:
-                # Download model and save locally
-                self.logger.info(f"Downloading toxicity model to {local_path}")
-                os.makedirs(local_path, exist_ok=True)
-
-                # Download and save tokenizer
-                self.toxicity_tokenizer = AutoTokenizer.from_pretrained(toxicity_model_name)
-                self.toxicity_tokenizer.save_pretrained(local_path)
-
-                # Download and save model
-                self.toxicity_model = AutoModelForSequenceClassification.from_pretrained(
-                    toxicity_model_name,
-                    torch_dtype=torch.float32
-                )
-                self.toxicity_model.save_pretrained(local_path)
-                self.logger.info(f"Toxicity model saved to {local_path}")
-
-            # Always keep toxicity model on CPU for efficiency
-            self.toxicity_model = self.toxicity_model.to("cpu")
-            self.toxicity_model.eval()
-
-        return self.toxicity_model, self.toxicity_tokenizer
+        return self.toxic_model, self.toxic_tokenizer
 
     def is_toxic(self, text: str) -> bool:
         """
@@ -1139,7 +1042,7 @@ class TextGenerator:
             try:
                 # NEW CODE: Check for special inputs before loading the regular template
                 special_prompt = self._prepare_prompt_for_generation(user_question, template_name, context)
-                
+
                 # If we got a special prompt, use it directly
                 if special_prompt:
                     prompt = special_prompt
@@ -1361,19 +1264,19 @@ class TextGenerator:
         """Return a supportive fallback response when needed."""
         import random
         import re
-        
+
         # For special character inputs
         if question and len(re.sub(r'[a-zA-Z0-9\s]', '', question)) / len(question) > 0.5:
             return "I'm here to support you. What would you like to talk about today?"
-            
+
         # For empty inputs
         if not question or len(question.strip()) == 0:
             return "I'm here to listen and support you. What's on your mind today?"
-            
+
         # For very long inputs
         if question and len(question) > 1000:
             return "Thank you for sharing. I'm here to help and support you. Which part would you like to focus on first?"
-        
+
         # General fallbacks that include supportive language
         fallbacks = [
             "I'm here to help you process these feelings. What would be most supportive right now?",
@@ -1381,7 +1284,7 @@ class TextGenerator:
             "I'm here to help you through this. What specific aspect would you like to explore?",
             "I'm available to support you. What would you find most helpful to discuss?"
         ]
-        
+
         return random.choice(fallbacks)
 
     def _is_crisis_situation(self, text: str) -> bool:
@@ -1535,15 +1438,15 @@ class TextGenerator:
             if os.path.exists(template_path):
                 with open(template_path, 'r') as f:
                     template_content = f.read()
-                    
+
                 # Validate template format
                 if "{{user_question}}" not in template_content:
                     logger.warning(f"Template missing {{user_question}} placeholder: {template_name}")
-                    
+
                 return Template(template_content)
         except Exception as e:
             logger.error(f"Error loading template {template_name}: {str(e)}")
-        
+
         # Try fallback template
         try:
             fallback_path = os.path.join(self.template_dir, "fallback.j2")
@@ -1552,7 +1455,7 @@ class TextGenerator:
                     return Template(f.read())
         except Exception as e:
             logger.error(f"Error loading fallback template: {str(e)}")
-        
+
         # Emergency hardcoded template
         return Template("You are a therapeutic assistant. Please respond to: {{user_question}}")
 
@@ -1596,20 +1499,20 @@ class TextGenerator:
     def _prepare_prompt_for_generation(self, user_input, template_name, context=None):
         """Prepare prompt with special handling for unusual inputs."""
         import re
-        
+
         # Detect non-standard inputs (special characters or very short inputs)
-        if user_input and (len(user_input.strip()) < 5 or 
+        if user_input and (len(user_input.strip()) < 5 or
                         len(re.sub(r'[a-zA-Z0-9\s]', '', user_input)) / max(1, len(user_input)) > 0.3):
             # Log that we detected a special input
             logger.info(f"Detected special character or very short input - using supportive template: '{user_input}'")
-            
+
             # Create a simple, direct template focused on therapeutic support
             from jinja2 import Template
             template = Template("""
             You are a supportive therapeutic assistant.
-            
+
             The user has sent an unusual message that may contain special characters: "{{user_question}}"
-            
+
             IMPORTANT INSTRUCTIONS:
             1. Respond with genuine empathy and support
             2. DO NOT create educational content, exercises, or examples
@@ -1617,13 +1520,13 @@ class TextGenerator:
             4. DO NOT write about fictional characters or scenarios
             5. Instead, provide a warm, supportive response that invites them to share more
             6. Keep your response conversational and directly addressing the person
-            
+
             Your response should focus on offering support and encouraging the person to share what's on their mind.
             """)
-            
+
             # Render this template directly instead of using the regular system
             return template.render(user_question=user_input)
-        
+
         # For normal inputs, return None to indicate we should use the regular template
         return None
 
