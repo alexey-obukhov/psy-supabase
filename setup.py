@@ -5,9 +5,15 @@ from setuptools.command.install import install
 
 # Function to download spaCy language model during package installation
 def download_spacy_model():
+    """Download the spaCy English language model."""
+    try:
         import spacy
         spacy.load("en_core_web_sm")
         print("Downloaded spaCy English language model")
+    except ImportError:
+        print("Spacy not available, skipping model download")
+        # Don't fail the build, just skip the download
+        pass
 
 class PostInstallCommand(install):
     """Post-installation for installation mode."""
