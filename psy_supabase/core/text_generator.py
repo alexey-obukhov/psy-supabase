@@ -66,7 +66,6 @@ import os
 import torch
 import traceback
 import numpy as np
-from dotenv import load_dotenv
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from psy_supabase.utilities.utils import get_dir
@@ -81,10 +80,18 @@ if TYPE_CHECKING:
     from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
     from psy_supabase.utilities.prompt_selector import PromptSelector
 
-# Load environment variables
-load_dotenv()
-
 logger = ColoredLogger(__name__)
+
+# Check if running in GitHub Actions environment
+is_github_actions = os.environ.get('GITHUB_ACTIONS') == 'true'
+
+# Only import dotenv in local development environment
+if not is_github_actions:
+    from dotenv import load_dotenv
+    load_dotenv()  # Load environment variables from .env file
+    logger.info("Local development: Loading environment from .env file")
+else:
+    logger.info("CI environment: Using GitHub secrets")
 
 class TextGenerator:
     """

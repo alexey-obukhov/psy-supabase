@@ -4,22 +4,12 @@ Entry point for the psy-supabase package.
 """
 import os
 import sys
-from dotenv import load_dotenv
 
 def main():
     """Run the application."""
-    # Load environment variables
-    env_path = os.path.join(os.path.dirname(__file__), '.env')
-    if os.path.exists(env_path):
-        load_dotenv(env_path)
-    else:
-        env_path = os.path.join(os.getcwd(), '.env')
-        if os.path.exists(env_path):
-            load_dotenv(env_path)
-    
     try:
         from . import main as main_module
-        
+
         # If main has a run function, use it
         if hasattr(main_module, 'run'):
             main_module.run()

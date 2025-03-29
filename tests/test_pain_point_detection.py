@@ -5,16 +5,22 @@ from school_logging.log import ColoredLogger
 from collections import Counter
 from typing import List, Dict, Any, Optional, Union, Set
 import json
-from dotenv import load_dotenv
 # import multiprocessing as mp
 from psy_supabase.utilities.utils import cleanup_memory
 
-
-# Load environment variables
-load_dotenv()
-
 # Set up logging
 logger: ColoredLogger = ColoredLogger("pain_point_detection_test")
+
+# Check if running in GitHub Actions environment
+is_github_actions = os.environ.get('GITHUB_ACTIONS') == 'true'
+
+# Conditionally import dotenv
+if not is_github_actions:
+    from dotenv import load_dotenv
+    load_dotenv()  # Load environment variables from .env file
+    logger.info("Local development: Loading environment from .env file")
+else:
+    logger.info("CI environment: Using GitHub secrets")
 
 device: str = "cpu"  # "cuda" if torch.cuda.is_available() else "cpu"
 logger.info(f"Using device: {device}")
