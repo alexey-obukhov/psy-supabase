@@ -296,7 +296,3 @@ def load_enhanced_mental_health_taxonomy():
             "help", "support", "understand", "listen", "care", "concern"
         ],
     }
-
-def get_dir(dir: str = "") -> str:
-    """Return the models directory path."""
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), dir)

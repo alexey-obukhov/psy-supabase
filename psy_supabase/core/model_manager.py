@@ -17,7 +17,7 @@ import torch.cuda
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
 from school_logging.log import ColoredLogger
-from psy_supabase.utilities.utils import get_dir
+from psy_supabase.utilities.common import get_models_dir, ensure_dir_exists
 from psy_supabase.core.text_generator import TextGenerator
 
 # Create a model manager class to handle loading/unloading
@@ -37,7 +37,7 @@ class ModelManager:
     # Class variable to store instances (no global variables)
     _instances: ClassVar[Dict[str, 'ModelManager']] = {}
     # Add models directory path
-    MODELS_DIR = get_dir("models")
+    MODELS_DIR = get_models_dir()
 
     @classmethod
     @typechecked
@@ -168,7 +168,7 @@ class ModelManager:
         return self.generator
 
     @typechecked
-    def get_toxicity_model(self):
+    def get_toxicity_model(self, toxicity_model_name="facebook/roberta-hate-speech-dynabench-r4-target"):
         """
         Get or initialize the toxicity detection model with local model caching.
 
@@ -177,15 +177,12 @@ class ModelManager:
         """
         if not hasattr(self, 'toxicity_model') or self.toxicity_model is None:
 
-            # Define toxicity model name
-            toxicity_model_name = "facebook/roberta-hate-speech-dynabench-r4-target"
-
             # Get local model path
             model_folder = toxicity_model_name.rsplit('/', maxsplit=1)[-1]
             local_path = os.path.join(self.MODELS_DIR, model_folder)
 
             # Create models dir if it doesn't exist
-            os.makedirs(self.MODELS_DIR, exist_ok=True)
+            ensure_dir_exists(self.MODELS_DIR)
 
             # Check if model exists locally
             if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:

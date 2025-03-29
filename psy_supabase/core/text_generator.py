@@ -68,10 +68,10 @@ import traceback
 import numpy as np
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
-from psy_supabase.utilities.utils import get_dir
+from jinja2 import Template
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
-from jinja2 import Template
+from psy_supabase.utilities.common import get_models_dir, ensure_dir_exists
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from school_logging.log import ColoredLogger
 from detoxify import Detoxify
@@ -133,7 +133,7 @@ class TextGenerator:
         3. Automatic template rendering with context variables
         4. Error handling with fallback templates
     """
-    MODELS_DIR = get_dir("models")
+    MODELS_DIR = get_models_dir()
 
     def __init__(self, model_name: str, device: str, use_bfloat16: bool = False, quantize: bool = False):
         """
@@ -171,6 +171,7 @@ class TextGenerator:
         self.toxic_model = None
         self.prompt_templates = prompt_templates
         self.template_dir = os.path.join(os.path.dirname(__file__), "templates")
+        ensure_dir_exists(self.template_dir)
 
         # Load the model immediately on initialization
         self._load_model()
