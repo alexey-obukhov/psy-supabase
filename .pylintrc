@@ -1,5 +1,6 @@
 [MASTER]
 ignore-patterns=test_.*?\.py
+ignored-modules=nltk,text2emotion
 
 [MESSAGES CONTROL]
 disable=duplicate-code
@@ -12,3 +13,6 @@ min-similarity-lines=15
 ignore-comments=yes
 ignore-docstrings=yes
 ignore-imports=yes
+
+[BASIC]
+good-names=e,ex,_

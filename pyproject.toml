@@ -18,7 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 
-# Dependencies can also be specified here if you prefer
+# Dependencies can also be specified here
 # dependencies = [
 #    "torch>=2.4.1",
 #    "transformers>=4.46.3",
