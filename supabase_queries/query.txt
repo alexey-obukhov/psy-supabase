@@ -1335,15 +1335,106 @@ END;
 $$;
 
 -- Function to improve vector query planning
-CREATE OR REPLACE FUNCTION optimize_vector_queries(p_schema_name TEXT)
+-- Function to optimize vector indexes and fix schema verification
+CREATE OR REPLACE FUNCTION optimize_vector_indexes(p_schema_name TEXT)
 RETURNS BOOLEAN AS $$
 BEGIN
-    -- Update statistics for more accurate query planning
-    EXECUTE format('ALTER TABLE %I.interaction_embeddings ALTER COLUMN embedding SET STATISTICS 1000;', p_schema_name);
-    EXECUTE format('ANALYZE %I.interaction_embeddings;', p_schema_name);
+    -- Update verify_schema_structure without dropping it
+    CREATE OR REPLACE FUNCTION verify_schema_structure(p_schema_name TEXT)
+    RETURNS TABLE (
+        table_name TEXT,
+        columns_expected INTEGER,
+        columns_found INTEGER,
+        table_exists BOOLEAN
+    ) AS $func$
+    BEGIN
+        -- First check if the schema exists
+        IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = p_schema_name) THEN
+            -- Return empty result if schema doesn't exist
+            RETURN QUERY SELECT
+                'schema_not_found'::TEXT AS table_name,
+                0 AS columns_expected,
+                0 AS columns_found,
+                FALSE AS table_exists;
+            RETURN;
+        END IF;
+
+        -- UPDATED: Check for interactions table with CORRECT column count (7 not 6)
+        RETURN QUERY SELECT
+            'interactions'::TEXT AS table_name,
+            7 AS columns_expected,  -- FIXED: Changed from 6 to 7
+            COALESCE(COUNT(column_name)::INTEGER, 0) AS columns_found,
+            EXISTS (
+                SELECT 1 FROM information_schema.tables t
+                WHERE t.table_schema = p_schema_name AND t.table_name = 'interactions'
+            ) AS table_exists
+        FROM information_schema.columns c
+        WHERE c.table_schema = p_schema_name AND c.table_name = 'interactions';
+
+        -- Check for knowledge_base table
+        RETURN QUERY SELECT
+            'knowledge_base'::TEXT AS table_name,
+            3 AS columns_expected,
+            COALESCE(COUNT(column_name)::INTEGER, 0) AS columns_found,
+            EXISTS (
+                SELECT 1 FROM information_schema.tables t
+                WHERE t.table_schema = p_schema_name AND t.table_name = 'knowledge_base'
+            ) AS table_exists
+        FROM information_schema.columns c
+        WHERE c.table_schema = p_schema_name AND c.table_name = 'knowledge_base';
+    END;
+    $func$ LANGUAGE plpgsql SECURITY DEFINER;
+
+    -- Optimize knowledge_base table - create better index using HNSW
+    BEGIN
+        EXECUTE format('
+            -- Drop existing indexes to recreate optimized ones
+            DROP INDEX IF EXISTS "%s".knowledge_base_embedding_idx;
+            DROP INDEX IF EXISTS "%s".knowledge_base_hnsw_embedding_idx;
+            
+            -- Create optimized HNSW index - much faster for RAG queries
+            CREATE INDEX knowledge_base_hnsw_embedding_idx 
+            ON "%s".knowledge_base 
+            USING hnsw (embedding vector_cosine_ops)
+            WITH (ef_construction = 128, m = 16, ef = 64);
+            
+            -- Set statistics for better query planning
+            ALTER TABLE "%s".knowledge_base ALTER COLUMN embedding SET STATISTICS 1000;
+            ANALYZE "%s".knowledge_base;
+        ', p_schema_name, p_schema_name, p_schema_name, p_schema_name, p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Index creation issue: %', SQLERRM;
+        -- Fall back to IVFFlat if HNSW isn't supported
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx 
+            ON "%s".knowledge_base 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', p_schema_name);
+    END;
+    
+    -- Also optimize the interactions table indexes
+    BEGIN
+        EXECUTE format('
+            -- Create optimized index for interactions table
+            DROP INDEX IF EXISTS "%s".interactions_embedding_idx;
+            DROP INDEX IF EXISTS "%s".interactions_hnsw_embedding_idx;
+            
+            CREATE INDEX interactions_hnsw_embedding_idx 
+            ON "%s".interactions 
+            USING hnsw (embedding vector_cosine_ops)
+            WITH (ef_construction = 128, m = 16, ef = 64);
+            
+            ALTER TABLE "%s".interactions ALTER COLUMN embedding SET STATISTICS 1000;
+            ANALYZE "%s".interactions;
+        ', p_schema_name, p_schema_name, p_schema_name, p_schema_name, p_schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Interactions index creation issue: %', SQLERRM;
+    END;
+    
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Failed to optimize vector queries: %', SQLERRM;
+    RAISE NOTICE 'Error optimizing vector indexes: %', SQLERRM;
     RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -1412,5 +1503,53 @@ BEGIN
         ORDER BY created_at DESC
         LIMIT %s;
     ', p_schema_name, p_topic_filter, p_topic_filter, p_min_effectiveness, p_limit);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to verify schema structure for testing/validation
+CREATE OR REPLACE FUNCTION verify_schema_structure(p_schema_name TEXT)
+RETURNS TABLE (
+    table_name TEXT,
+    columns_expected INTEGER,
+    columns_found INTEGER,
+    table_exists BOOLEAN
+) AS $$
+BEGIN
+    -- First check if the schema exists
+    IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = p_schema_name) THEN
+        -- Return empty result if schema doesn't exist
+        RETURN QUERY SELECT
+            'schema_not_found'::TEXT AS table_name,
+            0 AS columns_expected,
+            0 AS columns_found,
+            FALSE AS table_exists;
+        RETURN;
+    END IF;
+
+    -- Check for interactions table
+    RETURN QUERY SELECT
+        'interactions'::TEXT AS table_name,
+        7 AS columns_expected,  -- CHANGED FROM 6 TO 7 to account for embedding column
+        COALESCE(COUNT(column_name)::INTEGER, 0) AS columns_found,
+        EXISTS (
+            SELECT 1 FROM information_schema.tables t
+            WHERE t.table_schema = p_schema_name AND t.table_name = 'interactions'
+        ) AS table_exists
+    FROM information_schema.columns c
+    WHERE c.table_schema = p_schema_name AND c.table_name = 'interactions';
+
+    -- Check for knowledge_base table
+    RETURN QUERY SELECT
+        'knowledge_base'::TEXT AS table_name,
+        3 AS columns_expected,
+        COALESCE(COUNT(column_name)::INTEGER, 0) AS columns_found,
+        EXISTS (
+            SELECT 1 FROM information_schema.tables t
+            WHERE t.table_schema = p_schema_name AND t.table_name = 'knowledge_base'
+        ) AS table_exists
+    FROM information_schema.columns c
+    WHERE c.table_schema = p_schema_name AND c.table_name = 'knowledge_base';
+
+    -- Add additional checks for other expected tables here
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

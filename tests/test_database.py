@@ -22,21 +22,8 @@ from typeguard import TypeCheckError
 from unittest.mock import Mock, patch, ANY
 
 # Test data constants
-from tests.conftest import TEST_USER_ID, TEST_SCHEMA, TEST_SESSION_ID, TEST_URL, TEST_KEY
+from tests.conftest import TEST_USER_ID, TEST_SCHEMA, TEST_SESSION_ID, TEST_URL, TEST_KEY, SAMPLE_SIMILAR_DOCUMENTS
 
-# Return value for vector similarity search
-SAMPLE_SIMILAR_DOCUMENTS = [
-    {
-        'id': 1,
-        'content': 'This is a sample document about anxiety management techniques.',
-        'similarity': 0.95
-    },
-    {
-        'id': 2,
-        'content': 'Another document about stress reduction strategies.',
-        'similarity': 0.85
-    }
-]
 
 class TestDatabaseManager:
     """
@@ -264,21 +251,6 @@ class TestDatabaseManager:
 
     def test_find_similar_documents(self, db_manager):
         """Test finding similar documents by vector similarity."""
-        # Sample data with embeddings that should be processed
-        SAMPLE_SIMILAR_DOCUMENTS = [
-            {
-                'id': 1,
-                'content': 'Document 1 content',
-                'embedding': [0.1,0.2,0.3],
-                'similarity': 0.9
-            },
-            {
-                'id': 2,
-                'content': 'Document 2 content',
-                'embedding': [0.2,0.3,0.4],
-                'similarity': 0.85
-            }
-        ]
 
         # Configure mock response
         mock_response = Mock()

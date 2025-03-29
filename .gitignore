@@ -4,6 +4,8 @@
 security_files/
 test/logging/*
 logging/
+nltk_data/
+tests/nltk_data/
 
 # Supabase login data
 .env

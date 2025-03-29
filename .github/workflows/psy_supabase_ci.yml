@@ -54,16 +54,16 @@ jobs:
       run: |
         # Check directory structure
         ls -la
-        
+
         # Install dependencies
         pip install -r requirements.txt
-        
+
         # Install the package itself
         pip install -e .
-        
+
         # Install spacy model
         python -m spacy download en_core_web_sm
-    
+
     - name: Run tests
       run: |
         # Run tests with more verbosity to see what's failing

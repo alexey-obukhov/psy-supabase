@@ -1,86 +1,136 @@
-# Pain Point Detection in AI Therapeutic Conversations
+# Psy Supabase Tests
 
-By leveraging pgvector's capabilities, I'm creating a more psychologically-informed AI assistant that can identify recurring themes and potential areas of psychological distress.
+This directory contains comprehensive tests for the Psy Supabase psychological RAG system. The tests ensure both technical correctness and therapeutic effectiveness of the system.
 
-## Recent Enhancements
+## Test Organization
 
-We've significantly improved our therapeutic chatbot with these new capabilities:
+- `test_rag_processor.py` - Tests for the core RAG processor with therapeutic capabilities
+- `test_database.py` - Tests for vector database operations and conversation storage
+- `conftest.py` - Shared test fixtures and constants
 
-1. **Pattern Recognition**: Rather than treating each user message in isolation, I'm using vector similarity to build a psychological profile over time
+## Testing Philosophy
 
-2. **Depth-oriented Responses**: The system now adapts its therapeutic approach based on detected pain points, similar to how a real therapist would follow threads of significance
+Our testing approach combines technical validation with therapeutic efficacy verification:
 
-3. **User-centered Experience**: By remembering and recognizing when users circle back to important topics, the conversation feels more coherent and thoughtful
+1. **Technical Tests**: Ensure embedding generation, vector similarity, and database operations work correctly
+2. **Therapeutic Tests**: Validate psychological reasoning, approach selection, and therapeutic effectiveness
+3. **Integration Tests**: Verify all components work together to deliver appropriate responses
 
-4. **Efficient Vector Processing**: By performing most similarity operations directly in the database with pgvector, I maintain good performance while gaining rich psychological insights
+## Running Tests
 
-5. **Dynamic Topic Detection**: Using natural language processing to identify psychological topics in user messages and retrieve relevant knowledge from our database
+```bash
+# Run all tests
+pytest
 
-6. **Template Optimization**: Creating concise, token-efficient templates that maintain therapeutic quality while fitting within model constraints
+# Run only RAGProcessor tests
+pytest tests/test_rag_processor.py
 
-7. **Fallback Mechanisms**: Implementing multi-level fallbacks to ensure reliable responses even when primary generation methods encounter issues
+# Run specific test categories
+pytest tests/test_rag_processor.py::TestRAGProcessor::test_detect_pain_points_from_embedding
 
-## Technical Improvements
+# Run with increased verbosity
+pytest -v
 
-Our latest technical improvements include:
+# Generate test coverage report
+pytest --cov=psy_supabase
+```
 
-1. **CustomLogger Integration**: Replaced standard logging with our colorful, more readable ColoredLogger system
+## Key Test Categories
 
-2. **Memory Optimization**: Added GPU memory management to gracefully handle CUDA out-of-memory scenarios with automatic CPU fallback
+### Pain Point Detection Tests
 
-3. **Distributed Knowledge Management**: Implemented a system that can dynamically query our knowledge base mid-conversation when specific psychological topics arise
+These tests validate the system's ability to identify psychological concerns and select appropriate therapeutic approaches:
 
-4. **Prompt Management**: Created a dedicated PromptManager class to handle template loading, optimizing, and resizing for different model constraints
+- Detection of fixation patterns in user questions
+- Recognition of recurring psychological themes
+- Appropriate therapeutic approach selection based on emotional states
+- Handling of ambiguous psychological concerns
 
-5. **Therapeutic Template System**: Developed specialized templates for different therapeutic scenarios (basic responses, exploration, redirection)
+### Vector Retrieval Tests
 
-## Results from Testing
+Tests for the vector similarity and knowledge retrieval systems:
 
-Our pain point detection system has been tested against a variety of conversation patterns:
+- Accurate document similarity matching
+- Vector caching and retrieval optimization
+- Threshold filtering for relevant content
+- Edge cases with low-similarity or irrelevant documents
 
-- Workplace trauma scenarios
-- Relationship confidence issues
-- Grief processing
-- Self-blame patterns
-- Hidden trauma references
+### Response Generation Tests
 
-The system successfully:
-- Identifies recurring psychological themes
-- Selects appropriate therapeutic templates
-- Tracks first detection points for each pain point
-- Maintains consistent therapeutic approaches
+Tests that validate therapeutic response quality:
 
-## Next Steps
+- Template selection logic for different psychological scenarios
+- Context incorporation from knowledge base
+- Conversation history integration
+- Appropriate emotional tone in responses
 
-We continue to advance this technology with these planned enhancements:
+### Safety Feature Tests
 
-1. **Therapeutic Progress Tracking**: Measuring how user language around pain points evolves over time
+Tests for system safety and reliability:
 
-2. **Adaptive Response Techniques**: Developing more specialized templates based on the type of pain point detected
+- Toxic content detection and appropriate responses
+- Crisis detection and handling
+- Error recovery mechanisms
+- Performance under constrained resources
 
-3. **Long-term Pattern Recognition**: Identifying cyclical patterns in user emotional states across weeks or months
+## Test Implementation Details
 
-4. **Intervention Timing Optimization**: Learning when direct vs. indirect approaches to pain points are most effective
+### Fixtures
 
-5. **Comprehensive Prompt Management**: Implementing the proposed PromptManager system for more efficient template handling and automatic size optimization
+Our tests use comprehensive fixtures defined in `conftest.py`:
 
-6. **Template Adaptation**: Creating ultra-compact versions of all templates to handle various context window constraints
+- `TEST_USER_ID`, `TEST_SCHEMA`, `TEST_SESSION_ID` - Standard IDs for testing
+- `TEST_URL`, `TEST_KEY` - API endpoint constants
+- `COMPLEX_METADATA` - Standard metadata structure for testing
 
-7. **Token-based Optimization**: Moving from character-based to token-based size estimation for more accurate prompt sizing
+### Mock Strategy
 
-8. **Pre-retrieval Strategies**: Refining which information gets pre-fetched versus dynamically queried during conversations
+Tests use strategic mocking to isolate components:
 
-## Implementation Status
+```python
+# Example of database manager mocking
+@pytest.fixture
+def mock_db_manager():
+    mock = Mock(spec=DatabaseManager)
+    mock.schema_name = TEST_SCHEMA
+    return mock
 
-- ✅ Basic pain point detection
-- ✅ Vector similarity clustering
-- ✅ Dynamic template selection
-- ✅ Psychological topic extraction
-- ✅ Memory-efficient processing
-- ✅ Custom logging integration ('school_logging' should become new package)
-- 🔄 Enhanced PromptManager (in progress)
-- 🔄 Token-efficient templates (in progress)
-- 📅 Emotional trajectory tracking (planned)
-- 📅 Intervention effectiveness measurement (planned)
+# Example of text generator mocking
+@pytest.fixture
+def mock_text_generator():
+    mock = Mock(spec=TextGenerator)
+    mock.is_toxic.return_value = False
+    mock.generate_therapeutic_response_with_dynamic_retrieval.return_value = "This is a therapeutic response"
+    return mock
+```
 
-By continuing to refine these capabilities, I'm building an AI therapeutic assistant that provides increasingly personalized, psychologically-informed support while maintaining operational efficiency.
+## Extending the Tests
+
+When adding new features to the system, corresponding tests should be added:
+
+1. Create unit tests for new components
+2. Add integration tests for interaction with existing components 
+3. Include edge cases and failure scenarios
+4. For therapeutic features, test both technical operation and psychological soundness
+
+### Test Template
+
+```python
+def test_new_feature(self, rag_processor):
+    """Test description that explains purpose and psychological significance."""
+    # Setup test data
+    input_data = "Test input"
+    
+    # Execute test
+    result = rag_processor.new_feature(input_data)
+    
+    # Verify technical correctness
+    assert result["success"] == True
+    
+    # Verify therapeutic appropriateness
+    assert "supportive_element" in result["response"]
+```
+
+## Code Coverage Goals
+
+By maintaining comprehensive test coverage, we ensure the system provides reliable, psychologically-informed support while maintaining technical excellence.
