@@ -26,3 +26,12 @@ def get_models_dir():
     root_dir = get_project_root()
     models_dir = os.path.join(root_dir, "models")
     return ensure_dir_exists(models_dir)
+
+def is_github_actions():
+    """Check if running in GitHub Actions environment."""
+    return os.environ.get('GITHUB_ACTIONS') == 'true'
+
+def is_test_environment():
+    """Detect if we're running in a test environment."""
+    import sys
+    return any('pytest' in arg for arg in sys.argv) or any('test_' in arg for arg in sys.argv)

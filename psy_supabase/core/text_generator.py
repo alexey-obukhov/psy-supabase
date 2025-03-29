@@ -65,10 +65,10 @@ detoxify: Content safety filtering
 import os
 import torch
 import traceback
-import numpy as np
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from jinja2 import Template
+from psy_supabase.utilities.common import is_github_actions
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 from psy_supabase.utilities.common import get_models_dir, ensure_dir_exists
@@ -82,11 +82,8 @@ if TYPE_CHECKING:
 
 logger = ColoredLogger(__name__)
 
-# Check if running in GitHub Actions environment
-is_github_actions = os.environ.get('GITHUB_ACTIONS') == 'true'
-
 # Only import dotenv in local development environment
-if not is_github_actions:
+if not is_github_actions():
     from dotenv import load_dotenv
     load_dotenv()  # Load environment variables from .env file
     logger.info("Local development: Loading environment from .env file")
@@ -475,121 +472,192 @@ class TextGenerator:
             logger.error(traceback.format_exc())
             return ""
 
-    def _clean_response(self, response: str) -> str:
-        """
-        Clean up the model's response while preserving valuable content.
+    def generate_response(self, user_input, **kwargs):
+        """Generate a response using the enhanced template system."""
+        # Prepare context for template
+        context = {
+            "user_question": user_input,
+            # Add other context variables based on kwargs
+        }
         
-        Args:
-            response: Raw model response
-            
-        Returns:
-            Cleaned response with problematic content removed
-        """
-        import re
+        # Determine which template to use based on content
+        template_name = self._select_appropriate_template(user_input, **kwargs)
         
-        # Debug: Log original response
-        logger.debug(f"Original response ({len(response)} chars): {response[:50]}...")
+        # Render the template
+        template_parts = self._render_template(template_name, context)
         
-        # CRITICAL: Use non-greedy patterns with correct boundaries
-        # The issue is that your current patterns are capturing everything after the matched text
-        problematic_patterns = [
-            r"Illustration paragraph:.*?(\n\n|\n|$)",  # Use non-greedy match and keep newlines
-            r"Q&A \d+\).*?(\n\n|\n|$)",
-            r"Question \d+\).*?(\n\n|\n|$)",
-            r"<\|endoftext\|>.*?(\n\n|\n|$)",
-            r"True/False statement\?.*?(\n\n|\n|$)",
-            r"Example \d+:.*?(\n\n|\n|$)",
-            r"Logic Puzzle.*?(\n\n|\n|$)"
-        ]
+        # Generate using the system prompt and assistant template
+        response = self._generate_with_template_parts(
+            system_prompt=template_parts["system_prompt"],
+            assistant_template=template_parts["assistant_template"],
+            user_input=user_input
+        )
         
-        cleaned_response = response
-        
-        # Apply cleaning patterns more carefully - only remove the specific matches
-        for pattern in problematic_patterns:
-            # Find matches for logging
-            matches = re.findall(pattern, cleaned_response, re.DOTALL)
-            if matches:
-                logger.debug(f"Found pattern match: {pattern}")
-                
-            # Use re.sub with a specific capture group to preserve boundaries
-            # This is the key fix - we're removing just the matched problematic line
-            # while preserving the newlines after it
-            cleaned_response = re.sub(pattern, r"\1", cleaned_response, flags=re.DOTALL)
-        
-        # Clean up formatting issues
-        cleaned_response = re.sub(r"\n{3,}", "\n\n", cleaned_response)
-        cleaned_response = cleaned_response.strip()
-        
-        # Debug: Log what happened
-        logger.info(f"Cleaned response, final length: {len(cleaned_response)}")
-        logger.debug(f"First 50 chars: {cleaned_response[:50]}...")
-        
-        # Handle empty responses
-        if len(cleaned_response) < 50:
-            logger.warning("Cleaned response too short, using fallback")
-            return self._get_fallback_response()
+        # Clean the response
+        cleaned_response = self._clean_therapeutic_response(response)
         
         return cleaned_response
 
+    def _render_template(self, template_name, context):
+        """Render a template with the given context."""
+        try:
+            template_content = self._load_template(template_name)
+            template = Template(template_content)
+            rendered = template.render(**context)
+            
+            # Split the rendered template to extract system and assistant parts
+            parts = rendered.split("<|assistant|>")
+            if len(parts) > 1:
+                system_prompt = parts[0].replace("<|system|>", "").strip()
+                assistant_response = parts[1].strip()
+                
+                # Log the lengths for debugging
+                logger.info(f"System prompt: {len(system_prompt)} chars")
+                logger.info(f"Assistant response template: {len(assistant_response)} chars")
+                
+                # Use the split parts in your generation function
+                # This depends on how your text generation works
+                return {"system_prompt": system_prompt, "assistant_template": assistant_response}
+            else:
+                logger.warning("Template doesn't contain <|assistant|> tag")
+                return {"system_prompt": "", "assistant_template": rendered}
+        except Exception as e:
+            logger.error(f"Error rendering template: {e}")
+            return {"system_prompt": "", "assistant_template": f"I'm here to help with {context.get('user_question', 'your concerns')}."}
+
+    def _get_supportive_fallback(self):
+        """
+        Enterprise-grade fallback system with diverse, high-quality therapeutic responses.
+        Used when content filtering detects problematic responses.
+        """
+        import random
+        
+        # Multi-category fallback system for diverse, natural responses
+        fallback_categories = {
+            "reflective": [
+                "I notice you're reaching out. I'm here to listen and support you. Would you like to share more about what's on your mind?",
+                
+                "Thank you for your message. I'm here to provide a supportive space where we can explore what you're experiencing. What would be most helpful to discuss today?"
+            ],
+            "empathetic": [
+                "I can see you're trying to communicate something important. This is a safe space to express yourself, and I'm here to support you whenever you're ready to share more.",
+                
+                "I understand that expressing feelings can sometimes be challenging. I'm here to listen without judgment when you're ready to talk about what you're experiencing."
+            ],
+            "encouraging": [
+                "Sometimes finding the right words can be difficult. I'm here to support you through whatever you might be going through. Would you like to tell me a bit more?",
+                
+                "Thank you for reaching out. I'm here to help and support you. Feel free to share what's on your mind at your own pace."
+            ],
+            "curious": [
+                "I'm wondering what brought you here today. I'm here to listen and support you through whatever you might be experiencing.",
+                
+                "I'm here to provide support and would like to understand better what you're experiencing. Would you feel comfortable sharing more about what's on your mind?"
+            ]
+        }
+        
+        # First select a category, then select a response from that category
+        category = random.choice(list(fallback_categories.keys()))
+        return random.choice(fallback_categories[category])
+
     def _clean_therapeutic_response(self, response: str) -> str:
         """
-        Specialized cleaning method for therapeutic responses.
-        Preserves helpful therapeutic content while removing problematic patterns.
+        Enterprise-grade cleaning function for therapeutic responses using a multi-stage filtering approach.
+        
+        This implements industry best practices for ensuring responses remain therapeutic
+        while removing educational, instructional, or inappropriate content.
         
         Args:
-            response: Raw generated response
+            response: Raw model response text
             
         Returns:
-            Cleaned therapeutic response
+            A cleaned therapeutic response or appropriate fallback
         """
         import re
         
         logger.debug(f"Cleaning therapeutic response of length {len(response)}")
         
-        # STEP 1: Remove problematic patterns
-        problematic_patterns = [
-            r"Illustration paragraph:.*?(\n\n|\n|$)",
-            r"Q&A \d+\).*?(\n\n|\n|$)",
-            r"Question \d+\).*?(\n\n|\n|$)",
-            r"<\|endoftext\|>.*?(\n\n|\n|$)",
-            r"True/False statement\?.*?(\n\n|\n|$)",
-            r"Example \d+:.*?(\n\n|\n|$)",
-            r"Logic Puzzle.*?(\n\n|\n|$)"
+        # STAGE 1: CRITICAL PATTERN DETECTION - Educational/instructional content
+        educational_patterns = [
+            # Document structure markers
+            r"title:", r"introduction:", r"chapter \d+:", r"conclusion:",
+            # Educational content markers
+            r"guide for", r"comprehensive guide", r"manual", r"welcome, dear",
+            # Numbered learning sections
+            r"\d+\.\d+", r"\d+ \d+ \d+ \d+ \d+",
+            # Section headers
+            r"what is [a-z\s]+\?", r"understanding [a-z\s]+",
+            # Exercise patterns
+            r"exercise \d+:", r"exercise:", r"answer:",
+            # Q&A formats
+            r"q\d+[\):]", r"question \d+[\):]", r"true/false",
+            # Instructional patterns
+            r"in this (manual|guide|book)", r"let us embark", r"let's explore"
         ]
         
-        # Apply each pattern removal separately
-        for pattern in problematic_patterns:
-            response = re.sub(pattern, "", response, flags=re.DOTALL|re.IGNORECASE)
+        # Check for educational patterns with logging
+        for pattern in educational_patterns:
+            if re.search(pattern, response.lower(), re.IGNORECASE):
+                logger.warning(f"Educational pattern detected: {pattern}")
+                return self._get_supportive_fallback()
         
-        # STEP 2: Extract direct responses if quoted
-        instruction_prefixes = [
-            r"Your therapeutic response should be:\s*[\"'](.+)[\"']",
-            r"Your response should be:\s*[\"'](.+)[\"']",
-            r"Your response:\s*[\"'](.+)[\"']",
-            r"Respond with:\s*[\"']?(.+?)[\"']?(?=\n\n|$)"
+        # STAGE 2: CONTENT TYPE CLASSIFICATION
+        # Check for prompt leakage (instructions that should never reach users)
+        instruction_markers = [
+            "your response should", "provide a therapeutic", "write a response",
+            "respond as a therapist", "respond with empathy", "your goal is to",
+            "when responding", "do not include", "following the therapeutic",
+            "use the following"
         ]
-
-        for pattern in instruction_prefixes:
-            match = re.search(pattern, response, re.DOTALL)
+        
+        for marker in instruction_markers:
+            if marker in response.lower():
+                logger.warning(f"Instruction leakage detected: {marker}")
+                return self._get_supportive_fallback()
+        
+        # STAGE 3: SPECIAL CHARACTER & FORMATTING HANDLING
+        # Check if response starts with special characters
+        if response.strip() and any(response.strip().startswith(char) for char in "_+-=[]{};:',.<>/?\"\\"):
+            logger.warning("Response starts with special character - using supportive fallback")
+            return self._get_supportive_fallback()
+        
+        # STAGE 4: EXTRACT DIRECT THERAPIST RESPONSES
+        dialogue_extraction = [
+            # Extract therapist speech from roleplay
+            r'(?:Therapist|Assistant|Counselor):\s*"?([^"]+)"?',
+            # Extract quoted responses
+            r'Your (?:therapeutic )?response should be:\s*"([^"]+)"',
+        ]
+        
+        for pattern in dialogue_extraction:
+            match = re.search(pattern, response, re.IGNORECASE)
             if match:
-                extracted_text = match.group(1).strip()
-                logger.info(f"Found direct instruction pattern, extracting content")
-                response = extracted_text
-                break
+                extracted = match.group(1).strip()
+                if len(extracted) > 50:  # Ensure it's substantial
+                    logger.info(f"Extracted direct therapeutic response ({len(extracted)} chars)")
+                    response = extracted
         
-        # STEP 3: Remove dialogue roles but keep content
-        response = re.sub(r"^(?:Therapist|Assistant|Counselor):\s*", "", response, flags=re.IGNORECASE|re.MULTILINE)
+        # STAGE 5: STRUCTURAL CLEANING
+        # Remove ending prompt markers
+        response = response.replace("<|endoftext|>", "").strip()
         
-        # STEP 4: Clean up formatting but preserve content
-        response = re.sub(r"\n{3,}", "\n\n", response)
-        response = response.strip()
+        # Remove common therapist opener phrases for more natural flow
+        response = re.sub(r"^(?:As a therapist|As your therapist|In my role as a therapist),?\s+", "", response, flags=re.IGNORECASE)
         
-        # STEP 5: Handle too-short responses
-        if len(response.strip()) < 50:
-            logger.warning(f"Response too short after cleaning: {len(response)} chars")
-            return self._get_fallback_response()
+        # STAGE 6: VALIDATION & QUALITY CONTROL
+        # Ensure response has therapeutic language
+        supportive_terms = ["feel", "understand", "support", "help", "listen", "share", 
+                            "experience", "emotion", "thought", "challenge"]
         
-        logger.info(f"Cleaned therapeutic response, final length: {len(response)}")
+        has_supportive_language = any(term in response.lower() for term in supportive_terms)
+        
+        # Check length constraints
+        if len(response) < 50 or len(response) > 1500 or not has_supportive_language:
+            logger.warning(f"Response fails quality check: length={len(response)}, " 
+                        f"has_supportive_language={has_supportive_language}")
+            return self._get_supportive_fallback()
+        
+        logger.info(f"Cleaned response passed all quality checks, final length: {len(response)}")
         return response
 
     def _get_targeted_fallback_response(self, original_text: str) -> str:
@@ -627,21 +695,6 @@ class TextGenerator:
             return "I'm here to listen and support you. Could you share a bit more about what you're experiencing or what's on your mind right now? The more you can tell me, the better I can understand how to help."
         else:
             return "I understand you're going through a difficult time. Your feelings are valid, and I appreciate you sharing them with me. I'd like to understand more about your situation so I can offer better support. Could you tell me more about what you've been experiencing and how it's affecting you?"
-
-    def _get_supportive_fallback_response(self) -> str:
-        """
-        Provides context-appropriate therapeutic responses when generation fails.
-        Uses varied responses to prevent repetitive fallbacks.
-        """
-        import random
-        fallbacks = [
-            "I'm here to listen and support you. Could you tell me more about what you're experiencing?",
-            "It sounds like you're going through a difficult time. I'm here to help you work through these feelings.",
-            "Thank you for sharing that with me. Would you like to explore these thoughts a bit more?",
-            "Your feelings are valid, and I'm here to support you. How else have you been coping with this?",
-            "I appreciate you opening up. Let's work together to understand what you're going through."
-        ]
-        return random.choice(fallbacks)
 
     def get_toxicity_model(self):
         """Get or initialize toxicity detection model with local model caching."""
