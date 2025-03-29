@@ -1,0 +1,29 @@
+"""
+2025, Dresden Alexey Obukhov, alexey.obukhov@hotmail.com
+
+This module defines a tuple of words that should be preserved during the tokenization and lemmatization process
+in the `tokenize_and_lemmatize` function of the `data_augmentation.py` module. These words include key pronouns
+and verbs that are important for maintaining the context and meaning of the text data.
+
+Purpose:
+The `keep_words` tuple is used to ensure that certain important words are not removed during the tokenization
+and lemmatization process, which helps in preserving the essential structure and meaning of the text.
+
+Usage:
+    from utilities.keep_words import keep_words
+"""
+
+keep_words = ('a', 'about', 'above', 'after', 'again', 'against', 'am', 'an', 'and', 'are',
+              "aren't", 'as', 'at', 'be', 'because', 'been', 'before', 'being', 'below', 'between',
+              'but', 'by', "can't", 'cannot', 'could', "couldn't", 'did', "didn't", 'do', 'does',
+              "doesn't", 'doing', "don't", 'down', 'during', 'for', 'from', 'further', 'had',
+              "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd", "he'll", "he's",
+              'her', 'hers', 'herself', 'him', 'himself', 'his', 'how', 'i', "i'd", "i'll", "i'm",
+              "i've", 'if', 'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', 'me', "mustn't",
+              'my', 'myself', 'of', 'off', 'on', 'once', 'or', 'our', 'ours', 'ourselves', 'out', 'over',
+              "shan't", 'she', "she'd", "she'll", "she's", 'should', "shouldn't", 'that', "that'll", 'the',
+              'their', 'theirs', 'them', 'themselves', 'then', 'these', 'they', "they'd", "they'll", "they're",
+              "they've", 'this', 'those', 'through', 'to', 'tought', 'under', 'until', 'up', 'was', "wasn't",
+              'we', "we'd", "we'll", "we're", "we've", 'were', "weren't", 'what', 'when', 'where', 'which',
+              'while', 'who', 'whom', 'why', 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
+              "you're", "you've", 'your', 'yours', 'yourself', 'yourselves')
