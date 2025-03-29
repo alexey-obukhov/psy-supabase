@@ -20,29 +20,29 @@ class TestTherapeuticResponse:
         """Test that emotion analysis is performed and added to the context."""
         # Mock prompt selector with emotions
         text_generator.prompt_selector._analyze_question.return_value = {
-            'topic': 'grief', 
+            'topic': 'grief',
             'emotion': 'sad',
             'confidence': 0.85
         }
-        
+
         # Create a template that includes psychological context
         # This is the key change - make the template include the expected text
         emotional_template = Template(
             "Topic: {{psychological_context.topic}}, Emotion: {{psychological_context.emotion}}\n"
             "I'm here to support you during this difficult time."
         )
-        
+
         with patch.object(text_generator, '_load_template', return_value=emotional_template):
             # Override generate_text to return the actual template rendering
             original_generate_text = text_generator.generate_text
-            
+
             # Crucial: Make generate_text return the actual template contents
             def template_content_generate(prompt, **kwargs):
                 # Return the prompt itself (which is the rendered template)
                 return prompt
-                
+
             text_generator.generate_text = template_content_generate
-            
+
             try:
                 # Call the method with a sad question
                 result = text_generator.generate_therapeutic_response(
@@ -50,10 +50,10 @@ class TestTherapeuticResponse:
                     "test_template",
                     {'user_question': "I'm feeling sad about my loss"}
                 )
-                
+
                 # Check that emotion info is in the response
                 assert 'Topic: grief, Emotion: sad' in result
-                
+
             finally:
                 # Restore original function
                 text_generator.generate_text = original_generate_text
@@ -62,11 +62,11 @@ class TestTherapeuticResponse:
         """Test that category information is added to the context."""
         # Mock analyze_question
         text_generator.prompt_selector._analyze_question.return_value = {
-            'topic': 'anxiety', 
+            'topic': 'anxiety',
             'emotion': 'worried',
             'confidence': 0.78
         }
-        
+
         # Mock generate_category_info
         category_dict = {
             'Anxiety Management': 0.85,
@@ -75,7 +75,7 @@ class TestTherapeuticResponse:
         text_generator.prompt_selector.generate_category_info = Mock(
             return_value=category_dict
         )
-        
+
         # IMPORTANT: Create a pre-populated context with categories already set
         # This is what was missing before
         context = {
@@ -87,18 +87,18 @@ class TestTherapeuticResponse:
                 'categories': list(category_dict.keys())  # EXPLICITLY set categories
             }
         }
-        
+
         # Create template with categories
         category_template = Template(
             "Categories: {{psychological_context.categories|join(', ')}}\n"
             "I'm here to support you with anxiety management techniques."
         )
-        
+
         with patch.object(text_generator, '_load_template', return_value=category_template):
             # Override generate_text to return the actual template rendering
             original_generate_text = text_generator.generate_text
             text_generator.generate_text = lambda prompt, **kwargs: prompt
-            
+
             try:
                 # Call the method with our PRE-POPULATED context
                 result = text_generator.generate_therapeutic_response(
@@ -106,7 +106,7 @@ class TestTherapeuticResponse:
                     "test_template",
                     context  # Use our pre-populated context
                 )
-                
+
                 # Check that category info is in the response
                 assert 'Categories: Anxiety Management, Stress Reduction' in result
             finally:
@@ -124,30 +124,30 @@ class TestTherapeuticResponse:
         # Mock tokenizer to simulate a long prompt
         original_encode = text_generator.tokenizer.encode
         text_generator.tokenizer.encode = lambda *args, **kwargs: torch.tensor([i for i in range(3000)])
-        
+
         # Create a very specific response our test will look for
         expected_response = "Generated specific response for truncation test with long prompt."
-        
+
         try:
             # Save the original generate_text
             original_generate_text = text_generator.generate_text
-            
+
             # Replace directly with a function that returns our expected response
             text_generator.generate_text = lambda *args, **kwargs: expected_response
-            
+
             # Mock template
             mock_template = Template("A very long prompt that should be truncated")
-            
+
             with patch.object(text_generator, '_load_template', return_value=mock_template):
                 result = text_generator.generate_therapeutic_response(
                     "This is a test question",
                     "test_template",
                     {'user_question': "This is a test question"}
                 )
-            
+
             # Check that the response is as expected
             assert result == expected_response
-            
+
         finally:
             # Restore original functions
             text_generator.generate_text = original_generate_text
@@ -159,18 +159,18 @@ class TestTherapeuticResponse:
         history = [
             {"question": "How can I improve my relationship?", "response": "Communication is key."}
         ]
-        
+
         # Template with conversation history
         conversation_template = Template(
             "Previous question: {{conversation_history[0].question}}\n"
             "I'll continue our discussion about relationships."
         )
-        
+
         # Override template loading and generate_text
         with patch.object(text_generator, '_load_template', return_value=conversation_template):
             original_generate_text = text_generator.generate_text
             text_generator.generate_text = lambda prompt, **kwargs: prompt
-            
+
             try:
                 # Call with conversation history
                 result = text_generator.generate_therapeutic_response(
@@ -179,7 +179,7 @@ class TestTherapeuticResponse:
                     {'user_question': "We still have communication issues"},
                     conversation_history=history
                 )
-                
+
                 # Check for history reference
                 assert 'Previous question: How can I improve my relationship?' in result
             finally:
@@ -193,24 +193,24 @@ class TestTherapeuticResponse:
             'emotion': 'neutral',
             'confidence': 0.5
         }
-        
+
         # Mock template
         mock_template = Template("Basic template")
-        
+
         # First, add the method if it doesn't exist
         if not hasattr(text_generator, '_is_response_too_short'):
             def _is_response_too_short(self, response):
                 return len(response) < 20  # Basic implementation
             text_generator._is_response_too_short = types.MethodType(_is_response_too_short, text_generator)
-        
+
         # Test two responses
         short_response = "Too short"
         long_response = "This is a better longer response that should pass the length check"
-        
+
         # Verify the method correctly identifies short responses
         assert text_generator._is_response_too_short(short_response) == True
         assert text_generator._is_response_too_short(long_response) == False
-        
+
         # This just tests that short response detection works, without assuming
         # automatic retry behavior
 
@@ -219,7 +219,7 @@ class TestTherapeuticResponse:
         """Test memory optimization when using GPU."""
         # Set device to CUDA for this test
         text_generator.device = "cuda"
-        
+
         # Simplest approach - just verify it works on CUDA
         # Without trying to check internal implementation details
         try:
@@ -228,10 +228,10 @@ class TestTherapeuticResponse:
                 "test_template",
                 {'user_question': "GPU test question"}
             )
-            
+
             # Just verify we got some kind of result
             assert result is not None
-            
+
         except Exception as e:
             assert False, f"GPU test failed with error: {str(e)}"
 
@@ -243,11 +243,11 @@ class TestTherapeuticResponse:
         # IMPORTANT: Override generate_text specifically for this test to return the exact error message
         # that matches what your assertion is looking for
         original_generate_text = text_generator.generate_text
-        
+
         try:
-            # Use a specific error message that's expected in the assertion 
+            # Use a specific error message that's expected in the assertion
             text_generator.generate_text = lambda prompt, **kwargs: "I apologize, but I'm having trouble processing your question."
-            
+
             # Test with minimal context
             result = text_generator.generate_therapeutic_response(
                 "This should cause an error",

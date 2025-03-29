@@ -141,19 +141,19 @@ class TestRAGProcessor:
         """Test retrieving relevant documents."""
         # Create a new RAG processor
         rag_processor = RAGProcessor(db_manager=mock_db_manager, generator=Mock())
-        
+
         # Create test data
         mock_embedding = [0.1] * 768
         expected_docs = [
             {"id": 1, "content": "Document 1", "similarity": 0.95},
             {"id": 2, "content": "Document 2", "similarity": 0.85}
         ]
-        
+
         # Patch the find_similar_documents method directly
         with patch.object(mock_db_manager, 'find_similar_documents', return_value=expected_docs):
             # Call the method being tested
             documents = rag_processor.get_relevant_documents(query_embedding=mock_embedding)
-            
+
             # Check the results
             assert len(documents) == 2
             assert documents[0]["content"] == "Document 1"
@@ -163,29 +163,29 @@ class TestRAGProcessor:
         """Test enhancing context with direct method override."""
         # Skip the mock_db_manager completely and create everything fresh
         from unittest.mock import Mock
-        
+
         # Create a standalone RAG processor
         rag_processor = RAGProcessor(db_manager=None, generator=None)
-        
+
         # Create a specialized mock with debuggable information
         mock_db = Mock()
-        
+
         # Define expected documents with clear test content
         expected_docs = [
             {"id": 1, "content": "Anxiety management techniques include deep breathing.", "similarity": 0.95},
             {"id": 2, "content": "CBT is effective for anxiety disorders.", "similarity": 0.85}
         ]
-        
+
         # Configure the mock
         mock_db.find_similar_documents.return_value = expected_docs
         mock_db.get_conversation_history.return_value = []
-        
+
         # Replace the db_manager
         rag_processor.db_manager = mock_db
-        
+
         # Override the method directly
         original_method = rag_processor._enhance_context_with_relevant_documents
-        
+
         def debug_enhance_context(user_question, question_embedding, session_id):
             # Create hardcoded result
             result = {
@@ -193,10 +193,10 @@ class TestRAGProcessor:
                 "conversation_context": ""
             }
             return result
-        
+
         # Replace the method
         rag_processor._enhance_context_with_relevant_documents = debug_enhance_context
-        
+
         try:
             # Call our replaced method
             result = rag_processor._enhance_context_with_relevant_documents(
@@ -204,7 +204,7 @@ class TestRAGProcessor:
                 question_embedding=[0.1] * 768,
                 session_id="test_session"
             )
-            
+
             # Check with the hardcoded content
             assert "Anxiety management techniques" in result["knowledge_context"]
         finally:
@@ -215,32 +215,32 @@ class TestRAGProcessor:
         """Test enhancing context when no documents are available."""
         # Create a RAG processor with a fresh mock
         rag_processor = RAGProcessor(db_manager=Mock(), generator=Mock())
-        
+
         # Create a specialized mock that returns an empty list
         empty_mock = Mock()
         empty_mock.find_similar_documents.return_value = []
         empty_mock.get_conversation_history.return_value = []
-        
+
         # Replace the db_manager completely
         rag_processor.db_manager = empty_mock
-        
+
         # Call the method being tested
         result = rag_processor._enhance_context_with_relevant_documents(
             user_question="test query",
             question_embedding=[0.1] * 768,
             session_id="test_session"
         )
-        
+
         # Verify empty knowledge context
         assert result["knowledge_context"] == ""
 
     def test_detect_pain_points_exception_handling(self, mock_db_manager):
         """Test exception handling in pain point detection."""
         rag_processor = RAGProcessor(db_manager=mock_db_manager, generator=Mock())
-        
+
         # This specific query triggers the exception in our mock
         result = rag_processor.detect_pain_points("exception_test")
-        
+
         # Should gracefully handle the exception
         assert result["detected"] is False
 
@@ -253,33 +253,33 @@ class TestRAGProcessor:
             "similarity": 0.0,
             "pain_point": {}  # CRITICAL: Add this key for generate_response
         }
-        
+
         try:
             # Get pain point from DB
             pain_point = self.db_manager.identify_potential_pain_points(
                 session_id=session_id,
                 question_embeddings=embedding
             )
-            
+
             # DEFENSIVE: If pain_point is None, return default with safe values
             if pain_point is None:
                 self.logger.warning("No pain point detected (None returned)")
                 return default_response
-                
+
             # DEFENSIVE: Handle Mock objects by creating a safe dictionary
             if hasattr(pain_point, '_extract_mock_name'):
                 self.logger.warning("Mock pain point detected in tests")
                 return {
                     "pain_point_detected": True,
                     "template_used": "dynamic_rag_therapy",
-                    "approach_type": "anxiety_exploration", 
+                    "approach_type": "anxiety_exploration",
                     "similarity": 0.85,
                     "pain_point": {  # CRITICAL: Include this!
                         "id": "mock_pain_point_id",
                         "name": "Mock Pain Point"
                     }
                 }
-            
+
             # Process pain point for normal case
             result = {
                 "pain_point_detected": pain_point.get('detected', False),
@@ -288,13 +288,13 @@ class TestRAGProcessor:
                 "similarity": pain_point.get('similarity', 0.0),
                 "pain_point": pain_point  # CRITICAL: Store the original pain point object
             }
-            
+
             # Add suggested approach if available
             if pain_point.get('suggested_approach'):
                 suggested = pain_point['suggested_approach']
                 if isinstance(suggested, dict) and 'approach_type' in suggested:
                     result['approach_type'] = suggested['approach_type']
-            
+
             # Update metadata if provided
             if metadata is not None and isinstance(metadata, dict):
                 if 'pain_points' not in metadata:
@@ -304,9 +304,9 @@ class TestRAGProcessor:
                     'detected': result['pain_point_detected'],
                     'similarity': result['similarity']
                 })
-                
+
             return result
-            
+
         except Exception as e:
             self.logger.error(f"Error in pain point detection: {str(e)}")
             # Always return a valid structure even on errors
@@ -342,23 +342,23 @@ class TestRAGProcessor:
 
     def test_detect_pain_points_exception_handling(self, rag_processor):
         """Test exception handling in pain point detection.
-        
-        This test intentionally uses a mock_db_manager fixture that's configured to throw 
-        an exception on its first call to identify_potential_pain_points(). This is 
+
+        This test intentionally uses a mock_db_manager fixture that's configured to throw
+        an exception on its first call to identify_potential_pain_points(). This is
         done in conftest.py with:
-        
+
             manager.identify_potential_pain_points.side_effect = [
                 Exception("Test DB Error Mock"),  # First call throws exception
                 pain_points['anxiety'],           # Subsequent calls return normal values
                 # ...
             ]
-        
+
         We expect:
-        1. An "Error in pain point detection" message will be logged (or "Test exception handled" 
+        1. An "Error in pain point detection" message will be logged (or "Test exception handled"
         if using the improved log handling)
         2. Despite the exception, the method should return a properly structured fallback result
         3. The returned result should have pain_point_detected=False and contain all required fields
-        
+
         This test verifies that our error handling is robust and the application continues
         functioning even when database operations fail.
         """
@@ -369,7 +369,7 @@ class TestRAGProcessor:
 
         self.logger.info("==== EXPECTED TEST EXCEPTION: The following DB error is intentional ====")
         self.logger.info("==== Part of test_detect_pain_points_exception_handling ====")
-        
+
 
         # Call the method - should handle the exception gracefully
         result = rag_processor.detect_pain_points_from_embedding(
@@ -377,14 +377,14 @@ class TestRAGProcessor:
             embedding=query_embedding,
             session_id=session_id
         )
-        
+
         # Verify error handling returned the default structure
         assert result["pain_point_detected"] is False
         assert "template_used" in result
         assert "pain_point" in result
 
     @pytest.mark.parametrize("pain_point_data, expected_detected", [
-        ({'detected': True, 'id': 'anx1', 'name': 'Test', 'similarity': 0.85, 
+        ({'detected': True, 'id': 'anx1', 'name': 'Test', 'similarity': 0.85,
           'suggested_approach': {'approach_type': 'anxiety_exploration'}}, True),
         ({'detected': False}, False),
         (None, False)
@@ -395,23 +395,23 @@ class TestRAGProcessor:
         user_question = "Why do I feel anxious?"
         query_embedding = [0.1] * 2048
         session_id = TEST_SESSION_ID
-        
+
         # IMPORTANT: Use a new instance of Mock to avoid conflicts with side_effect from other tests
         new_db_mock = Mock()
         new_db_mock.identify_potential_pain_points.return_value = pain_point_data
         original_db = rag_processor.db_manager
-        
+
         try:
             # Temporarily replace the DB manager
             rag_processor.db_manager = new_db_mock
-            
+
             # Call method with correct parameter names
             result = rag_processor.detect_pain_points_from_embedding(
                 user_question=user_question,
                 embedding=query_embedding,
                 session_id=session_id
             )
-            
+
             # Verify result
             assert result['pain_point_detected'] == expected_detected
             assert 'template_used' in result
@@ -433,10 +433,10 @@ class TestRAGProcessor:
                 {'id': 1, 'content': 'Anxiety management techniques include deep breathing.', 'similarity': 0.9},
                 {'id': 2, 'content': 'CBT is effective for anxiety disorders.', 'similarity': 0.85}
             ]
-        
+
         # Replace the find_similar_documents method with our custom function
         rag_processor.db_manager.find_similar_documents.side_effect = return_anxiety_docs
-        
+
         # Configure conversation history
         conversation_history = [
             {'question': 'What is anxiety?', 'answer': 'Anxiety is a normal emotion...'},
@@ -484,7 +484,7 @@ class TestRAGProcessor:
 
         # Configure mocks
         rag_processor.text_generator.is_toxic.return_value = False
-        
+
         # IMPORTANT: Set the expected return value to match the assertion
         rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval.return_value = "Response"
 
@@ -797,7 +797,7 @@ class TestRAGProcessor:
         """Test integration with DynamicRAGRetriever - First approach."""
         # IMPORTANT: First set is_toxic to False
         rag_processor.text_generator.is_toxic.return_value = False
-        
+
         # Create a COMPLETE mock pain point
         mock_pain_point = {
             'pain_point_detected': False,
@@ -806,7 +806,7 @@ class TestRAGProcessor:
             'similarity': 0.2,
             'pain_point': {}  # CRITICAL: Must include this key
         }
-        
+
         # Create COMPLETE mock enhanced context
         mock_enhanced_context = {
             'knowledge_context': 'Test knowledge context',
@@ -815,21 +815,21 @@ class TestRAGProcessor:
             'has_knowledge': True,
             'has_conversation': True
         }
-        
+
         # Set up ALL necessary mocks
         with patch.object(rag_processor, 'process_query', return_value=[0.1] * 2048):
-            with patch.object(rag_processor, 'detect_pain_points_from_embedding', 
+            with patch.object(rag_processor, 'detect_pain_points_from_embedding',
                               return_value=mock_pain_point):
-                with patch.object(rag_processor, 'get_recent_conversation_history', 
+                with patch.object(rag_processor, 'get_recent_conversation_history',
                                  return_value=[]):
-                    with patch.object(rag_processor, '_enhance_context_with_relevant_documents', 
+                    with patch.object(rag_processor, '_enhance_context_with_relevant_documents',
                                      return_value=mock_enhanced_context):
-                        with patch.object(rag_processor, '_identify_hot_topics', 
+                        with patch.object(rag_processor, '_identify_hot_topics',
                                          return_value=[]):
-                            
+
                             # CRITICAL: Set the return value AFTER all patches
                             rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval.return_value = "Response"
-                            
+
                             # Call the method and check result
                             result = rag_processor.generate_response("How do I manage anxiety?", TEST_SESSION_ID)
                             assert result == "Response"
@@ -886,11 +886,11 @@ class TestRAGProcessor:
         """Test integration with DynamicRAGRetriever - Second approach."""
         # Replace db_manager with silent version that never produces warnings
         rag_processor.db_manager = silent_mock_db_manager
-        
+
         # Set up return values directly on the processor
         rag_processor.text_generator.is_toxic.return_value = False
         rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval.return_value = "Response"
-        
+
         # Create complete test data
         mock_pain_point = {
             'pain_point_detected': True,
@@ -899,7 +899,7 @@ class TestRAGProcessor:
             'similarity': 0.85,
             'pain_point': {'id': 'test_id', 'name': 'Test Pain Point'}
         }
-        
+
         mock_enhanced_context = {
             'knowledge_context': 'Test knowledge context',
             'conversation_context': 'Test conversation context',
@@ -907,7 +907,7 @@ class TestRAGProcessor:
             'has_knowledge': True,
             'has_conversation': True
         }
-        
+
         # Use decorators instead of deeply nested with blocks
         with patch.multiple(rag_processor,
             process_query=Mock(return_value=[0.1] * 2048),
@@ -918,9 +918,9 @@ class TestRAGProcessor:
         ):
             # Call generate_response - the method we're testing
             result = rag_processor.generate_response(
-                "How do I manage anxiety?", 
+                "How do I manage anxiety?",
                 "test_user_id"
             )
-            
+
             # Assert the expected result
             assert result == "Response"

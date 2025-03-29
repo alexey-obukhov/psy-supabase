@@ -22,7 +22,7 @@ from typeguard import install_import_hook
 
 # Local imports
 from psy_supabase.utilities.common import is_github_actions
-from psy_supabase.nlp.nltk_loader import is_text2emotion_ready
+from psy_supabase.utilities.nlp_utils import get_spacy_model
 from psy_supabase.utilities.utils import cleanup_memory
 from psy_supabase.utilities.logging_config import configure_logging
 from psy_supabase.core.rag_processor import RAGProcessor
@@ -39,8 +39,10 @@ configure_logging(level=logging.INFO)  # Use logging.DEBUG for development
 logger = ColoredLogger(__name__)
 
 
-if not is_text2emotion_ready():
-    logger.warning("text2emotion is not working properly, emotional analysis may be limited")
+# Initialize spaCy model at startup
+nlp = get_spacy_model()
+if nlp is None:
+    logger.warning("Failed to initialize spaCy model. Some functionality will be limited.")
 
 if not is_github_actions():
     from dotenv import load_dotenv

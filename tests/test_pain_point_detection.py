@@ -151,30 +151,30 @@ class PainPointDetectionTester:
     def _setup_test_environment(self) -> None:
         """Set up the test environment, creating necessary tables."""
         logger.info("Setting up test environment...")
-        
+
         # Initialize the database schema for testing
         self.db_manager.create_user_schema_sync()
-        
+
         # Initialize knowledge base
         self.db_manager.initialize_knowledge_base(self.test_session_id)
-        
+
         # Ensure vector indexes for proper pgvector functionality
         self.db_manager.ensure_vector_indexes(self.test_session_id)
-        
+
         logger.info("Test environment setup complete")
-    
+
     def _simulate_conversation(self, conversation: Dict[str, Any]) -> Dict[str, Any]:
         """
         Simulate a conversation and track pain point detection.
 
         Args:
             conversation: Dictionary with conversation name and questions
-                
+
         Returns:
             Dictionary with conversation results
         """
         logger.info(f"Testing conversation: {conversation['name']}")
-        
+
         results: Dict[str, Any] = {
             "name": conversation["name"],
             "exchanges": [],
@@ -182,11 +182,11 @@ class PainPointDetectionTester:
             "templates_used": [],
             "first_detection_at": None
         }
-        
+
         # Process each question in sequence
         for i, question in enumerate(conversation["questions"]):
             logger.info(f"Question {i+1}: {question[:50]}...")
-            
+
             # Generate response through the RAG processor
             response: str = self.rag_processor.generate_response(
                 user_question=question,
@@ -194,15 +194,15 @@ class PainPointDetectionTester:
                 device=device,
                 question_id=i
             )
-            
+
             # Get the most recent interaction's metadata
             try:
                 # FIXED: Remove 'limit' parameter which isn't supported
                 history: List[Dict[str, Any]] = self.db_manager.get_conversation_history(self.test_session_id)
-                
+
                 # Get just the latest message (the one we just added)
                 latest_interaction: Dict[str, Any] = history[-1] if history else {}
-                
+
                 # Convert metadata from string to dict if needed
                 metadata: Dict[str, Any] = latest_interaction.get("metadata", {})
                 if isinstance(metadata, str):
@@ -211,28 +211,28 @@ class PainPointDetectionTester:
                     except Exception as e:
                         logger.error(f"Error parsing metadata JSON: {e}")
                         metadata = {}
-                
+
                 # IMPROVED: Handle both field naming conventions
                 # Extract pain point information with fallbacks
                 pain_point_detected: bool = metadata.get("pain_point_detected", False)
-                
+
                 # Handle multiple possible field names for approach
                 therapeutic_approach: str = (
-                    metadata.get("therapeutic_approach") or 
-                    metadata.get("approach_type") or 
+                    metadata.get("therapeutic_approach") or
+                    metadata.get("approach_type") or
                     "none"
                 )
-                
+
                 # Get template used
                 template_used: str = metadata.get("template_used", "dynamic_rag_therapy")
-                
+
                 # Get similarity score from either field name
                 similarity: float = (
-                    metadata.get("pain_point_similarity") or 
-                    metadata.get("similarity") or 
+                    metadata.get("pain_point_similarity") or
+                    metadata.get("similarity") or
                     0.0
                 )
-                
+
                 # Get recurring themes with fallback to keywords in pain_point
                 recurring_themes: List[str] = metadata.get("recurring_themes", [])
                 if not recurring_themes and "pain_point" in metadata:
@@ -241,13 +241,13 @@ class PainPointDetectionTester:
                         recurring_themes = pain_point["keywords"][:3]
                     elif isinstance(pain_point, dict) and "name" in pain_point:
                         recurring_themes = [pain_point["name"]]
-                
+
                 # Get approach type with multiple fallbacks
                 approach_type: Optional[str] = None
                 if "approach_type" in metadata:
                     approach_type = metadata.get("approach_type")
                 elif "therapeutic_approach" in metadata:
-                    approach_type = metadata.get("therapeutic_approach") 
+                    approach_type = metadata.get("therapeutic_approach")
                 elif "suggested_approach" in metadata and isinstance(metadata["suggested_approach"], dict):
                     approach_type = metadata["suggested_approach"].get("approach_type")
                 else:
@@ -255,7 +255,7 @@ class PainPointDetectionTester:
                     template = metadata.get("template_used", "")
                     if "_" in template:
                         approach_type = template.split("_")[-1]
-                
+
                 # Record results
                 exchange_result: Dict[str, Any] = {
                     "question": question,
@@ -267,24 +267,24 @@ class PainPointDetectionTester:
                     "similarity": similarity,
                     "recurring_themes": recurring_themes
                 }
-                
+
                 results["exchanges"].append(exchange_result)
-                
+
                 # Update summary statistics
                 if pain_point_detected:
                     results["pain_points_detected"] += 1
                     if not results["first_detection_at"]:
                         results["first_detection_at"] = i + 1
-                
+
                 results["templates_used"].append(template_used)
-                
+
                 logger.info(f"Response generated. Pain point detected: {pain_point_detected}, " +
                             f"Approach: {therapeutic_approach}, Template: {template_used}")
-                
+
             except Exception as e:
                 logger.error(f"Error processing results: {e}")
                 # Add fallback to error exception handling...
-                
+
                 # Simple fallback with just the question and response
                 results["exchanges"].append({
                     "question": question,
@@ -297,46 +297,46 @@ class PainPointDetectionTester:
                     "recurring_themes": []
                 })
         return results
-    
+
     def run_tests(self) -> List[Dict[str, Any]]:
         """
         Run all test conversations and collect results.
-        
+
         Returns:
             List of result dictionaries for each conversation
         """
         all_results: List[Dict[str, Any]] = []
-        
+
         for conversation in TEST_CONVERSATIONS:
             # Add a small delay between conversations
             logger.info(f"Starting test for: {conversation['name']}")
-            
+
             # Simulate the conversation
             result: Dict[str, Any] = self._simulate_conversation(conversation)
             all_results.append(result)
-            
+
             # Run topic analysis after the conversation is complete
             logger.info("Performing vector-based topic analysis...")
             result["vector_topics"] = self.analyze_conversation_topics()
-            
+
             # Log summary of this conversation test
             logger.info(f"Completed test for: {conversation['name']}")
             logger.info(f"  Pain points detected: {result['pain_points_detected']} out of {len(conversation['questions'])}")
             if result["first_detection_at"]:
                 logger.info(f"  First detected at question #{result['first_detection_at']}")
             logger.info(f"  Templates used: {', '.join(result['templates_used'])}")
-            
+
             # Log topic analysis results
             if result["vector_topics"]:
-                topic_str = ", ".join([f"{t['topic']}({t['frequency']})" for t in result["vector_topics"] 
+                topic_str = ", ".join([f"{t['topic']}({t['frequency']})" for t in result["vector_topics"]
                                       if not t["topic"].startswith("Error") and not t["topic"].startswith("No ")])
                 if topic_str:
                     logger.info(f"  Vector topics identified: {topic_str}")
-            
+
             logger.info("----------------------------------------")
-        
+
         return all_results
-    
+
     def cleanup(self) -> None:
         """Clean up test environment to avoid cluttering the database."""
         logger.info("Cleaning up test environment...")
@@ -345,7 +345,7 @@ class PainPointDetectionTester:
     def analyze_conversation_topics(self) -> List[Dict[str, Any]]:
         """
         Analyze topics in the test conversation using pgvector clustering.
-        
+
         Returns:
             List of topic dictionaries with topic name and frequency
         """
@@ -359,7 +359,7 @@ class PainPointDetectionTester:
                     'p_min_count': 1
                 }
             ).execute()
-            
+
             if response.data:
                 topics = []
                 for item in response.data:
@@ -372,7 +372,7 @@ class PainPointDetectionTester:
             else:
                 logger.info("No significant topics identified")
                 return [{"topic": "No significant topics identified", "frequency": 0}]
-                
+
         except Exception as e:
             logger.error(f"Error analyzing topics: {e}")
             return [{"topic": f"Error: {str(e)}", "frequency": 0}]
@@ -380,54 +380,54 @@ class PainPointDetectionTester:
 def analyze_test_results(results: List[Dict[str, Any]]) -> None:
     """
     Analyze and print summary of test results.
-    
+
     Args:
         results: List of test results from run_tests()
     """
     logger.info("=== PAIN POINT DETECTION TEST RESULTS ===")
     logger.info(f"Conversations tested: {len(results)}")
-    
+
     # Overall statistics
     total_exchanges: int = sum(len(r["exchanges"]) for r in results)
     total_detected: int = sum(r["pain_points_detected"] for r in results)
     detection_rate: float = (total_detected / total_exchanges) * 100 if total_exchanges > 0 else 0
-    
+
     logger.info(f"Total exchanges: {total_exchanges}")
     logger.info(f"Total pain points detected: {total_detected}")
     logger.info(f"Overall detection rate: {detection_rate:.2f}%")
-    
+
     # Analyze each conversation
     logger.info("\nDetailed results by conversation:")
     for i, result in enumerate(results):
         logger.info(f"\n{result['name']}:")
         logger.info(f"  Detection rate: {(result['pain_points_detected'] / len(result['exchanges'])) * 100:.2f}%")
         logger.info(f"  First detected at: Question #{result['first_detection_at'] if result['first_detection_at'] else 'N/A'}")
-        
+
         # Analyze approach types detected
         all_approach_types: List[str] = []
         for exchange in result["exchanges"]:
             if exchange.get("pain_point_detected") and exchange.get("approach_type"):
                 all_approach_types.append(exchange.get("approach_type"))
-        
+
         # Analyze approach types
         if all_approach_types:
             approach_type_counts: Counter = Counter(all_approach_types)
             logger.info(f"  Detected approach types: {', '.join([f'{t}({c})' for t, c in approach_type_counts.most_common()])}")
-            
+
             # Check against expected approach types if defined in test case
             expected_conversation: Dict[str, Any] = TEST_CONVERSATIONS[i]
             if "expected_pain_point" in expected_conversation and "approach_types" in expected_conversation["expected_pain_point"]:
                 expected_types: Set[str] = set(expected_conversation["expected_pain_point"]["approach_types"])
                 detected_types: Set[str] = set(all_approach_types)
-                
+
                 # Normalize approach types for comparison (convert to lowercase, replace underscores with spaces)
                 normalized_expected: Set[str] = {t.lower().replace('_', ' ') for t in expected_types}
                 normalized_detected: Set[str] = {(t.lower().replace('_', ' ') if t else "") for t in detected_types}
-                
+
                 # Find matches and misses
                 matches: Set[str] = normalized_expected.intersection(normalized_detected)
                 misses: Set[str] = normalized_expected - normalized_detected
-                
+
                 # Report matches and misses
                 match_percentage: float = (len(matches) / len(normalized_expected)) * 100 if normalized_expected else 0
                 logger.info(f"  Approach type match: {match_percentage:.2f}% ({len(matches)}/{len(normalized_expected)})")
@@ -435,38 +435,38 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                     logger.info(f"    Matched types: {', '.join(matches)}")
                 if misses:
                     logger.info(f"    Missed types: {', '.join(misses)}")
-        
+
         # Analyze themes detected
         all_themes: List[str] = []
         for exchange in result["exchanges"]:
             if exchange.get("recurring_themes"):
                 all_themes.extend(exchange["recurring_themes"])
-        
+
         if all_themes:
             theme_counts: Counter = Counter(all_themes)
             logger.info(f"  Top detected themes: {', '.join([f'{t}({c})' for t, c in theme_counts.most_common(3)])}")
-        
+
         # Check templates used
         template_counts: Counter = Counter(result["templates_used"])
         logger.info(f"  Templates used: {', '.join([f'{t}({c})' for t, c in template_counts.most_common()])}")
-        
+
         # Add vector-based topic analysis results
         if "vector_topics" in result and result["vector_topics"]:
-            meaningful_topics = [t for t in result["vector_topics"] 
-                               if not t["topic"].startswith("Error") and 
+            meaningful_topics = [t for t in result["vector_topics"]
+                               if not t["topic"].startswith("Error") and
                                not t["topic"].startswith("No ")]
-            
+
             if meaningful_topics:
                 logger.info(f"  Vector-based topic analysis:")
                 for topic in sorted(meaningful_topics, key=lambda x: x["frequency"], reverse=True):
                     logger.info(f"    - {topic['topic']} (frequency: {topic['frequency']})")
-                
+
                 # Compare with expected themes
                 expected_conversation: Dict[str, Any] = TEST_CONVERSATIONS[i]
                 if "expected_pain_point" in expected_conversation and "themes" in expected_conversation["expected_pain_point"]:
                     expected_themes: Set[str] = set(expected_conversation["expected_pain_point"]["themes"])
                     detected_topics: Set[str] = set(t["topic"].lower() for t in meaningful_topics)
-                    
+
                     # Check for partial matches (substring matching)
                     matches = set()
                     for expected in expected_themes:
@@ -474,9 +474,9 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                             if expected in detected or detected in expected:
                                 matches.add(expected)
                                 break
-                    
+
                     misses = expected_themes - matches
-                    
+
                     match_percentage = (len(matches) / len(expected_themes)) * 100 if expected_themes else 0
                     logger.info(f"  Vector topic match: {match_percentage:.2f}% ({len(matches)}/{len(expected_themes)})")
                     if matches:

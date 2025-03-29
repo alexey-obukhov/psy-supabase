@@ -413,10 +413,10 @@ def mock_conversation_history():
 def mock_db_manager():
     """Create a mock DatabaseManager that matches test expectations."""
     from unittest.mock import MagicMock
-    
+
     # Use MagicMock for better attribute handling
     manager = MagicMock()
-    
+
     # Create pain point data with proper structure
     pain_points = {
         'anxiety': {
@@ -456,9 +456,9 @@ def mock_db_manager():
                 {"id": 1, "content": f"Information about {query}.", "similarity": 0.95},
                 {"id": 2, "content": f"Additional details about {query}.", "similarity": 0.85}
             ]
-    
+
     manager.find_similar_documents.side_effect = find_similar_documents
-    
+
     # Configure identify_potential_pain_points for test_detect_pain_points_exception_handling
     def identify_potential_pain_points(query=None, **kwargs):
         if query == "exception_test":
@@ -467,18 +467,18 @@ def mock_db_manager():
             return pain_points['anxiety']
         else:
             return pain_points['none']
-            
+
     manager.identify_potential_pain_points.side_effect = identify_potential_pain_points
-    
+
     # Configure get_conversation_history
     manager.get_conversation_history.return_value = [
         {"role": "user", "content": "I've been feeling really down lately"},
         {"role": "assistant", "content": "I'm sorry to hear you're feeling down. Can you tell me more?"}
     ]
-    
+
     # Return True for save_interaction
     manager.save_interaction.return_value = True
-    
+
     return manager
 
 @pytest.fixture
@@ -518,27 +518,27 @@ def silent_mock_db_manager():
 def mock_text_generator():
     """Create a mock TextGenerator for testing."""
     generator = MagicMock()
-    
+
     # Make generate_text return something meaningful
     generator.generate_text.return_value = "This is a helpful therapeutic response."
-    
+
     # Add a render_template method that works with mocks
     def render_template(template_name, context):
         # Return a simple response based on template and context
         topics = context.get('extracted_topics', ['general'])
         return f"Rendering template {template_name} with topics: {', '.join(topics)}"
-    
+
     generator.render_template = render_template
-    
+
     return generator
 
 @pytest.fixture
 def mock_dynamic_retriever():
     """Create a mock DynamicRetriever that's configurable for different test cases."""
     from unittest.mock import MagicMock
-    
+
     retriever = MagicMock()
-    
+
     # Define query_knowledge to return test-specific data
     def query_knowledge(topic, limit=None):
         if topic == "test_topic":
@@ -557,9 +557,9 @@ def mock_dynamic_retriever():
                 {"id": 1, "content": f"Information about {topic}.", "similarity": 0.95},
                 {"id": 2, "content": f"Additional details about {topic}.", "similarity": 0.85}
             ]
-    
+
     retriever.query_knowledge = query_knowledge
-    
+
     return retriever
 
 @pytest.fixture
@@ -638,9 +638,9 @@ def clean_mock_db_manager():
 def mock_db_manager_with_test_values():
     """Create a mock DB manager with specific return values for each test."""
     from unittest.mock import MagicMock
-    
+
     manager = MagicMock()
-    
+
     # Create a dictionary to store test-specific document responses
     test_documents = {
         'test_get_relevant_documents': [
@@ -653,7 +653,7 @@ def mock_db_manager_with_test_values():
         ],
         'test_empty': []
     }
-    
+
     # Configure find_similar_documents to use the test name to select the right response
     def find_similar_documents_mock(embedding=None, query=None, limit=None, **kwargs):
         # For test_get_relevant_documents
@@ -667,8 +667,8 @@ def mock_db_manager_with_test_values():
             return test_documents['test_empty']
         # Default fallback
         return test_documents['test_get_relevant_documents']
-    
+
     # Attach the find_similar_documents_mock function to the manager mock
     manager.find_similar_documents = find_similar_documents_mock
-    
+
     return manager

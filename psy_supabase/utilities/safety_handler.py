@@ -10,7 +10,7 @@ class SafetyHandler:
     Handles detection and response for potentially harmful content.
     Acts as middleware to process queries before they reach the RAG system.
     """
-    
+
     def __init__(self):
         """Initialize SafetyHandler with detection patterns and response templates."""
         # Define categories of harmful content
@@ -41,14 +41,14 @@ class SafetyHandler:
                 'response': self._get_violence_response
             }
         }
-    
+
     def process_input(self, user_input: str) -> Tuple[bool, Optional[str], Optional[Dict]]:
         """
         Process user input to detect harmful content.
-        
+
         Args:
             user_input: The text input from the user
-            
+
         Returns:
             Tuple containing:
             - is_harmful: Boolean indicating if harmful content was detected
@@ -59,10 +59,10 @@ class SafetyHandler:
             for pattern in data['patterns']:
                 if re.search(pattern, user_input):
                     logger.warning(f"Detected {category} content: '{user_input}'")
-                    
+
                     # Get appropriate response
                     response = data['response']()
-                    
+
                     # Create metadata for logging and tracking
                     metadata = {
                         'detected_category': category,
@@ -70,12 +70,12 @@ class SafetyHandler:
                         'matched_pattern': pattern,
                         'response_type': 'safety_intervention'
                     }
-                    
+
                     return True, response, metadata
-        
+
         # No harmful content detected
         return False, None, None
-    
+
     def _get_suicide_response(self) -> str:
         """Generate a response for suicide-related content."""
         return """I'm deeply concerned about what you're sharing. These thoughts are serious, and I want you to know you're not alone.
@@ -90,7 +90,7 @@ These services are available with trained counsellors ready to listen and help. 
 If you're in immediate danger, please call NHS emergency services on 999 or go to your nearest A&E department.
 
 Your life matters, and these difficult feelings can improve with the right support. Please reach out for help now."""
-    
+
     def _get_self_harm_response(self) -> str:
         """Generate a response for self-harm related content."""
         return """I'm concerned about what you're sharing about harming yourself. These feelings are difficult, but support is available.
@@ -103,7 +103,7 @@ Please consider these resources:
 A trained counsellor can help you navigate these feelings and find healthier coping strategies. If you're in immediate danger, please call 999 or go to your nearest A&E department.
 
 You deserve support and care during difficult times."""
-    
+
     def _get_violence_response(self) -> str:
         """Generate a response for violent content."""
         return """I notice you're expressing thoughts about harming others. These are serious concerns that require proper support and intervention.

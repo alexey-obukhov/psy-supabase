@@ -19,11 +19,11 @@ logger = ColoredLogger(__name__)
 
 class DatabaseManager:
     """Database manager for psychology-specific Supabase operations.
-    
+
     This class provides a comprehensive interface for working with a Supabase
     database in psychological applications, including vector embeddings,
     conversation history tracking, and therapeutic data analysis.
-    
+
     Attributes:
         supabase_url (str): URL to the Supabase instance
         supabase_key (str): API key for authentication

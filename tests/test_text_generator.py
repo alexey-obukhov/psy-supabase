@@ -184,13 +184,13 @@ class TestTextGenerator:
         # This is a template test, so we need to mock differently
         # Generate a realistic therapeutic response that will pass cleaning
         realistic_response = """
-        I understand you're feeling worried about your confidence. 
-        
+        I understand you're feeling worried about your confidence.
+
         Many people experience these concerns, and it's a normal part of personal growth.
-        
+
         Would you like to explore some strategies that might help build your confidence?
         """
-        
+
         mock_template = self.setup_mocks_for_generation(text_generator, realistic_response)
 
         # Mock the _load_template method
@@ -216,7 +216,7 @@ class TestTextGenerator:
 
                 result = text_generator.generate_therapeutic_response(
                     "I'm worried about my confidence",
-                    "test_template", 
+                    "test_template",
                     context
                 )
 

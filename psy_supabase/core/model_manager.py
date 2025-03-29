@@ -204,10 +204,10 @@ class ModelManager:
         """
         Generate embedding vector for text using the main model.
         Uses the loaded model's hidden states for embedding generation.
-        
+
         Args:
             text: Text to generate embedding for
-            
+
         Returns:
             List of floats representing the embedding vector or None if failed
         """
@@ -257,10 +257,10 @@ class ModelManager:
     def _generate_embedding_with_sentence_transformer(self, text: str) -> Optional[List[float]]:
         """
         Generate embedding using sentence-transformers as a fallback.
-        
+
         Args:
             text: Text to generate embedding for
-            
+
         Returns:
             List of floats representing the embedding vector or None if failed
         """
@@ -292,10 +292,10 @@ class ModelManager:
         Generate embeddings for a batch of texts.
         For large batches, uses sentence-transformers which is more efficient.
         For small batches, uses the main model for better quality.
-        
+
         Args:
             texts: List of texts to generate embeddings for
-            
+
         Returns:
             List of embedding vectors
         """
@@ -364,12 +364,12 @@ class ModelManager:
 def get_model_manager(model_name: str = "microsoft/phi-1_5", device: Optional[str] = None, quantize: bool = False) -> ModelManager:
     """
     Get a ModelManager instance.
-    
+
     Args:
         model_name: Model name to use
         device: Device to use (None for auto-detection)
         quantize: Whether to use 8-bit quantization for large models
-        
+
     Returns:
         ModelManager instance
     """
@@ -434,7 +434,7 @@ class EmbeddingProviderAdapter:
     def set_device(self, device: Optional[str]) -> None:
         """
         Set the device for the embedding provider.
-        
+
         Args:
             device: Device to use (cuda or cpu)
         """
@@ -451,10 +451,10 @@ def get_embedding_provider(model_name: Optional[str] = None) -> EmbeddingProvide
     Get embedding provider compatible with ai_providers.py interface.
     This provides a bridge to the ModelManager for code that expects
     the ai_providers.py interface.
-    
+
     Args:
         model_name: Optional model name
-        
+
     Returns:
         Object with generate_embedding method
     """

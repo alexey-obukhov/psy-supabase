@@ -24,6 +24,12 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Setup NLP environment
+      run: |
+        pip install nltk spacy text2emotion
+        python -c "import spacy; spacy.cli.download('en_core_web_sm')"
+        python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
+
     - name: Install dependencies (consolidated)
       run: |
           # Set up pip with proper cache
@@ -35,15 +41,8 @@ jobs:
           # Install pre-built spaCy wheel to avoid compilation issues
           pip install --no-build-isolation --only-binary=:all: spacy==3.6.1
 
-          # Now it's safe to download models
-          python -m spacy download en_core_web_sm
-
-          # Install NLTK and download data
-          pip install nltk
-          python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
-
           # Install remaining dependencies with constraints
-          pip install text2emotion python-dotenv
+          pip install python-dotenv
 
           # Install remaining requirements, but skip already installed packages
           pip install -r requirements.txt

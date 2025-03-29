@@ -78,11 +78,11 @@ logger = ColoredLogger(__name__)
 class RAGProcessor:
     """
     Advanced retrieval-augmented generation processor specialized for psychological applications.
-    
+
     This class implements a comprehensive RAG system that integrates vector similarity search,
     pain point detection, therapeutic approach selection, and context enhancement to
     generate psychologically-informed responses for therapeutic conversations.
-    
+
     Attributes:
         db_manager (DatabaseManager): Database manager for vector operations and history
         generator (TextGenerator): Text generator for response generation
@@ -96,14 +96,14 @@ class RAGProcessor:
         MAX_KNOWLEDGE_CHARS (int): Maximum characters for knowledge context
         MAX_CONVERSATION_EXCHANGES (int): Maximum conversation exchanges to include
         VECTOR_CACHE_ENABLED (bool): Enable vector caching for similar questions
-        
+
     Pain Point Detection:
         The system identifies potential psychological pain points by analyzing:
         1. Repetition patterns in user questions
         2. Emotional signals in conversation history
         3. Vector similarity to known psychological concerns
         4. Recurring themes across sessions
-        
+
     Therapeutic Approach Selection:
         Based on detected pain points and conversational context, the system selects
         appropriate therapeutic approaches:
@@ -111,7 +111,7 @@ class RAGProcessor:
         2. Grief reflection for sadness and loss themes
         3. Gentle refocus for persistent thought patterns
         4. Exploratory approaches for general psychological concerns
-        
+
     Vector Optimization:
         The implementation uses database-side vector operations with pgvector:
         1. Similarity search performed in PostgreSQL/Supabase
@@ -143,13 +143,13 @@ class RAGProcessor:
     def get_relevant_documents(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:
         """
         Retrieves the most relevant documents using pgvector similarity.
-        
+
         OPTIMIZED: Uses direct pgvector similarity search in database instead of Python-side calculation.
-        
+
         Args:
             query_embedding (List[float]): Vector embedding to find similar documents for
             top_k (int): Maximum number of documents to return
-            
+
         Returns:
             List[Dict]: List of relevant documents with similarity scores
         """
@@ -197,7 +197,7 @@ class RAGProcessor:
                           ) -> str:
         """
         Generate a therapeutic response using Dynamic RAG with pain point detection.
-        
+
         This method implements the complete psychological RAG pipeline:
         1. Safety filtering of user input
         2. Vector embedding generation with caching
@@ -207,22 +207,22 @@ class RAGProcessor:
         6. Template selection based on detected approach
         7. Response generation with therapeutic focus
         8. Interaction recording with metadata
-        
+
         The method incorporates several psychological techniques:
         - Detection of recurring thought patterns (rumination)
         - Emotional trajectory analysis across conversations
         - Therapeutic approach selection based on topic and emotion
         - Integration of psychological context from knowledge base
-        
+
         Args:
             user_question (str): The user's question or statement
             session_id (str): Session ID for conversation tracking and context
             device (Optional[str]): Device for embedding generation (CPU/GPU)
             question_id (Optional[int]): ID for tracking specific questions
-            
+
         Returns:
             str: Generated therapeutic response with relevant knowledge
-            
+
         Safety Features:
             - Toxic content detection
             - Crisis situation identification
@@ -231,19 +231,19 @@ class RAGProcessor:
         """
         if not user_question or user_question.strip() == "":
             return "I'm here to help and support you. What would you like to talk about today?"
-            
+
         # Count the ratio of special characters to total length
         import re
         special_char_count = len(re.sub(r'[a-zA-Z0-9\s]', '', user_question))
         if len(user_question) > 0 and special_char_count / len(user_question) > 0.5:
             logger.info(f"Detected high ratio of special characters in input ({special_char_count}/{len(user_question)})")
             return "I notice your message contains special characters. I'm here to support you with whatever you'd like to discuss. How can I help you today?"
-            
+
         # ADDED: Handle excessively long inputs
         if len(user_question) > 1000:
             logger.info(f"Processing very long input ({len(user_question)} chars)")
             return "Thank you for sharing so much detail. I'm here to help and support you. Which specific aspect would you like me to focus on first?"
-        
+
         try:
             if self.text_generator.is_toxic(user_question):
                 logger.warning(f"Toxic user input detected: {user_question[:50]}...")
@@ -434,12 +434,12 @@ class RAGProcessor:
                                    limit=100) -> List[Dict]:
         """
         Generates high-quality training examples from past interactions.
-        
+
         Args:
             topic_filter: Optional topic to filter by
             min_effectiveness: Minimum effectiveness score to include
             limit: Maximum number of examples to generate
-            
+
         Returns:
             List of formatted training examples ready for fine-tuning
         """
@@ -496,12 +496,12 @@ class RAGProcessor:
                                      emotional_trajectory: List[Dict]) -> Dict[str, Any]:
         """
         Build psychological context from vector-retrieved data.
-        
+
         Args:
             similar_memories: Vector-similar past memories
             theme_clusters: pgvector theme clusters
             emotional_trajectory: Emotional vector trajectory
-            
+
         Returns:
             Dict with psychological context
         """
@@ -567,14 +567,14 @@ class RAGProcessor:
     def _enhance_context_with_relevant_documents(self, user_question: str, question_embedding: List[float], session_id: str) -> Dict:
         """
         Enhance context with only the most relevant documents while maintaining a fixed context size.
-        
+
         OPTIMIZED: Uses pgvector's similarity search for document selection, limiting data transfer.
-        
+
         Args:
             user_question (str): User's question to enhance with context
             question_embedding (List[float]): Vector embedding of the question
             session_id (str): Session ID for conversation history
-            
+
         Returns:
             Dict: Enhanced context with knowledge and conversation data
         """
@@ -699,12 +699,12 @@ class RAGProcessor:
     def detect_repetition_pattern(self, original_question: str, current_question: str, similar_questions: List[Dict]) -> Dict:
         """
         Analyze repetition patterns in similar questions to detect psychological fixation.
-        
+
         Args:
             original_question: The first occurrence of this question
             current_question: The current question
             similar_questions: List of similar questions identified
-            
+
         Returns:
             Dictionary with repetition pattern data
         """
@@ -730,28 +730,28 @@ class RAGProcessor:
                                       emotions: List[Dict], repetition_pattern: Dict) -> Dict:
         """
         Generate appropriate therapeutic approach based on detected pain points and question evolution.
-        
+
         This method implements a clinical decision system that analyzes:
         1. Question evolution: Whether the user is asking essentially the same question repeatedly
         or if their questions are evolving in a healthy way
         2. Emotional patterns: The dominant emotional states detected in user messages
         3. Fixation patterns: Whether the user is fixating on specific topics or concerns
-        
+
         Based on this analysis, the method selects between different therapeutic approaches:
-        
+
         * 'anxiety_exploration': Used when detecting fixation on anxiety-related topics with
         minimal question evolution. This approach helps users explore the root of their
         anxiety rather than reinforcing repetitive thought patterns.
-        
+
         * 'exploratory': Used when questions show evolution or when no strong fixation is
         detected. This approach encourages continued exploration and self-discovery.
-        
+
         * Other specialized approaches may be selected for depression, grief, etc.
-        
+
         Clinical rationale: Research in cognitive behavioral therapy suggests that identifying
         and redirecting repetitive thought patterns is more effective than directly answering
         repetitive questions, which can reinforce rumination.
-        
+
         Args:
             original_question (str): The user's previous question or statement
             current_question (str): The user's current question or statement
@@ -759,14 +759,14 @@ class RAGProcessor:
                                 [{'emotional_state': 'anxious', 'intensity': 0.8}, ...]
             repetition_pattern (Dict): Analysis of repetition and fixation patterns
                                     {'count': 3, 'recurring_terms': [...], 'is_fixation': True}
-        
+
         Returns:
             Dict: Therapeutic approach configuration with:
                 - approach_type (str): The selected therapeutic approach
                 - emotional_tone (str): Dominant emotional tone detected
                 - guidance_question (str): A question to guide the user's exploration
                 - should_redirect (bool): Whether to redirect the conversation
-        
+
         Example:
             When a user repeatedly asks about anxiety symptoms with minimal variation:
             {'approach_type': 'anxiety_exploration',
@@ -831,11 +831,11 @@ class RAGProcessor:
     def enhance_response_with_pain_point_guidance(self, response: str, pain_point_data: Dict) -> str:
         """
         Enhance the therapeutic response with specialized guidance when a pain point is detected.
-        
+
         Args:
             response: The original response
             pain_point_data: Pain point detection data
-            
+
         Returns:
             Enhanced response with pain point guidance
         """
@@ -961,11 +961,11 @@ class RAGProcessor:
         """
         Process a user query to generate an embedding.
         Implements caching for similar previous questions.
-        
+
         Args:
             user_question: The user's question text
             session_id: Optional session ID for cache lookup
-            
+
         Returns:
             List[float]: The embedding vector
         """
@@ -1007,11 +1007,11 @@ class RAGProcessor:
     def _identify_hot_topics(self, user_question: str, query_embedding: List[float]) -> List[Dict]:
         """
         Identify hot topics in the user's question using vector similarity.
-        
+
         Args:
             user_question: The user's question
             query_embedding: The embedding of the user's question
-            
+
         Returns:
             List[Dict]: Hot topics with relevance scores
         """
@@ -1050,24 +1050,24 @@ class RAGProcessor:
                 # SQL to find hot topics
                 query = f"""
                 WITH hot_topic_embeddings AS (
-                    SELECT 
-                        id, 
-                        content, 
+                    SELECT
+                        id,
+                        content,
                         embedding,
                         1 - (embedding <=> '{vector_str}'::vector) as similarity
-                    FROM 
+                    FROM
                         public.hot_topics
-                    WHERE 
+                    WHERE
                         1 - (embedding <=> '{vector_str}'::vector) > {threshold}
-                    ORDER BY 
+                    ORDER BY
                         similarity DESC
                     LIMIT 2
                 )
-                SELECT 
-                    id, 
-                    content as topic, 
+                SELECT
+                    id,
+                    content as topic,
                     similarity as relevance
-                FROM 
+                FROM
                     hot_topic_embeddings;
                 """
 
@@ -1111,11 +1111,11 @@ class RAGProcessor:
     def get_recent_conversation_history(self, session_id: str, limit: int = 2) -> List[Dict]:
         """
         Get recent conversation history with appropriate formatting for psychological context.
-        
+
         Args:
             session_id: Session identifier
             limit: Maximum number of recent exchanges to include
-        
+
         Returns:
             List[Dict]: Recent conversation exchanges properly formatted
         """
@@ -1176,7 +1176,7 @@ class RAGProcessor:
             "similarity": 0.0,
             "pain_point": {}
         }
-        
+
         try:
             # Get pain point from DB
             pain_point = self.db_manager.identify_potential_pain_points(
@@ -1184,12 +1184,12 @@ class RAGProcessor:
                 session_id=session_id,
                 question_embedding=embedding
             )
-            
+
             # If pain_point is None, return default with safe values
             if pain_point is None:
                 logger.warning("No pain point detected (None returned)")
                 return default_response
-            
+
             # Process pain point for normal case (NO MOCK DETECTION)
             result = {
                 "pain_point_detected": pain_point.get('detected', False),
@@ -1198,17 +1198,17 @@ class RAGProcessor:
                 "similarity": pain_point.get('similarity', 0.0),
                 "pain_point": pain_point
             }
-            
+
             # Add suggested approach if available
             if pain_point.get('suggested_approach'):
                 suggested = pain_point['suggested_approach']
                 if isinstance(suggested, dict) and 'approach_type' in suggested:
                     result['approach_type'] = suggested['approach_type']
-            
+
             # Add repetition pattern if available
             if pain_point.get('repetition_pattern'):
                 result['repetition_pattern'] = pain_point['repetition_pattern']
-                
+
             # Update metadata if provided
             if metadata is not None and isinstance(metadata, dict):
                 if 'pain_points' not in metadata:
@@ -1218,9 +1218,9 @@ class RAGProcessor:
                     'detected': result['pain_point_detected'],
                     'similarity': result['similarity']
                 })
-                
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Error in pain point detection: {e}")
             logger.error(traceback.format_exc())
