@@ -24,37 +24,35 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install critical dependencies
+    - name: Install dependencies (consolidated)
       run: |
-        python -m pip install --upgrade pip
-        # Fix for import errors - install these packages explicitly before other steps
-        pip install spacy nltk text2emotion python-dotenv
-        python -m spacy download en_core_web_sm
-
-        # Download NLTK data
-        python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
-
-    - name: Install all dependencies
-      run: |
-        # Setup Python environment properly first
-        if [[ "${{ matrix.python-version }}" == "3.8" ]]; then
-          python -m pip install --upgrade pip wheel "setuptools<60.0.0"
-        else
+          # Set up pip with proper cache
           python -m pip install --upgrade pip wheel setuptools
-        fi
 
-        # Install your package in development mode
-        pip install -e .
+          # CRITICAL FIX: Force install numpy<2.0.0 first to prevent version conflicts
+          pip install numpy==1.24.4
 
-        # Install all dependencies from requirements.txt (including school_logging)
-        pip install -r requirements.txt
+          # Install pre-built spaCy wheel to avoid compilation issues
+          pip install --no-build-isolation --only-binary=:all: spacy==3.6.1
 
-        # Install spacy language model
-        python -m spacy download en_core_web_sm
+          # Now it's safe to download models
+          python -m spacy download en_core_web_sm
 
-        # Verify important dependencies
-        python -c "import school_logging; print('✓ school_logging imported successfully')"
+          # Install NLTK and download data
+          pip install nltk
+          python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
 
+          # Install remaining dependencies with constraints
+          pip install text2emotion python-dotenv
+
+          # Install your package in development mode
+          pip install -e .
+
+          # Install remaining requirements, but skip already installed packages
+          pip install -r requirements.txt --no-deps
+
+          # Install school-logging explicitly
+          pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
     - name: Setup Supabase environment
       run: |
         # Set up environment variables for Supabase
