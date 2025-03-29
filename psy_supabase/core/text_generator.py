@@ -150,6 +150,10 @@ class TextGenerator:
             Initializes Detoxify for content safety checks and configures model loading
             based on available hardware capabilities.
         """
+        if device == "cuda" and not torch.cuda.is_available():
+            logger.warning("CUDA requested but not available - falling back to CPU")
+            device = "cpu"
+
         self.device = device
         self.model_name = model_name
         self.use_bfloat16 = use_bfloat16
