@@ -49,6 +49,7 @@ tzdata==2025.1
 python-dateutil==2.9.0.post0
 
 # Testing
+pluggy==1.5.0
 pytest==8.3.5
 typeguard==4.4.0
 
