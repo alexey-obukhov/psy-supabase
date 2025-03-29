@@ -45,14 +45,15 @@ jobs:
           # Install remaining dependencies with constraints
           pip install text2emotion python-dotenv
 
-          # Install your package in development mode
-          pip install -e .
-
           # Install remaining requirements, but skip already installed packages
           pip install -r requirements.txt --no-deps
 
           # Install school-logging explicitly
           pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
+
+          # Install your package in development mode
+          pip install -e .
+
     - name: Setup Supabase environment
       run: |
         # Set up environment variables for Supabase
@@ -65,7 +66,7 @@ jobs:
       continue-on-error: true
       run: |
         # Run tests and continue regardless of result
-        pytest -v || echo "Tests failed but continuing workflow"
+        python -m pytest -v || echo "Tests failed but continuing workflow"
         
         # Create test reports for later analysis
         mkdir -p test-reports
