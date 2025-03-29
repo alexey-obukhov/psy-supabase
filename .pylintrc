@@ -1,0 +1,14 @@
+[MASTER]
+ignore-patterns=test_.*?\.py
+
+[MESSAGES CONTROL]
+disable=duplicate-code
+
+[FORMAT]
+max-line-length=120
+
+[SIMILARITIES]
+min-similarity-lines=15
+ignore-comments=yes
+ignore-docstrings=yes
+ignore-imports=yes

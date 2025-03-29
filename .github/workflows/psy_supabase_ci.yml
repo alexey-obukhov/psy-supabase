@@ -67,9 +67,8 @@ jobs:
         # Install pylint
         pip install pylint
 
-        # Run pylint with modified settings to ignore import errors
-        pylint --disable=import-error,missing-module-docstring,duplicate-code,cyclic-import \
-               $(git ls-files '*.py') || echo "Linting had issues, but continuing"
+        # Run pylint with config file from root directory
+        pylint --rcfile=.pylintrc $(git ls-files '*.py') || echo "Linting had issues, but continuing"
 
     - name: Run tests
       continue-on-error: true
