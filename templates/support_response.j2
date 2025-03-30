@@ -23,8 +23,8 @@ DETECTED EMOTIONS: {{ detected_emotions|join(", ") }}
 </|system|>
 
 <|assistant|>
-{% if user_message %}
-  {% if user_message|length < 5 or any(char in user_message for char in "+-=[]{};:',.<>/?\\") %}
+{% if user_question %}
+  {% if user_question|length < 5 or any(char in user_question for char in "+-=[]{};:',.<>/?\\") %}
     I notice you're reaching out. This is a safe space to express yourself at your own pace. I'm here whenever you're ready to share more.
   {% else %}
     Thank you for sharing that with me. I appreciate your openness, and I'm here to listen and support you.

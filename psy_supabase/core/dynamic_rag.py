@@ -1,8 +1,8 @@
 """
 dynamic_rag.py
 
-This module implements the DynamicRAGRetriever class, which provides dynamic retrieval and analysis capabilities 
-for a psychological AI system. It enables efficient and relevant responses by fetching only the necessary 
+This module implements the DynamicRAGRetriever class, which provides dynamic retrieval and analysis capabilities
+for a psychological AI system. It enables efficient and relevant responses by fetching only the necessary
 knowledge, past interactions, and related concepts during model generation.
 
 Key Features:
@@ -65,108 +65,117 @@ class DynamicRAGRetriever:
         # Replace spaces with underscores, lowercase everything
         return text.lower().replace(' ', '_')
 
-    # For knowledge_by_query - use dynamic limits based on query complexity
-    def get_knowledge_by_query(self, query: str, limit: Optional[int] = None) -> str:
+    def get_knowledge_by_query(self, query: str, limit: Optional[int] = None, associative_memory: bool = False) -> str:
         """
-        Get knowledge based on a query by retrieving similar documents from the database.
+        Retrieve knowledge based on a query string, with optional associative memory.
+
+        When associative_memory is enabled, the system will also retrieve additional knowledge
+        related to the primary results, simulating how human memories connect and trigger
+        each other.
 
         Args:
-            query: The search query (topic) to look for
-            limit: Maximum number of documents to retrieve. If None, dynamically determined.
+            query: The user's query
+            limit: Maximum number of primary results to return
+            associative_memory: Whether to include associated knowledge
 
         Returns:
-            str: Combined content from retrieved documents
+            str: Formatted string of relevant knowledge
         """
         try:
-            # Calculate appropriate limit based on query complexity if not specified
-            if limit is None:
-                # Simple queries need fewer results
-                if len(query.split()) <= 3:
-                    limit = 2
-                # Complex queries might need more comprehensive information
-                elif len(query.split()) >= 8:
-                    limit = 5
-                # Default for medium complexity
-                else:
-                    limit = 3
-
-            if not self.allow_dynamic_queries:
-                return "Dynamic querying is disabled."
-
-            # Check cache first - use clean query for cache key
-            cache_key = f"knowledge_{self._standardize_cache_key(query)}_{limit}"
+            # Check cache for exact match
+            cache_key = f"knowledge_{self._standardize_cache_key(query)}_{limit or 3}_{associative_memory}"
             if cache_key in self.query_cache:
                 logger.info(f"Using cached knowledge for query: {query}")
                 return self.query_cache[cache_key]
 
-            # Get embeddings for the query
+            # Create embedding for the query
             embedding = self.db_manager.create_embedding(query)
             if not embedding:
-                logger.error(f"Failed to generate embedding for knowledge query: {query}")
+                logger.error("Failed to create embedding for query")
                 return ""
 
-            # Use schema-specific knowledge base search for better performance
-            # This uses the specific schema's knowledge_base table with specialized pgvector indexes
-            results = self.db_manager.find_similar_documents_via_rpc(
-                session_id=self.session_id,
-                embedding=embedding,
-                similarity_threshold=0.65,
-                limit=limit
+            # Find primary documents
+            docs = self.db_manager.find_similar_documents_via_rpc(
+                self.session_id,
+                embedding,
+                similarity_threshold=0.1,
+                limit=limit or 3
             )
 
-            if not results:
-                # Fallback to regular search if RPC fails
-                results = self.db_manager.find_similar_documents_by_embedding(
-                    embedding=embedding,
-                    threshold=0.5,
-                    limit=limit
-                )
+            # Filter by similarity threshold
+            filtered_docs = [doc for doc in docs if doc.get('similarity', 0) >= 0.1]
 
-            if not results:
-                logger.warning(f"No similar documents found for query: {query}")
-                return f"No knowledge found for: {query}"
+            # When associative memory is enabled, find related documents
+            if associative_memory and filtered_docs:
+                # Extract related topics from the metadata
+                related_topics = []
+                for doc in filtered_docs:
+                    if 'metadata' in doc and 'related_topics' in doc['metadata']:
+                        topics = doc['metadata'].get('related_topics', [])
+                        if isinstance(topics, list):
+                            related_topics.extend(topics)
+                        elif isinstance(topics, str):
+                            related_topics.append(topics)
 
-            # Combine the content - choose the format based on the first result's structure
-            if isinstance(results[0], dict) and "content" in results[0]:
-                # Simple format - just combine content fields
-                combined_content = "\n\n".join([doc.get("content", "") for doc in results])
+                # Remove duplicates and query-related terms
+                related_topics = list(set(related_topics))
+
+                # Get associated documents for each related topic
+                associated_docs = []
+                if related_topics:
+                    logger.info(f"Found related topics: {', '.join(related_topics)}")
+
+                    # Process each related topic (up to a reasonable limit)
+                    for topic in related_topics[:3]:  # Limit to 3 topics max to prevent excessive queries
+                        # Create an embedding for the related topic
+                        topic_embedding = self.db_manager.create_embedding(topic)
+                        if topic_embedding:
+                            # Find documents related to this topic
+                            topic_docs = self.db_manager.find_similar_documents_via_rpc(
+                                self.session_id,
+                                topic_embedding,
+                                similarity_threshold=0.1,
+                                limit=1  # Limit per topic to keep results manageable
+                            )
+
+                            # Add high similarity documents to results
+                            for doc in topic_docs:
+                                if doc.get('similarity', 0) >= 0.1:
+                                    # Add an indicator that this is an associated memory
+                                    doc['associated'] = True
+                                    # Add topic source for clarity
+                                    doc['source_topic'] = topic
+                                    associated_docs.append(doc)
+
+                # Combine primary and associated documents
+                all_docs = filtered_docs + associated_docs
             else:
-                # Format the results with more details
-                combined_content = ""
-                for _, doc in enumerate(results):
-                    # Handle both dictionary and string formats
-                    if isinstance(doc, dict):
-                        content = doc.get('content', '')
-                        metadata = doc.get('metadata', {})
-                        similarity = doc.get('similarity', 0)
+                all_docs = filtered_docs
 
-                        # Include metadata if available
-                        meta_str = ""
-                        if metadata and isinstance(metadata, dict):
-                            if 'source' in metadata:
-                                meta_str = f" (Source: {metadata['source']})"
-                            elif 'category' in metadata:
-                                meta_str = f" (Category: {metadata['category']})"
+            # Format all results
+            formatted_results = []
+            for doc in all_docs:
+                content = doc.get('content', '')
+                similarity = doc.get('similarity', 0)
 
-                        # Only include content with sufficient similarity
-                        if similarity >= 0.1:  # Dummy threshold needs adjustments
-                            combined_content += f"{content}{meta_str} (Relevance: {similarity:.2f})\n\n"
-                            logger.debug(f"Including content with similarity: {similarity:.2f}")
-                        else:
-                            logger.debug(f"Skipping content with low similarity: {similarity:.2f}")
-                    else:
-                        content = str(doc)
-                        combined_content += f"{content}\n\n"
+                # Add a marker for associated memories
+                if doc.get('associated'):
+                    formatted_results.append(f"{content} (Associated Memory, Relevance: {similarity:.2f})")
+                else:
+                    formatted_results.append(f"{content} (Relevance: {similarity:.2f})")
 
-            # Cache the result
-            self.query_cache[cache_key] = combined_content
+            # Combine results
+            result = "\n\n".join(formatted_results)
 
-            logger.info(f"Retrieved knowledge for '{query}': {len(combined_content)} chars from {len(results)} docs")
-            return combined_content
+            # Store in cache
+            self.query_cache[cache_key] = result
+
+            logger.info(f"Retrieved knowledge with{' ' if associative_memory else 'out '}associative memory for '{query}': {len(result)} chars from {len(all_docs)} docs")
+            return result
 
         except Exception as e:
-            logger.error(f"Error retrieving knowledge for query '{query}': {e}")
-            return f"Error retrieving knowledge: {str(e)}"
+            logger.error(f"Error retrieving knowledge: {e}")
+            return ""
 
     def get_past_interactions(self, topic: Optional[str] = None, limit: int = 3) -> str:
         """

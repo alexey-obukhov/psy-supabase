@@ -19,14 +19,14 @@ CRISIS RESOURCES:
 </|system|>
 
 <|assistant|>
-{% if user_message %}
-  {% if user_message|length < 5 or any(char in user_message for char in "+-=[]{};:',.<>/?\\") %}
+{% if user_question %}
+  {% if user_question|length < 5 or any(char in user_question for char in "+-=[]{};:',.<>/?\\") %}
     I notice you're reaching out, which takes courage. This is a safe space, and I'm here to listen and support you however I can.
-  {% elif "suicide" in user_message.lower() or "kill myself" in user_message.lower() or "end my life" in user_message.lower() %}
+  {% elif "suicide" in user_question.lower() or "kill myself" in user_question.lower() or "end my life" in user_question.lower() %}
     I'm really concerned about what you're sharing, and I'm glad you reached out. Your life matters deeply. If you're in immediate danger, please call 911 or go to your nearest emergency room. You can also text HOME to 741741 to reach the Crisis Text Line or call 1-800-273-8255 for the National Suicide Prevention Lifeline.
 
     Would you be willing to reach out to one of these resources? They have trained professionals who can provide immediate support.
-  {% elif "hurt" in user_message.lower() or "harm" in user_message.lower() or "pain" in user_message.lower() %}
+  {% elif "hurt" in user_question.lower() or "harm" in user_question.lower() or "pain" in user_question.lower() %}
     I'm sorry you're experiencing such pain right now. These intense feelings are real, and it makes sense that you're looking for support. Please know you don't have to face this alone.
 
     Would it help to talk about what's happening right now? Or would you prefer some grounding techniques to help manage these difficult feelings?
