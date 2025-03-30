@@ -20,11 +20,6 @@ import json
 from typing import Any, Dict, List
 import nltk
 
-from psy_supabase.core.text_generator import TextGenerator
-from psy_supabase.core.database import DatabaseManager
-from psy_supabase.core.model_manager import EmbeddingProviderAdapter
-from psy_supabase.core.rag_processor import RAGProcessor
-
 # Ensure NLTK data is downloaded for text processing
 def download_nltk_data():
     """Download necessary NLTK data packages if not already present."""
@@ -216,6 +211,7 @@ def db_manager(mock_supabase):
     Returns:
         DatabaseManager: Configured with mock client
     """
+    from psy_supabase.core.database import DatabaseManager
     with patch('psy_supabase.core.database.create_client', return_value=mock_supabase):
         manager = DatabaseManager(TEST_URL, TEST_KEY, TEST_USER_ID)
         return manager
@@ -373,6 +369,8 @@ def setup_text_generator_for_testing(text_generator):
 @pytest.fixture
 def text_generator(mock_model, mock_tokenizer):
     """Create a TextGenerator instance with mocked components for testing."""
+    from psy_supabase.core.text_generator import TextGenerator
+
     with patch('psy_supabase.core.text_generator.AutoModelForCausalLM.from_pretrained',
               return_value=mock_model), \
          patch('psy_supabase.core.text_generator.AutoTokenizer.from_pretrained',
@@ -533,6 +531,8 @@ def setup_safe_context():
 @pytest.fixture
 def mock_embedding_provider():
     """Create a mock embedding provider."""
+    from psy_supabase.core.model_manager import EmbeddingProviderAdapter
+
     mock = Mock(spec=EmbeddingProviderAdapter)
     mock.get_embedding_dimension.return_value = 2048
     mock.generate_embedding.return_value = [0.1] * 2048  # Mock embedding vector
@@ -633,6 +633,8 @@ def mock_db_manager_with_test_values():
 @pytest.fixture
 def non_toxic_rag_processor(mock_db_manager_with_spy, mock_text_generator):
     """Create a RAG processor that won't detect toxicity."""
+    from psy_supabase.core.rag_processor import RAGProcessor
+
     # Ensure the text generator doesn't report toxicity
     mock_text_generator.is_toxic.return_value = False
 
