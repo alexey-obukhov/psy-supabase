@@ -7,6 +7,15 @@ from psy_supabase.core.rag_processor import RAGProcessor
 from tests.conftest import SUPPORTIVE_TERMS
 from unittest.mock import patch
 import logging
+import os
+
+# Check if running in GitHub Actions
+RUNNING_IN_GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS') == 'true'
+
+# Check if CUDA is available
+CUDA_AVAILABLE = torch.cuda.is_available()
+# Determine device to use
+DEVICE = "cpu" if RUNNING_IN_GITHUB_ACTIONS else ("cuda" if CUDA_AVAILABLE else "cpu")
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +34,34 @@ def cleanup_gpu_memory():
     # Use your existing utility function
     cleanup_memory()
 
-class TestResponseQuality:
-    """Test suite focused on ensuring high-quality responses."""
-
-    @pytest.fixture
-    def setup_response_generator_without_cleanup(self, mock_db_manager, mock_dynamic_retriever):
-        """Create a RAGProcessor with enhanced mock objects from conftest.py."""
-        # Create a real TextGenerator with test configuration
-        text_generator = TextGenerator(
-            model_name="microsoft/phi-1_5",
-            device="cuda",
-            quantize=False
-        )
+@pytest.fixture
+def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
+    """
+    Create a RAGProcessor with enhanced mock objects and ensure cleanup.
+    This fixture includes memory cleanup even if the test fails.
+    """
+    try:
+        logger.info(f"Setting up TextGenerator on {DEVICE}...")
+        
+        # For GitHub Actions, use a fully mocked model
+        if RUNNING_IN_GITHUB_ACTIONS:
+            # Create a mock model that's good enough for testing
+            from unittest.mock import MagicMock
+            
+            # Create a fully mocked TextGenerator
+            text_generator = MagicMock()
+            text_generator.device = "cpu"
+            text_generator.generate_text.return_value = "This is a mock response for GitHub Actions testing."
+            text_generator.generate_therapeutic_response.return_value = "This is a mock therapeutic response."
+            
+            logger.info("Created mock TextGenerator for GitHub Actions")
+        else:
+            # Use real TextGenerator with appropriate device
+            text_generator = TextGenerator(
+                model_name="microsoft/phi-1_5",
+                device=DEVICE,
+                quantize=False
+            )
 
         # Create the RAG processor with mock dependencies
         rag_processor = RAGProcessor(
@@ -47,48 +72,23 @@ class TestResponseQuality:
         # Add the dynamic retriever mock to ensure query_knowledge works
         rag_processor.dynamic_retriever = mock_dynamic_retriever
 
-        return rag_processor
+        yield rag_processor
+        
+    finally:
+        # Cleanup code that runs even if the test fails
+        logger.info("Cleaning up TextGenerator resources...")
 
-    @pytest.fixture
-    def setup_response_generator(self, mock_db_manager, mock_dynamic_retriever):
-        """
-        Create a RAGProcessor with enhanced mock objects and ensure cleanup.
-        This fixture includes memory cleanup even if the test fails.
-        """
+        # Release model resources if possible
+        if 'text_generator' in locals() and not RUNNING_IN_GITHUB_ACTIONS:
+            if hasattr(text_generator, 'model'):
+                del text_generator.model
+            del text_generator
 
-        # Create a real TextGenerator with test configuration
-        try:
-            logger.info("Setting up TextGenerator on CUDA...")
-            text_generator = TextGenerator(
-                model_name="microsoft/phi-1_5",
-                device="cuda",
-                quantize=False
-            )
+        # Force garbage collection
+        gc.collect()
 
-            # Create the RAG processor with mock dependencies
-            rag_processor = RAGProcessor(
-                db_manager=mock_db_manager,
-                generator=text_generator
-            )
-
-            # Add the dynamic retriever mock to ensure query_knowledge works
-            rag_processor.dynamic_retriever = mock_dynamic_retriever
-
-            yield rag_processor
-        finally:
-            # Cleanup code that runs even if the test fails
-            logger.info("Cleaning up TextGenerator resources...")
-
-            # Release model resources if possible
-            if 'text_generator' in locals():
-                if hasattr(text_generator, 'model'):
-                    del text_generator.model
-                del text_generator
-
-            # Force garbage collection
-            gc.collect()
-
-            # cleanup_memory()
+class TestResponseQuality:
+    """Test suite focused on ensuring high-quality responses."""
 
     def test_response_does_not_contain_illustration_paragraph(self, setup_response_generator):
         """Ensure responses don't contain 'Illustration paragraph' pattern."""

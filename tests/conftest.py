@@ -438,6 +438,7 @@ def mock_db_manager():
 @pytest.fixture
 def silent_mock_db_manager():
     """Create a mock DatabaseManager that never produces warnings."""
+    from psy_supabase.core.database import DatabaseManager
     manager = Mock(spec=DatabaseManager)
 
     # Create pain point data (same as in mock_db_manager)
@@ -579,6 +580,7 @@ def rag_processor(mock_db_manager, mock_text_generator):
 @pytest.fixture
 def clean_mock_db_manager():
     """Create a mock DatabaseManager that never raises exceptions."""
+    from psy_supabase.core.database import DatabaseManager
     manager = Mock(spec=DatabaseManager)
 
     # Always return a valid pain point

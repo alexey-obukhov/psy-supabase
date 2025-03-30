@@ -183,7 +183,10 @@ class TestTherapeuticResponse:
         # This just tests that short response detection works, without assuming
         # automatic retry behavior
 
-    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+    @pytest.mark.skipif(
+        not torch.cuda.is_available() or os.environ.get('GITHUB_ACTIONS') == 'true',
+        reason="CUDA not available"
+    )
     def test_memory_optimization_for_gpu(self, text_generator):
         """Test memory optimization when using GPU."""
         # Set device to CUDA for this test

@@ -160,9 +160,9 @@ jobs:
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
-      if: always()  # FIXED: Correctly positioned outside the 'with' section
+      if: always()
       with:
-        name: test-results
+        name: test-results-${{ matrix.python-version }}-${{ github.run_id }}
         path: |
           junit/test-results.xml
           htmlcov/
