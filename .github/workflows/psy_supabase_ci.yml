@@ -142,7 +142,7 @@ jobs:
         fi
 
     - name: Upload test results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       if: always()  # FIXED: Correctly positioned outside the 'with' section
       with:
         name: test-results
