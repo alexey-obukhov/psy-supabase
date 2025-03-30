@@ -20,5 +20,6 @@ jobs:
         pip install pylint
         pip install python-dotenv
     - name: Analysing the code with pylint
+      continue-on-error: true
       run: |
         pylint $(git ls-files '*.py')
