@@ -60,21 +60,24 @@ jobs:
         echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
         echo "USER_ID=${{ secrets.USER_ID }}" >> $GITHUB_ENV
 
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint
     - name: Run linting
       continue-on-error: true
       run: |
-        # Install pylint
-        pip install pylint
-
         # Run pylint with config file from root directory
         pylint --rcfile=.pylintrc $(git ls-files '*.py') || echo "Linting had issues, but continuing"
 
-    - name: Run tests
-      continue-on-error: true
+    - name: Pytest dependencies
       run: |
         # Install pytest dependencies explicitly
         pip install exceptiongroup pluggy
 
+    - name: Run tests
+      continue-on-error: true
+      run: |
         # Run tests and continue regardless of result
         python -m pytest -v || echo "Tests failed but continuing workflow"
 
