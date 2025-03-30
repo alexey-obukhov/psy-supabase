@@ -1,6 +1,59 @@
 """
-Prompt selector for therapeutic AI responses.
-Based on Alexey Obukhov's therapeutic prompt system.
+prompt_selector.py
+
+This module implements the `PromptSelector` class, which is responsible for selecting the most appropriate 
+therapeutic prompt template based on user input. It uses semantic matching, keyword associations, and 
+natural language processing (NLP) techniques to analyze user queries and determine the best response strategy.
+
+Key Features:
+- **Therapeutic Prompt Selection**:
+  - Matches user input to predefined therapeutic prompt templates based on keywords, topics, and emotions.
+  - Supports a wide range of therapeutic categories, including anxiety, depression, trauma, grief, and more.
+
+- **Natural Language Processing (NLP)**:
+  - Tokenizes and lemmatizes user input to extract key concepts.
+  - Uses spaCy for named entity recognition (NER) and advanced text processing.
+  - Cleans and normalizes user input for consistent analysis.
+
+- **Category and Topic Analysis**:
+  - Maps user input to therapeutic categories such as "Empathy and Validation" or "Providing Suggestions."
+  - Detects primary and secondary topics using an enhanced mental health taxonomy.
+  - Identifies emotional content and intensity to tailor responses.
+
+- **Response Effectiveness Analysis**:
+  - Evaluates the quality of AI-generated responses based on length, term overlap, and adherence to the selected prompt template.
+
+Classes:
+- `PromptSelector`: The main class that provides methods for analyzing user input, selecting prompt templates, 
+  and refining therapeutic categories.
+
+Dependencies:
+- `psy_supabase.utilities.utils`: Utility functions for loading mental health taxonomies.
+- `psy_supabase.utilities.nlp_utils`: NLP utilities for text cleaning, tokenization, and entity extraction.
+- `psy_supabase.utilities.templates.therapeutic_prompt`: Predefined therapeutic prompt templates.
+- `school_logging.log.ColoredLogger`: Enhanced logging for debugging and monitoring.
+
+Usage:
+    from psy_supabase.utilities.prompt_selector import PromptSelector
+
+    # Initialize the prompt selector with a text generator
+    prompt_selector = PromptSelector(generator)
+
+    # Analyze a user question and select a prompt template
+    question = "I'm feeling very anxious about my upcoming presentation."
+    template, context = prompt_selector.select_prompt_template(question)
+
+    print("Selected Template:", template)
+    print("Context:", context)
+
+    # Generate category information for the question
+    category_info = prompt_selector.generate_category_info(question)
+    print("Category Info:", category_info)
+
+    # Analyze the effectiveness of a response
+    response = "Try practicing deep breathing exercises to calm your nerves."
+    analysis = prompt_selector.analyze_response_effectiveness(question, response, template)
+    print("Response Analysis:", analysis)
 """
 import re
 import traceback
@@ -183,7 +236,7 @@ class PromptSelector:
         """Select the appropriate prompt template based on the question content."""
         try:
             # Analyze question to determine topic and template
-            classification = self._analyze_question(question_text)
+            classification = self.analyze_question(question_text)
             topic = classification.get("topic", "general")
             confidence = classification.get("confidence", 0.5)
 
@@ -238,7 +291,7 @@ class PromptSelector:
     def _determine_topic(self, category_info: Dict[str, str], question: str) -> str:
         """
         Determine the most relevant therapeutic topic using the enhanced mental health taxonomy.
-        Returns 'emotional_support' as default when no specific match is found.
+        Returns 'emotional support' as default when no specific match is found.
         """
         import re
 
@@ -362,7 +415,7 @@ class PromptSelector:
                 if "angry" in emotional_words or "frustrated" in emotional_words:
                     return "Emotional Regulation"
 
-        return "emotional_support"  # Default fallback
+        return "emotional support"  # Default fallback
 
     def analyze_response_effectiveness(self, question: str, response: str, template_used: str) -> Dict[str, Any]:
         """
@@ -425,7 +478,7 @@ class PromptSelector:
 
         return analysis
 
-    def _analyze_question(self, question_text: str) -> Dict[str, Any]:
+    def analyze_question(self, question_text: str) -> Dict[str, Any]:
         """
         Analyze a question to determine topic, emotion, and other contextual factors.
 

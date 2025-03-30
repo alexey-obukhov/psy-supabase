@@ -1,5 +1,35 @@
-from school_logging.log import ColoredLogger
+"""
+dynamic_rag.py
+
+This module implements the DynamicRAGRetriever class, which provides dynamic retrieval and analysis capabilities 
+for a psychological AI system. It enables efficient and relevant responses by fetching only the necessary 
+knowledge, past interactions, and related concepts during model generation.
+
+Key Features:
+- Dynamic knowledge retrieval based on user queries, with support for schema-specific searches and similarity-based document retrieval.
+- Retrieval of past user interactions, optionally filtered by topic, to maintain conversational context.
+- Analysis of related psychological concepts using vector similarity for enhanced therapeutic insights.
+- Emotion and topic analysis to better understand user input and provide tailored responses.
+- Detection of recurring pain points in user interactions to identify key areas of concern and recommend therapeutic approaches.
+- Caching to avoid redundant database queries and improve performance.
+
+Classes:
+- DynamicRAGRetriever: The main class that provides methods for dynamic retrieval, analysis, and caching.
+
+Dependencies:
+- psy_supabase.core.database.DatabaseManager: Handles database operations such as embedding creation and document retrieval.
+- school_logging.log.ColoredLogger: Provides enhanced logging capabilities for debugging and monitoring.
+
+Usage:
+    db_manager = DatabaseManager(...)
+    retriever = DynamicRAGRetriever(db_manager, session_id="user_session_123")
+    knowledge = retriever.get_knowledge_by_query("anxiety management")
+    past_interactions = retriever.get_past_interactions(topic="anxiety")
+    emotion_analysis = retriever.analyze_emotion("I'm feeling very stressed lately.")
+    pain_point = retriever.get_pain_point()
+"""
 from typing import Dict, List, Any, Optional, TYPE_CHECKING
+from school_logging.log import ColoredLogger
 
 # Set up logging
 logger = ColoredLogger(__name__)
@@ -103,7 +133,7 @@ class DynamicRAGRetriever:
             else:
                 # Format the results with more details
                 combined_content = ""
-                for i, doc in enumerate(results):
+                for _, doc in enumerate(results):
                     # Handle both dictionary and string formats
                     if isinstance(doc, dict):
                         content = doc.get('content', '')
@@ -118,7 +148,12 @@ class DynamicRAGRetriever:
                             elif 'category' in metadata:
                                 meta_str = f" (Category: {metadata['category']})"
 
-                        combined_content += f"{content}{meta_str}\n\n"
+                        # Only include content with sufficient similarity
+                        if similarity >= 0.1:  # Dummy threshold needs adjustments
+                            combined_content += f"{content}{meta_str} (Relevance: {similarity:.2f})\n\n"
+                            logger.debug(f"Including content with similarity: {similarity:.2f}")
+                        else:
+                            logger.debug(f"Skipping content with low similarity: {similarity:.2f}")
                     else:
                         content = str(doc)
                         combined_content += f"{content}\n\n"

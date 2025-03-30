@@ -1,3 +1,47 @@
+"""
+safety_handler.py
+
+This module implements the `SafetyHandler` class, which is responsible for detecting and responding to potentially harmful content 
+in user input. It acts as middleware to process queries before they reach the main RAG system, ensuring that harmful or unsafe 
+content is identified and addressed appropriately.
+
+Key Features:
+- **Harmful Content Detection**:
+  - Detects suicide-related, self-harm-related, and violence-related content using regex patterns.
+  - Categorizes harmful content into predefined categories with associated severity levels.
+
+- **Safety Interventions**:
+  - Generates tailored responses for each category of harmful content.
+  - Provides crisis helpline information and encourages users to seek professional help.
+
+- **Metadata Generation**:
+  - Creates metadata for detected harmful content, including the category, severity, and matched pattern.
+  - Facilitates logging and tracking of safety interventions.
+
+Classes:
+- `SafetyHandler`: The main class that provides methods for detecting harmful content and generating appropriate responses.
+
+Dependencies:
+- `re`: Used for regex-based pattern matching to detect harmful content.
+- `school_logging.log.ColoredLogger`: Provides enhanced logging for debugging and monitoring.
+
+Usage:
+    from psy_supabase.utilities.safety_handler import SafetyHandler
+
+    # Initialize the safety handler
+    safety_handler = SafetyHandler()
+
+    # Process user input
+    user_input = "I feel like I want to end my life."
+    is_harmful, response, metadata = safety_handler.process_input(user_input)
+
+    if is_harmful:
+        print("Harmful content detected!")
+        print("Response:", response)
+        print("Metadata:", metadata)
+    else:
+        print("No harmful content detected.")
+"""
 import re
 from typing import Dict, Tuple, Optional
 from school_logging.log import ColoredLogger

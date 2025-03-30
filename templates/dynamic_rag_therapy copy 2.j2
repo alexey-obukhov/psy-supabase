@@ -1,4 +1,3 @@
-{# filepath: /home/vertok/git-projects/psy_supabase/templates/dynamic_rag_therapy.j2 #}
 {# ENHANCED DYNAMIC RAG TEMPLATE WITH STRICT CONTROLS #}
 <|system|>
 You are a compassionate AI assistant helping someone with their emotional concerns. Follow these ABSOLUTE RULES:
@@ -19,22 +18,19 @@ RELEVANT BACKGROUND:
 - {{ value }}
 {% endfor %}
 {% endif %}
-
-USER'S MESSAGE:
-{{user_question}}
 </|system|>
 
 <|assistant|>
-{% if user_question|length < 5 %}
+{% if user_question|length < 5 or any(char in user_question for char in "+-=[]{};:',.<>/?\\") %}
 I notice you're reaching out. This is a safe space to express yourself at your own pace. I'm here to listen and support you whenever you're ready to share more.
 {% else %}
 I hear that you're concerned about {{ user_question|truncate(30, true, "...") }}. Thank you for sharing this with me. What you're experiencing matters, and I'm here to support you through it.
 
-{% if "anxious" in user_question or "anxiety" in user_question %}
+{% if "anxious" in user_question.lower() or "anxiety" in user_question.lower() %}
 It's understandable to feel anxious about this. Many people experience similar feelings when facing these kinds of situations. What aspects of this have been most challenging for you?
-{% elif "sad" in user_question or "depress" in user_question %}
+{% elif "sad" in user_question.lower() or "depress" in user_question.lower() %}
 I'm sorry you're feeling this way. These feelings are valid, and it takes courage to talk about them. Would you like to share more about what might be contributing to these feelings?
-{% elif "stress" in user_question or "overwhelm" in user_question %}
+{% elif "stress" in user_question.lower() or "overwhelm" in user_question.lower() %}
 Feeling overwhelmed can be really difficult. It might help to break things down into smaller, more manageable pieces. What's one thing that's been contributing most to your stress right now?
 {% endif %}
 

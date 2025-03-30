@@ -32,11 +32,6 @@ def is_github_actions():
     """Check if running in GitHub Actions environment."""
     return os.environ.get('GITHUB_ACTIONS') == 'true'
 
-def is_test_environment():
-    """Detect if we're running in a test environment."""
-    import sys
-    return any('pytest' in arg for arg in sys.argv) or any('test_' in arg for arg in sys.argv)
-
 def load_toxicity_model(logger_instance=None):
     """
     Load toxicity detection model with local caching support.

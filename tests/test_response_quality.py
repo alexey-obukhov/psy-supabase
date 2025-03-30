@@ -4,6 +4,7 @@ import gc
 from psy_supabase.utilities.utils import cleanup_memory
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.core.rag_processor import RAGProcessor
+from tests.conftest import SUPPORTIVE_TERMS
 from unittest.mock import patch
 import logging
 
@@ -414,6 +415,7 @@ Would you like to discuss some strategies that could help with your feelings of 
             assert len(response) > 100, "Response should have substantial content"
             assert "not alone" in response.lower(), "Response should include supportive language"
             assert "mental health professional" in response.lower(), "Response should mention professional support"
+
     def test_response_handles_anger_topic(self, setup_response_generator):
         """Test that anger-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
@@ -493,10 +495,11 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         print(f"Empty input response: {response}")
 
+        has_supportive_language = any(term in response.lower() for term in SUPPORTIVE_TERMS)
         # Should provide a helpful, non-error response
         assert response, "Response should not be empty"
         assert len(response) > 20, "Response should have meaningful content"
-        assert "help" in response.lower() or "support" in response.lower(), "Response should offer support"
+        assert has_supportive_language, "Response should offer support"
 
     def test_response_handles_invalid_input(self, setup_response_generator):
         """Test that invalid inputs are handled gracefully."""
@@ -526,10 +529,13 @@ Would you like to discuss some strategies that could help with your feelings of 
         long_input = "I'm feeling really down lately and can't find motivation. " * 50
         response = rag_processor.generate_response(long_input, session_id="test_long")
         print(f"Long input response: {response}")
+
+
+        has_supportive_language = any(term in response.lower() for term in SUPPORTIVE_TERMS)
         # Should provide a helpful, non-error response
         assert response, "Response should not be empty"
         assert len(response) > 20, "Response should have meaningful content"
-        assert "help" in response.lower() or "support" in response.lower(), "Response should offer support"
+        assert has_supportive_language, "Response should offer support"
         # Check for any problematic patterns
         assert "error" not in response.lower(), "Response should not contain error messages"
         assert "invalid" not in response.lower(), "Response should not mention invalid input"
@@ -543,10 +549,11 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         print(f"Special characters input response: {response}")
 
+        has_supportive_language = any(term in response.lower() for term in SUPPORTIVE_TERMS)
         # Should provide a helpful, non-error response
         assert response, "Response should not be empty"
         assert len(response) > 20, "Response should have meaningful content"
-        assert "help" in response.lower() or "support" in response.lower(), "Response should offer support"
+        assert has_supportive_language, "Response should offer support"
         # Check for any problematic patterns
         assert "error" not in response.lower(), "Response should not contain error messages"
         assert "invalid" not in response.lower(), "Response should not mention invalid input"

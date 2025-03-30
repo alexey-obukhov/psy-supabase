@@ -1,3 +1,66 @@
+"""
+database.py
+
+This module implements the `DatabaseManager` class, which provides a comprehensive interface for interacting 
+with a Supabase database in the context of psychological AI applications. It supports operations such as 
+schema management, interaction tracking, vector embedding storage, and retrieval of knowledge and conversation history.
+
+Key Features:
+- **Schema Management**:
+  - Create and manage user-specific schemas for isolating data.
+  - Ensure schema structure and optimize vector operations for efficient queries.
+
+- **Interaction Management**:
+  - Add, retrieve, and analyze user interactions, including questions, answers, and metadata.
+  - Support for embedding generation and storage for vector similarity searches.
+
+- **Knowledge Base Operations**:
+  - Add documents to the knowledge base with vector embeddings.
+  - Retrieve similar documents using pgvector for semantic similarity.
+
+- **Psychological Analysis**:
+  - Detect recurring psychological themes and pain points in user interactions.
+  - Analyze emotional signals and trajectories over time.
+  - Identify therapeutic insights and recommend therapeutic approaches.
+
+- **Advanced Vector Operations**:
+  - Perform vector similarity searches for documents and interactions.
+  - Optimize vector indexes and enrich interactions with embeddings.
+
+Classes:
+- `DatabaseManager`: The main class that provides methods for schema management, interaction tracking, 
+  knowledge base operations, and psychological analysis.
+
+Dependencies:
+- `supabase.create_client`: Used for interacting with the Supabase database.
+- `psy_supabase.utilities.utils`: Utility functions for cleaning and formatting text.
+- `psy_supabase.core.model_manager`: Provides embedding generation for vector operations.
+- `psy_supabase.utilities.embedding_utils`: Utilities for formatting embeddings for database storage.
+- `school_logging.log.ColoredLogger`: Enhanced logging for debugging and monitoring.
+
+Usage:
+    from psy_supabase.core.database import DatabaseManager
+
+    # Initialize the database manager
+    db_manager = DatabaseManager(supabase_url="https://your-supabase-url", supabase_key="your-supabase-key")
+
+    # Add an interaction
+    db_manager.add_interaction({
+        "context": "Therapeutic context",
+        "question": "How can I manage my anxiety?",
+        "answer": "Practice mindfulness and deep breathing exercises.",
+        "metadata": {"topic": "anxiety"}
+    }, session_id="session_123")
+
+    # Retrieve conversation history
+    history = db_manager.get_conversation_history(session_id="session_123")
+
+    # Find similar documents
+    similar_docs = db_manager.find_similar_documents(embedding=[0.1, 0.2, 0.3], limit=5)
+
+    # Analyze psychological themes
+    themes = db_manager.extract_psychological_themes(session_id="session_123")
+"""
 from supabase import create_client
 from typing import List, Dict, Any, Optional
 import json

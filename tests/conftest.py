@@ -65,6 +65,14 @@ TEST_SESSION_ID = "test_session_123"
 TEST_URL = "https://fake-supabase-url.com"
 TEST_KEY = "fake-api-key"
 
+# Commonly used terms for identifying supportive language
+SUPPORTIVE_TERMS: List[str] = [
+    "help", "support", "understand", "listen", "hear",
+    "validat", "care", "concern", "empath", "compassion",
+    "acknowledge", "comfort", "reassure", "encourage",
+    "validate", "recognize", "relate", "connect",
+    "sympath", "feel", "emotion", "experienc"]
+
 # Sample data with embeddings that should be processed
 SAMPLE_SIMILAR_DOCUMENTS: List[dict] = [
     {
@@ -342,8 +350,8 @@ def setup_text_generator_for_testing(text_generator):
     # Fix emotion analysis to handle iteration
     mock_selector = MagicMock()
 
-    # Make _analyze_question return a dict that can be iterated
-    mock_selector._analyze_question.return_value = {
+    # Make analyze_question return a dict that can be iterated
+    mock_selector.analyze_question.return_value = {
         'topic': 'test_topic',
         'emotion': 'test_emotion',
         'confidence': 0.9,
@@ -411,73 +419,21 @@ def mock_conversation_history():
 
 @pytest.fixture
 def mock_db_manager():
-    """Create a mock DatabaseManager that matches test expectations."""
-    from unittest.mock import MagicMock
-
-    # Use MagicMock for better attribute handling
+    """Create a mock DatabaseManager for testing."""
     manager = MagicMock()
 
-    # Create pain point data with proper structure
-    pain_points = {
-        'anxiety': {
-            'detected': True,
-            'id': 'anx1',
-            'name': 'Anxiety',
-            'similarity': 0.85,
-            'keywords': ['worry', 'stress', 'fear'],
-            'suggested_approach': {'approach_type': 'anxiety_exploration'}
-        },
-        'none': {'detected': False}
-    }
+    # Track the contexts passed to save_interaction
+    manager.saved_contexts = []
 
-    # Add the get_hot_topics method
-    manager.get_hot_topics.return_value = ["depression", "anxiety", "trauma", "relationships"]
+    # Wrap the save_interaction mock to record contexts
+    original_save = manager.save_interaction
+    def save_wrapper(*args, **kwargs):
+        context = kwargs.get('context', 'unknown')
+        manager.saved_contexts.append(context)
+        print(f"Saving with context: {context}")
+        return original_save(*args, **kwargs)
 
-    # Configure find_similar_documents to return test-expected documents
-    def find_similar_documents(query=None, limit=None, **kwargs):
-        # Critical fix: Return what the test expects for 'test_get_relevant_documents'
-        if query == "test_relevant_documents":
-            return [
-                {"id": 1, "content": "Document 1", "similarity": 0.95},
-                {"id": 2, "content": "Document 2", "similarity": 0.85}
-            ]
-        # For 'test_enhance_context_with_relevant_documents'
-        elif query and "anxiety" in query.lower():
-            return [
-                {"id": 1, "content": "Anxiety management techniques include deep breathing.", "similarity": 0.95},
-                {"id": 2, "content": "CBT is effective for anxiety disorders.", "similarity": 0.85}
-            ]
-        # For 'test_enhance_context_with_no_documents'
-        elif query == "empty_result":
-            return []
-        # Default fallback
-        else:
-            return [
-                {"id": 1, "content": f"Information about {query}.", "similarity": 0.95},
-                {"id": 2, "content": f"Additional details about {query}.", "similarity": 0.85}
-            ]
-
-    manager.find_similar_documents.side_effect = find_similar_documents
-
-    # Configure identify_potential_pain_points for test_detect_pain_points_exception_handling
-    def identify_potential_pain_points(query=None, **kwargs):
-        if query == "exception_test":
-            raise Exception("Test DB Error Mock")
-        elif query and "anxiety" in query.lower():
-            return pain_points['anxiety']
-        else:
-            return pain_points['none']
-
-    manager.identify_potential_pain_points.side_effect = identify_potential_pain_points
-
-    # Configure get_conversation_history
-    manager.get_conversation_history.return_value = [
-        {"role": "user", "content": "I've been feeling really down lately"},
-        {"role": "assistant", "content": "I'm sorry to hear you're feeling down. Can you tell me more?"}
-    ]
-
-    # Return True for save_interaction
-    manager.save_interaction.return_value = True
+    manager.save_interaction = save_wrapper
 
     return manager
 
@@ -594,7 +550,7 @@ def rag_processor(mock_db_manager, mock_text_generator):
 
     # Create a proper prompt_selector with real return values
     mock_prompt_selector = Mock()
-    mock_prompt_selector._analyze_question.return_value = {
+    mock_prompt_selector.analyze_question.return_value = {
         'topic': 'anxiety',
         'emotion': 'worried'
     }
@@ -672,3 +628,71 @@ def mock_db_manager_with_test_values():
     manager.find_similar_documents = find_similar_documents_mock
 
     return manager
+
+# Add this fixture to your conftest.py
+@pytest.fixture
+def non_toxic_rag_processor(mock_db_manager_with_spy, mock_text_generator):
+    """Create a RAG processor that won't detect toxicity."""
+    # Ensure the text generator doesn't report toxicity
+    mock_text_generator.is_toxic.return_value = False
+
+    # Create the processor
+    processor = RAGProcessor(
+        db_manager=mock_db_manager_with_spy,
+        generator=mock_text_generator
+    )
+
+    # Patch the response_generator
+    processor.response_generator.check_toxic_content = lambda text, session_id: None
+
+    return processor
+
+@pytest.fixture
+def mock_db_manager_with_spy():
+    """Create a mock DatabaseManager with spy for save_interaction."""
+    from unittest.mock import MagicMock
+
+    # Create a proper MagicMock (not a function)
+    mock_db = MagicMock()
+
+    # Create a dedicated MagicMock for save_interaction that can be asserted against
+    save_mock = MagicMock()
+    save_mock.return_value = True
+
+    # Set it on the mock_db
+    mock_db.save_interaction = save_mock
+
+    # Storage for last values
+    mock_db._last_context = None
+    mock_db._last_metadata = None
+
+    def get_last_context():
+        """Get the context from the most recent call."""
+        if not save_mock.call_args:
+            return None
+        args, kwargs = save_mock.call_args
+        if 'context' in kwargs:
+            return kwargs['context']
+        return args[0] if args else None
+
+    def get_last_metadata():
+        """Get the metadata from the most recent call."""
+        if not save_mock.call_args:
+            return None
+        args, kwargs = save_mock.call_args
+        if 'metadata' in kwargs:
+            return kwargs['metadata']
+        return args[3] if len(args) > 3 else None
+
+    # Add helper methods
+    mock_db.get_last_context = get_last_context
+    mock_db.get_last_metadata = get_last_metadata
+
+    # For pain point tests
+    mock_db.identify_potential_pain_points.return_value = {
+        'detected': False,
+        'similarity': 0.5,
+        'topic': 'general'
+    }
+
+    return mock_db

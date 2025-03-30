@@ -1,38 +1,18 @@
-# Psy Supabase Tests
+# Testing the PSY Supabase System
 
-This directory contains comprehensive tests for the Psy Supabase psychological RAG system. The tests ensure both technical correctness and therapeutic effectiveness of the system.
-
-## Test Organization
-
-- `test_rag_processor.py` - Tests for the core RAG processor with therapeutic capabilities
-- `test_database.py` - Tests for vector database operations and conversation storage
-- `conftest.py` - Shared test fixtures and constants
-
-## Testing Philosophy
-
-Our testing approach combines technical validation with therapeutic efficacy verification:
-
-1. **Technical Tests**: Ensure embedding generation, vector similarity, and database operations work correctly
-2. **Therapeutic Tests**: Validate psychological reasoning, approach selection, and therapeutic effectiveness
-3. **Integration Tests**: Verify all components work together to deliver appropriate responses
+This document explains how to run and maintain tests for the PSY Supabase system.
 
 ## Running Tests
 
 ```bash
 # Run all tests
-pytest
+python -m pytest
 
-# Run only RAGProcessor tests
-pytest tests/test_rag_processor.py
+# Run specific test files
+python -m pytest [test_rag_processor.py](http://_vscodecontentref_/1)
 
-# Run specific test categories
-pytest tests/test_rag_processor.py::TestRAGProcessor::test_detect_pain_points_from_embedding
-
-# Run with increased verbosity
-pytest -v
-
-# Generate test coverage report
-pytest --cov=psy_supabase
+# Run with verbose output
+python -m pytest -v
 ```
 
 ## Key Test Categories
@@ -109,7 +89,7 @@ def mock_text_generator():
 When adding new features to the system, corresponding tests should be added:
 
 1. Create unit tests for new components
-2. Add integration tests for interaction with existing components 
+2. Add integration tests for interaction with existing components
 3. Include edge cases and failure scenarios
 4. For therapeutic features, test both technical operation and psychological soundness
 
@@ -120,13 +100,13 @@ def test_new_feature(self, rag_processor):
     """Test description that explains purpose and psychological significance."""
     # Setup test data
     input_data = "Test input"
-    
+
     # Execute test
     result = rag_processor.new_feature(input_data)
-    
+
     # Verify technical correctness
     assert result["success"] == True
-    
+
     # Verify therapeutic appropriateness
     assert "supportive_element" in result["response"]
 ```

@@ -14,13 +14,13 @@ USER'S CURRENT MESSAGE:
 "{{ user_question }}"
 
 {% if enhanced_context.psychological_context and enhanced_context.psychological_context.emotional_signals %}
-DETECTED EMOTIONAL SIGNALS: 
+DETECTED EMOTIONAL SIGNALS:
 {{ enhanced_context.psychological_context.emotional_signals|join(", ") }}
 {% endif %}
 
 INSTRUCTIONS:
 1. Acknowledge the reality and impact of their stress
-2. Validate that stress responses are normal physiological reactions 
+2. Validate that stress responses are normal physiological reactions
 3. Offer 1-2 specific, practical stress management techniques relevant to their situation
 4. Use a calm, grounded tone that models regulation
 5. If appropriate, help them distinguish between controllable and uncontrollable stressors

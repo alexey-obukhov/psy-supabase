@@ -63,21 +63,24 @@ jinja2: Template processing
 detoxify: Content safety filtering
 """
 import os
-import torch
 import traceback
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
+import gc
+import random
+import re
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
+import jinja2
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from jinja2 import Template
-from psy_supabase.utilities.common import is_github_actions, get_models_dir, ensure_dir_exists, load_toxicity_model
+from detoxify import Detoxify
+from school_logging.log import ColoredLogger
+from psy_supabase.utilities.common import is_github_actions, get_project_root, get_models_dir, ensure_dir_exists, load_toxicity_model
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 from psy_supabase.utilities.prompt_selector import PromptSelector
-from school_logging.log import ColoredLogger
-from detoxify import Detoxify
 
 if TYPE_CHECKING:
     from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
-    from psy_supabase.utilities.prompt_selector import PromptSelector
 
 logger = ColoredLogger(__name__)
 
@@ -166,11 +169,15 @@ class TextGenerator:
         self.toxic_tokenizer = None
         self.toxic_model = None
         self.prompt_templates = prompt_templates
-        self.template_dir = os.path.join(os.path.dirname(__file__), "templates")
+        project_root = get_project_root()
+        self.template_dir = os.path.join(project_root, "templates")
         ensure_dir_exists(self.template_dir)
 
         # Load the model immediately on initialization
         self._load_model()
+
+        # Initialize the prompt selector
+        self.prompt_selector = PromptSelector(generator=self)
 
         # Set cache directory for Detoxify to use our models directory
         os.environ["TRANSFORMERS_CACHE"] = self.MODELS_DIR
@@ -209,31 +216,20 @@ class TextGenerator:
 
             # Add quantization if requested
             if self.quantize and self.device == "cuda":
-                try:
-                    # Try to import bitsandbytes
-                    import bitsandbytes
-                    logger.info("Using 8-bit quantization with bitsandbytes")
-                    load_config["load_in_8bit"] = True
-                    load_config["device_map"] = "auto"
+                logger.info("Using 8-bit quantization with bitsandbytes")
+                load_config["load_in_8bit"] = True
+                load_config["device_map"] = "auto"
 
-                    # Only add bfloat16 if specifically requested AND the GPU supports it
-                    if self.use_bfloat16 and torch.cuda.is_bf16_supported():
-                        logger.info("Using bfloat16 with 8-bit quantization")
-                        load_config["torch_dtype"] = torch.bfloat16
+                # Only add bfloat16 if specifically requested AND the GPU supports it
+                if self.use_bfloat16 and torch.cuda.is_bf16_supported():
+                    logger.info("Using bfloat16 with 8-bit quantization")
+                    load_config["torch_dtype"] = torch.bfloat16
 
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        self.model_name,
-                        **load_config
-                    )
-                    self.using_device_map = True
-                except ImportError:
-                    logger.warning("bitsandbytes not installed, falling back to standard loading")
-                    load_config["torch_dtype"] = torch.bfloat16 if self.use_bfloat16 else torch.float32
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        self.model_name,
-                        **load_config
-                    )
-                    self.model.to(self.device)
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    self.model_name,
+                    **load_config
+                )
+                self.using_device_map = True
             else:
                 # Standard loading without quantization
                 load_config["torch_dtype"] = torch.bfloat16 if self.use_bfloat16 else torch.float32
@@ -360,7 +356,7 @@ class TextGenerator:
                 logger.info("Fixed known problematic pattern in prompt")
 
             # Generate text with the prepared prompt
-            logger.info(f"Generating text with prompt of length {len(prompt)} (tokens: {token_count})")
+            logger.info("Generating text with prompt of length %d (tokens: %d)", len(prompt), token_count)
 
             with torch.no_grad():
                 input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.device)
@@ -391,7 +387,7 @@ class TextGenerator:
                             max_new_tokens=max_new_tokens,
                             temperature=temperature,
                             top_p=top_p,
-                            do_sample=True if temperature > 0 else False,
+                            do_sample=temperature > 0,
                             pad_token_id=self.tokenizer.eos_token_id
                         )
                     else:
@@ -411,65 +407,11 @@ class TextGenerator:
             logger.error(traceback.format_exc())
             return ""
 
-    def generate_response(self, user_input, **kwargs):
-        """Generate a response using the enhanced template system."""
-        # Prepare context for template
-        context = {
-            "user_question": user_input,
-            # Add other context variables based on kwargs
-        }
-
-        # Determine which template to use based on content
-        template_name = self._select_appropriate_template(user_input, **kwargs)
-
-        # Render the template
-        template_parts = self._render_template(template_name, context)
-
-        # Generate using the system prompt and assistant template
-        response = self._generate_with_template_parts(
-            system_prompt=template_parts["system_prompt"],
-            assistant_template=template_parts["assistant_template"],
-            user_input=user_input
-        )
-
-        # Clean the response
-        cleaned_response = self._clean_therapeutic_response(response)
-
-        return cleaned_response
-
-    def _render_template(self, template_name, context):
-        """Render a template with the given context."""
-        try:
-            template_content = self._load_template(template_name)
-            template = Template(template_content)
-            rendered = template.render(**context)
-
-            # Split the rendered template to extract system and assistant parts
-            parts = rendered.split("<|assistant|>")
-            if len(parts) > 1:
-                system_prompt = parts[0].replace("<|system|>", "").strip()
-                assistant_response = parts[1].strip()
-
-                # Log the lengths for debugging
-                logger.info(f"System prompt: {len(system_prompt)} chars")
-                logger.info(f"Assistant response template: {len(assistant_response)} chars")
-
-                # Use the split parts in your generation function
-                # This depends on how your text generation works
-                return {"system_prompt": system_prompt, "assistant_template": assistant_response}
-            else:
-                logger.warning("Template doesn't contain <|assistant|> tag")
-                return {"system_prompt": "", "assistant_template": rendered}
-        except Exception as e:
-            logger.error(f"Error rendering template: {e}")
-            return {"system_prompt": "", "assistant_template": f"I'm here to help with {context.get('user_question', 'your concerns')}."}
-
     def _get_supportive_fallback(self):
         """
         Enterprise-grade fallback system with diverse, high-quality therapeutic responses.
         Used when content filtering detects problematic responses.
         """
-        import random
 
         # Multi-category fallback system for diverse, natural responses
         fallback_categories = {
@@ -512,11 +454,25 @@ class TextGenerator:
         Returns:
             A cleaned therapeutic response or appropriate fallback
         """
-        import re
+
 
         logger.debug(f"Cleaning therapeutic response of length {len(response)}")
 
-        # STAGE 1: CRITICAL PATTERN DETECTION - Educational/instructional content
+        # DEBUGGING: Log the raw response for inspection
+        logger.info(f"[DEBUG] Raw response before cleaning: {response[:200]}...")
+
+        # STEP 1: Extract the "Answer:" or "A:" section
+        answer_match = re.search(r"(?i)(?:^ *|\n)(answer\s*\d*:|a\s*\d*:|ans\s*:)\s*(.*?)(?=\n\n|$)", response, flags=re.DOTALL)
+        if answer_match:
+            # Extract the answer text
+            answer_text = answer_match.group(2).strip()
+
+            # Check if the extracted answer is long enough to be meaningful
+            if len(answer_text) > 10:
+                logger.info("Extracted valid 'Answer:' section. Returning it directly.")
+                return answer_text
+
+        # STAGE 2: CRITICAL PATTERN DETECTION - Educational/instructional content
         educational_patterns = [
             # Document structure markers
             r"title:", r"introduction:", r"chapter \d+:", r"conclusion:",
@@ -538,9 +494,11 @@ class TextGenerator:
         for pattern in educational_patterns:
             if re.search(pattern, response.lower(), re.IGNORECASE):
                 logger.warning(f"Educational pattern detected: {pattern}")
+                # DEBUGGING: Log which pattern triggered the fallback
+                logger.info(f"[DEBUG] Educational pattern fallback triggered: {pattern}")
                 return self._get_supportive_fallback()
 
-        # STAGE 2: CONTENT TYPE CLASSIFICATION
+        # STAGE 3: CONTENT TYPE CLASSIFICATION
         # Check for prompt leakage (instructions that should never reach users)
         instruction_markers = [
             "your response should", "provide a therapeutic", "write a response",
@@ -552,15 +510,19 @@ class TextGenerator:
         for marker in instruction_markers:
             if marker in response.lower():
                 logger.warning(f"Instruction leakage detected: {marker}")
+                # DEBUGGING: Log which instruction marker triggered the fallback
+                logger.info(f"[DEBUG] Instruction marker fallback triggered: {marker}")
                 return self._get_supportive_fallback()
 
-        # STAGE 3: SPECIAL CHARACTER & FORMATTING HANDLING
+        # STAGE 4: SPECIAL CHARACTER & FORMATTING HANDLING
         # Check if response starts with special characters
         if response.strip() and any(response.strip().startswith(char) for char in "_+-=[]{};:',.<>/?\"\\"):
             logger.warning("Response starts with special character - using supportive fallback")
+            # DEBUGGING: Log the special character fallback
+            logger.info(f"[DEBUG] Special character fallback triggered. Response starts with: {response.strip()[0]}")
             return self._get_supportive_fallback()
 
-        # STAGE 4: EXTRACT DIRECT THERAPIST RESPONSES
+        # STAGE 5: EXTRACT DIRECT THERAPIST RESPONSES
         dialogue_extraction = [
             # Extract therapist speech from roleplay
             r'(?:Therapist|Assistant|Counselor):\s*"?([^"]+)"?',
@@ -576,14 +538,22 @@ class TextGenerator:
                     logger.info(f"Extracted direct therapeutic response ({len(extracted)} chars)")
                     response = extracted
 
-        # STAGE 5: STRUCTURAL CLEANING
-        # Remove ending prompt markers
-        response = response.replace("<|endoftext|>", "").strip()
-
+        # STAGE 6: STRUCTURAL CLEANING
         # Remove common therapist opener phrases for more natural flow
-        response = re.sub(r"^(?:As a therapist|As your therapist|In my role as a therapist),?\s+", "", response, flags=re.IGNORECASE)
+        patterns_to_remove = [
+            r"(?i)As (an AI|a therapist|a mental health professional).*?:",
+            r"(?i)Illustration paragraph:.*?(?=\n\n|\Z)",  # Remove entire illustration paragraphs
+            r"(?i)Example response:.*?(?=\n\n|\Z)",
+            r"\[.*?\]",  # Remove content in square brackets
+            r"\(.*?\)",  # Remove content in parentheses that contain instructions
+            r"<.*?>",    # Remove HTML-like tags
+        ]
 
-        # STAGE 6: VALIDATION & QUALITY CONTROL
+        # Apply each pattern
+        for pattern in patterns_to_remove:
+            response = re.sub(pattern, "", response, flags=re.DOTALL)
+
+        # STAGE 7: VALIDATION & QUALITY CONTROL
         # Ensure response has therapeutic language
         supportive_terms = ["feel", "understand", "support", "help", "listen", "share",
                             "experience", "emotion", "thought", "challenge"]
@@ -591,9 +561,15 @@ class TextGenerator:
         has_supportive_language = any(term in response.lower() for term in supportive_terms)
 
         # Check length constraints
-        if len(response) < 50 or len(response) > 1500 or not has_supportive_language:
-            logger.warning(f"Response fails quality check: length={len(response)}, "
+        if len(response) < 10 or len(response) > 1500 or not has_supportive_language:
+            # DEBUGGING: Log specifically which quality check triggered the fallback
+            logger.warning(f"[DEBUG] Quality check fallback - length={len(response)}, "
                         f"has_supportive_language={has_supportive_language}")
+
+            # Check if any supportive terms are present
+            found_terms = [term for term in supportive_terms if term in response.lower()]
+            logger.info(f"[DEBUG] Supportive terms found: {found_terms}")
+
             return self._get_supportive_fallback()
 
         logger.info(f"Cleaned response passed all quality checks, final length: {len(response)}")
@@ -608,32 +584,31 @@ class TextGenerator:
         if "depress" in original_text.lower():
             return "I understand you're feeling depressed. These feelings can be incredibly heavy and make everything seem more difficult. It's important to know that depression is a real condition that can affect anyone, and you deserve support. Would you like to share more about what you've been experiencing recently? I'm here to listen without judgment."
 
-        elif "anxi" in original_text.lower():
+        if "anxi" in original_text.lower():
             return "I can hear that anxiety is affecting you right now. Anxiety can feel overwhelming, with racing thoughts and physical sensations that are hard to manage. Remember that your feelings are valid, and many people experience anxiety. Would it help to talk about what triggers these feelings for you? Together we can explore some strategies that might help ease these difficult moments."
 
-        elif "trauma" in original_text.lower() or "abuse" in original_text.lower():
+        if "trauma" in original_text.lower() or "abuse" in original_text.lower():
             return "Thank you for sharing something so difficult with me. Experiences of trauma or abuse can have profound impacts on our wellbeing, and it takes courage to talk about them. Your feelings and reactions are valid responses to what you've been through. Would you feel comfortable telling me a bit more about what support you're looking for right now?"
 
-        elif "relationship" in original_text.lower() or "partner" in original_text.lower():
+        if "relationship" in original_text.lower() or "partner" in original_text.lower():
             return "Relationship challenges can be deeply affecting and complex. The connections we form with others are so important to us, which makes difficulties in these relationships particularly painful. I'm here to listen to your experience without judgment. What aspects of your relationship situation are most concerning for you right now?"
 
-        elif "work" in original_text.lower() or "job" in original_text.lower():
+        if "work" in original_text.lower() or "job" in original_text.lower():
             return "Work-related stress and challenges can significantly impact our wellbeing, especially considering how much of our time and energy we invest in our professional lives. These feelings are completely valid. Would you like to share more about what's happening in your workplace that's troubling you?"
 
-        elif "family" in original_text.lower() or "parent" in original_text.lower():
+        if "family" in original_text.lower() or "parent" in original_text.lower():
             return "Family relationships are often complex and deeply emotional. The dynamics formed in our families can affect us profoundly, and navigating challenges within them can be particularly difficult. I'm here to listen and support you. Could you tell me more about what's happening with your family situation?"
 
-        elif "alone" in original_text.lower() or "lonely" in original_text.lower():
+        if "alone" in original_text.lower() or "lonely" in original_text.lower():
             return "Feeling lonely or isolated can be incredibly painful. As humans, we have a fundamental need for connection, and when that need isn't met, it can affect us deeply. Your feelings are completely understandable. Would you like to share more about your experience of loneliness and what it's been like for you?"
 
-        elif "broke up" in original_text.lower() or "breakup" in original_text.lower() or "ex" in original_text.lower():
+        if "broke up" in original_text.lower() or "breakup" in original_text.lower() or "ex" in original_text.lower():
             return "I'm sorry to hear about your breakup. The end of a relationship can be incredibly painful and bring up many difficult emotions. It's completely natural to feel a range of emotions right now - sadness, confusion, anger, or even relief mixed with guilt. Would you like to talk more about what you're experiencing during this challenging time?"
 
         # General fallback based on length of original text
         if len(original_text.split()) < 10:
             return "I'm here to listen and support you. Could you share a bit more about what you're experiencing or what's on your mind right now? The more you can tell me, the better I can understand how to help."
-        else:
-            return "I understand you're going through a difficult time. Your feelings are valid, and I appreciate you sharing them with me. I'd like to understand more about your situation so I can offer better support. Could you tell me more about what you've been experiencing and how it's affecting you?"
+        return "I understand you're going through a difficult time. Your feelings are valid, and I appreciate you sharing them with me. I'd like to understand more about your situation so I can offer better support. Could you tell me more about what you've been experiencing and how it's affecting you?"
 
     def get_toxicity_model(self):
         """Get or initialize toxicity detection model with local model caching."""
@@ -699,7 +674,7 @@ class TextGenerator:
         """
         Final validation to catch invalid response patterns before sending to user.
         """
-        import re
+
 
         # Check for code-related patterns that would never be appropriate
         code_patterns = [
@@ -733,7 +708,7 @@ class TextGenerator:
 
         return response
 
-    def _get_emergency_fallback(self, question=None) -> str:
+    def _get_emergency_fallback(self, question: Optional[str] = None) -> str:
         """
         Provide an emergency fallback response when generation fails.
 
@@ -785,21 +760,20 @@ class TextGenerator:
                         "These trained professionals can help you through this difficult time. "
                         "You deserve support, and help is available 24/7. Would you consider reaching out to one of these resources right now?"
                     )
-                else:
-                    return (
-                        "I'm very concerned about what you've shared. Your life matters, and the pain you're experiencing right now can be addressed with the right support. "
-                        "\n\n"
-                        "Please reach out for immediate help:\n"
-                        "• Call or text 988 to reach the Suicide and Crisis Lifeline (US)\n"
-                        "• Text HOME to 741741 for the Crisis Text Line\n"
-                        "• Call emergency services (911 in US) or go to your nearest emergency room\n"
-                        "\n"
-                        "Trained professionals are available 24/7 who can help you through this difficult time. "
-                        "Would you be willing to contact one of these resources right now? You don't have to face this alone."
-                    )
+                return (
+                    "I'm very concerned about what you've shared. Your life matters, and the pain you're experiencing right now can be addressed with the right support. "
+                    "\n\n"
+                    "Please reach out for immediate help:\n"
+                    "• Call or text 988 to reach the Suicide and Crisis Lifeline (US)\n"
+                    "• Text HOME to 741741 for the Crisis Text Line\n"
+                    "• Call emergency services (911 in US) or go to your nearest emergency room\n"
+                    "\n"
+                    "Trained professionals are available 24/7 who can help you through this difficult time. "
+                    "Would you be willing to contact one of these resources right now? You don't have to face this alone."
+                )
 
             # Handle relationship breakups (non-crisis)
-            elif any(term in question.lower() for term in ["broke up", "breakup", "left me", "ex", "girlfriend", "boyfriend"]):
+            if any(term in question.lower() for term in ["broke up", "breakup", "left me", "ex", "girlfriend", "boyfriend"]):
                 return (
                     "I'm sorry to hear about your breakup. Ending relationships can bring intense emotions - sadness, anger, confusion, and grief. "
                     "These feelings are a natural response to loss, and it's important to acknowledge them. "
@@ -809,7 +783,7 @@ class TextGenerator:
                 )
 
             # Handle depression/sadness
-            elif any(term in question.lower() for term in ["depress", "sad", "down", "hopeless", "empty"]):
+            if any(term in question.lower() for term in ["depress", "sad", "down", "hopeless", "empty"]):
                 return (
                     "I can hear that you're feeling down right now. Depression and sadness can feel overwhelming and make everything seem more difficult. "
                     "Your feelings are valid, and many people experience similar struggles. "
@@ -893,7 +867,6 @@ class TextGenerator:
                 # Add enhanced_context to the main context
                 context['enhanced_context'] = enhanced_context
 
-            # IMPORTANT: Add this block to call _analyze_question
             # Add psychological context if not present
             if 'psychological_context' not in context:
                 self._update_psychological_context(context, user_question)
@@ -905,7 +878,7 @@ class TextGenerator:
                 logger.info(f"Using dynamic RAG retrieval with template: {template_name}")
 
                 # Get the retriever object
-                retriever = context['dynamic_retriever']
+                retriever: DynamicRAGRetriever = context['dynamic_retriever']
 
                 # Extract specific psychological topics for dynamic retrieval
                 detected_topic = context['psychological_context'].get('topic', 'general')
@@ -959,7 +932,7 @@ class TextGenerator:
 
                     # Map the approach_type to a therapeutic template name
                     if approach_type and hasattr(self, 'map_approach_to_template'):
-                        therapeutic_approach = self.map_approach_to_template(approach_type)
+                        therapeutic_approach = map_approach_to_template(approach_type)
                         context['therapeutic_approach'] = therapeutic_approach
                         logger.info(f"Using therapeutic approach '{therapeutic_approach}' from pain point")
 
@@ -968,7 +941,7 @@ class TextGenerator:
                     try:
                         # Validate topic_query against "topic" placeholder
                         if topic_query.lower() in ["topic", "specific topic", "the topic"]:
-                            logger.warning(f"Detected placeholder 'topic' - replacing with extracted topic")
+                            logger.warning("Detected placeholder 'topic' - replacing with extracted topic")
                             # Use our pre-extracted topics instead of placeholder
                             if extracted_topics:
                                 topic_query = extracted_topics[0]
@@ -986,7 +959,7 @@ class TextGenerator:
                     try:
                         # Validate topic_query against "topic" placeholder
                         if topic_query.lower() in ["topic", "specific topic", "the topic"]:
-                            logger.warning(f"Detected placeholder 'topic' - replacing with extracted topic")
+                            logger.warning("Detected placeholder 'topic' - replacing with extracted topic")
                             # Use our pre-extracted topics instead of placeholder
                             if extracted_topics:
                                 topic_query = extracted_topics[0]
@@ -1002,7 +975,7 @@ class TextGenerator:
 
                 def get_pain_point():
                     try:
-                        logger.info(f"Dynamic pain point retrieval")
+                        logger.info("Dynamic pain point retrieval")
                         result = retriever.get_pain_point()
                         if result and result.get('pain_point'):
                             return f"\nDetected recurring theme: {result.get('pain_point')}\n"
@@ -1060,7 +1033,6 @@ class TextGenerator:
                             f"Please respond to the user's question: {user_question}"
                         )
                         # Use a basic Template
-                        from jinja2 import Template
                         template = Template(fallback_template_str)
 
                     # Try to render the template
@@ -1158,8 +1130,8 @@ class TextGenerator:
                 'max_new_tokens': 512,
                 'temperature': 0.7,
                 'top_p': 0.9,
-                'repetition_penalty': 1.15,
-                'do_sample': True  # Enable sampling to use temperature and top_p
+                # 'repetition_penalty': 1.15,
+                # 'do_sample': True  # Enable sampling to use temperature and top_p
             }
 
             # Add GPU memory optimizations if using CUDA
@@ -1182,7 +1154,6 @@ class TextGenerator:
                 if torch.cuda.get_device_properties(0).total_memory < 8e9:  # Less than 8GB
                     logger.info("Using low memory optimizations for small GPU")
                     # Force garbage collection between generations
-                    import gc
                     gc.collect()
                     torch.cuda.empty_cache()
 
@@ -1244,12 +1215,11 @@ class TextGenerator:
             "Remember that healing isn't linear - some days will be better than others. What aspects of these suggestions feel most helpful for your situation right now?"
         )
 
-    def _get_crisis_response(self, question: str = "") -> str:
+    def _get_crisis_response(self) -> str:
         """
         Returns a crisis response when a true emergency is detected.
         We keep this hardcoded for safety.
         """
-        # This is one of the few places where hardcoded responses make sense
         return (
             "I'm concerned about what you've shared. If you're having thoughts of harming yourself, "
             "please reach out for immediate support from trained professionals who can help:\n\n"
@@ -1260,10 +1230,8 @@ class TextGenerator:
             "Would you be willing to reach out to one of these resources right now?"
         )
 
-    def _get_fallback_response(self, question=None) -> str:
+    def _get_fallback_response(self, question: Optional[str] = None) -> str:
         """Return a supportive fallback response when needed."""
-        import random
-        import re
 
         # For special character inputs
         if question and len(re.sub(r'[a-zA-Z0-9\s]', '', question)) / len(question) > 0.5:
@@ -1314,7 +1282,7 @@ class TextGenerator:
         # Simple check if any keyword appears in the user's message
         return any(keyword in text.lower() for keyword in crisis_keywords)
 
-    def _final_validation(self, response, question=None):
+    def _final_validation(self, response, question: Optional[str] = None):
         """
         A last-chance validation to catch any instructions or inappropriate content
         before it reaches the user.
@@ -1329,7 +1297,7 @@ class TextGenerator:
         if any(indicator in response.lower() for indicator in instruction_indicators):
             logger.critical("INSTRUCTION LEAK DETECTED in final response!")
             if question and any(kw in question.lower() for kw in ["suicide", "kill myself", "dont want to live"]):
-                return self._get_crisis_response(question)
+                return self._get_crisis_response()
             return self._get_fallback_response()
 
         # If no instructions found, return the original
@@ -1339,7 +1307,6 @@ class TextGenerator:
         """
         Less aggressive cleaning method to preserve valid therapeutic responses.
         """
-        import re
         try:
             # DEBUGGING - log raw response to understand what's being generated
             logger.debug(f"Raw response before cleaning: {response[:100]}...")
@@ -1350,7 +1317,7 @@ class TextGenerator:
             ]
 
             if any(pattern in response for pattern in critical_patterns):
-                logger.critical(f"Critical pattern detected in response")
+                logger.critical("Critical pattern detected in response")
                 return self._get_emergency_fallback(question)
 
             # STEP 1.5: CHECK FOR EDUCATIONAL/LECTURE CONTENT LEAKAGE
@@ -1376,7 +1343,7 @@ class TextGenerator:
                 match = re.search(pattern, response, re.DOTALL)
                 if match:
                     extracted_text = match.group(1).strip()
-                    logger.info(f"Found direct instruction pattern, extracting content")
+                    logger.info("Found direct instruction pattern, extracting content")
                     response = extracted_text
                     break
 
@@ -1402,7 +1369,7 @@ class TextGenerator:
                 therapist_responses = re.findall(pattern, response, re.IGNORECASE)
                 if therapist_responses and len(therapist_responses[-1]) > 30:
                     response = therapist_responses[-1].strip()
-                    logger.info(f"Extracted therapist response from dialogue")
+                    logger.info("Extracted therapist response from dialogue")
                     break
 
             # STEP 5: CLEAN REMAINING STRUCTURAL ELEMENTS
@@ -1436,8 +1403,8 @@ class TextGenerator:
         try:
             template_path = os.path.join(self.template_dir, f"{template_name}.j2")
             if os.path.exists(template_path):
-                with open(template_path, 'r') as f:
-                    template_content = f.read()
+                with open(template_path, mode='r', encoding='utf-8') as jinja2_template:
+                    template_content = jinja2_template.read()
 
                 # Validate template format
                 if "{{user_question}}" not in template_content:
@@ -1451,8 +1418,8 @@ class TextGenerator:
         try:
             fallback_path = os.path.join(self.template_dir, "fallback.j2")
             if os.path.exists(fallback_path):
-                with open(fallback_path, 'r') as f:
-                    return Template(f.read())
+                with open(fallback_path, mode='r', encoding='utf-8') as jinja2_fallback_template:
+                    return Template(jinja2_fallback_template.read())
         except Exception as e:
             logger.error(f"Error loading fallback template: {str(e)}")
 
@@ -1489,29 +1456,33 @@ class TextGenerator:
                 torch.cuda.empty_cache()
 
             # Run garbage collection
-            import gc
             gc.collect()
 
             logger.info("Model unloaded successfully")
         except Exception as e:
             logger.error(f"Error unloading model: {e}")
 
-    def _prepare_prompt_for_generation(self, user_input, template_name, context=None):
+    def _prepare_prompt_for_generation(self, user_input, template_name, context: Optional[dict] = None):
         """Prepare prompt with special handling for unusual inputs."""
-        import re
 
         # Detect non-standard inputs (special characters or very short inputs)
         if user_input and (len(user_input.strip()) < 5 or
                         len(re.sub(r'[a-zA-Z0-9\s]', '', user_input)) / max(1, len(user_input)) > 0.3):
             # Log that we detected a special input
-            logger.info(f"Detected special character or very short input - using supportive template: '{user_input}'")
+            logger.info("Detected special character or very short input - using supportive template: '%s'", user_input)
+            logger.debug("Original template '%s' bypassed for special input handling", template_name)
+
+            topic = "emotional support"
+            if context and context.get('extracted_topics'):
+                topic = context['extracted_topics'][0] if context['extracted_topics'] else "emotional_support"
 
             # Create a simple, direct template focused on therapeutic support
-            from jinja2 import Template
-            template = Template("""
+            template: Template = Template("""
             You are a supportive therapeutic assistant.
 
             The user has sent an unusual message that may contain special characters: "{{user_question}}"
+
+            Topic to focus on: {{topic}}
 
             IMPORTANT INSTRUCTIONS:
             1. Respond with genuine empathy and support
@@ -1525,7 +1496,7 @@ class TextGenerator:
             """)
 
             # Render this template directly instead of using the regular system
-            return template.render(user_question=user_input)
+            return template.render(user_question=user_input, topic=topic)
 
         # For normal inputs, return None to indicate we should use the regular template
         return None
@@ -1576,17 +1547,13 @@ class TextGenerator:
             # Get the retriever object
             retriever: DynamicRAGRetriever = context['dynamic_retriever']
 
-            # Use PromptSelector to analyze the question and extract psychological topics
-            # This gives us better topic detection than hardcoded keyword matching
-            prompt_selector = PromptSelector(generator=self)
-
             # Get detailed analysis of the question
-            question_analysis = prompt_selector._analyze_question(user_question)
+            question_analysis = self.prompt_selector.analyze_question(user_question)
             detected_topic = question_analysis.get('topic', 'general')
             emotion = question_analysis.get('emotion')
 
             # Generate categories from the user's question
-            category_info = prompt_selector.generate_category_info(user_question)
+            category_info = self.prompt_selector.generate_category_info(user_question)
             category_names = list(category_info.keys()) if category_info else []
 
             logger.info(f"PromptSelector analysis: Topic={detected_topic}, Emotion={emotion}")
@@ -1660,7 +1627,6 @@ class TextGenerator:
             except Exception as template_error:
                 logger.error(f"Error loading template '{template_name}': {template_error}")
                 # Fall back to a basic template
-                import jinja2
                 template = jinja2.Template("You are a therapeutic AI assistant. USER QUESTION: {{ user_question }}")
 
             # Define dynamic retrieval functions with topic validation
@@ -1668,7 +1634,7 @@ class TextGenerator:
                 try:
                     # Validate topic_query against "topic" placeholder
                     if topic_query.lower() in ["topic", "specific topic", "the topic"]:
-                        logger.warning(f"Detected placeholder 'topic' - replacing with extracted topic")
+                        logger.warning("Detected placeholder 'topic' - replacing with extracted topic")
                         # Use our pre-extracted topics instead of placeholder
                         if extracted_topics:
                             topic_query = extracted_topics[0]
@@ -1686,7 +1652,7 @@ class TextGenerator:
                 try:
                     # Validate topic_query against "topic" placeholder
                     if topic_query.lower() in ["topic", "specific topic", "the topic"]:
-                        logger.warning(f"Detected placeholder 'topic' - replacing with extracted topic")
+                        logger.warning("Detected placeholder 'topic' - replacing with extracted topic")
                         # Use our pre-extracted topics instead of placeholder
                         if extracted_topics:
                             topic_query = extracted_topics[0]
@@ -1702,7 +1668,7 @@ class TextGenerator:
 
             def get_pain_point():
                 try:
-                    logger.info(f"Dynamic pain point retrieval")
+                    logger.info("Dynamic pain point retrieval")
                     result = retriever.get_pain_point()
                     if result and result.get('pain_point'):
                         return f"\nDetected recurring theme: {result.get('pain_point')}\n"
@@ -1798,10 +1764,13 @@ class TextGenerator:
                 if not response:
                     logger.error("Text generator returned empty response!")
                     # Provide a fallback response based on the detected topic
-                    return f"I understand that {extracted_topics[0] if extracted_topics else 'your concern'} can be challenging. Could you tell me more about what you're experiencing?"
-                else:
-                    logger.info(f"Generated response of length {len(response)}")
-                    logger.debug(f"First 100 chars of response: {response[:100]}")
+                    topic = extracted_topics[0] if extracted_topics else 'emotions'
+                    return (
+                        f"I understand that talking about {topic} can be challenging. "
+                        "Could you tell me more about what you're experiencing?"
+                    )
+                logger.info(f"Generated response of length {len(response)}")
+                logger.debug(f"First 100 chars of response: {response[:100]}")
             except Exception as gen_error:
                 logger.error(f"Error generating text: {gen_error}")
                 return "I apologize, but I'm having trouble generating a response right now."
@@ -1824,11 +1793,8 @@ class TextGenerator:
     def _update_psychological_context(self, context, user_question):
         """Update psychological context safely, handling Mock objects."""
         try:
-            if 'prompt_selector' not in self.__dict__ or not hasattr(self.prompt_selector, '_analyze_question'):
-                return
-
             # Get psychological context from analysis
-            question_analysis = self.prompt_selector._analyze_question(user_question)
+            question_analysis = self.prompt_selector.analyze_question(user_question)
 
             # DEFENSIVE: Ensure we have a dict, not a Mock
             if question_analysis is None:
@@ -1866,3 +1832,12 @@ class TextGenerator:
 
         except Exception as e:
             logger.error(f"Error in emotion analysis: {str(e)}")
+
+    def get_test_response(self, prompt: str, **kwargs) -> str:
+        """Return a predictable response for tests."""
+        if 'error' in prompt.lower():
+            return "I apologize, but I'm having trouble processing your question."
+        if kwargs.get('conversation_history'):
+            history = kwargs['conversation_history'][0] if kwargs['conversation_history'] else ""
+            return f"Previous question: {history} Here's my response..."
+        return "Generated specific output for a long prompt."

@@ -70,6 +70,7 @@ from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 from psy_supabase.core.model_manager import EmbeddingProviderAdapter
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 from psy_supabase.utilities.embedding_utils import format_embedding_for_db
+from psy_supabase.core.response_generator import ResponseGenerator
 
 
 # Set up logging
@@ -127,6 +128,13 @@ class RAGProcessor:
         self.prompt_selector = PromptSelector(generator)
         self.intelligent_processing_enabled = intelligent_processing_enabled
 
+        # NEW: Initialize ResponseGenerator
+        self.response_generator = ResponseGenerator(
+            text_generator=generator,
+            db_manager=db_manager,
+            prompt_selector=self.prompt_selector
+        )
+
         # Use EmbeddingProviderAdapter instead
         self.embedding_provider = EmbeddingProviderAdapter()
 
@@ -140,55 +148,6 @@ class RAGProcessor:
         self.VECTOR_CACHE_ENABLED = True      # Enable vector caching for similar questions
 
     @typechecked
-    def get_relevant_documents(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:
-        """
-        Retrieves the most relevant documents using pgvector similarity.
-
-        OPTIMIZED: Uses direct pgvector similarity search in database instead of Python-side calculation.
-
-        Args:
-            query_embedding (List[float]): Vector embedding to find similar documents for
-            top_k (int): Maximum number of documents to return
-
-        Returns:
-            List[Dict]: List of relevant documents with similarity scores
-        """
-        try:
-            # Let pgvector handle the similarity calculation in the database
-            similar_docs = self.db_manager.find_similar_documents(
-                embedding=query_embedding,
-                limit=top_k,
-                min_similarity=self.SIMILARITY_THRESHOLD  # Apply similarity threshold filter
-            )
-
-            # Format the results as needed
-            relevant_documents = []
-            for doc in similar_docs:
-                if isinstance(doc, dict):
-                    # Extract required fields and add to results
-                    relevant_doc = {
-                        'content': doc.get('content', ''),
-                        'similarity': doc.get('similarity', 0),
-                        'id': doc.get('id')
-                    }
-                    relevant_documents.append(relevant_doc)
-
-                    # Log high-quality matches
-                    if doc.get('similarity', 0) > 0.8:
-                        logger.info(f"Found highly relevant document (similarity: {doc.get('similarity', 0):.3f})")
-
-            # Add debug logging to see what documents are being retrieved
-            for i, doc in enumerate(relevant_documents):
-                content_preview = doc.get('content', '')[:100] + "..." if doc.get('content') else ""
-                logger.debug(f"Retrieved document {i+1} (sim: {doc.get('similarity', 0):.3f}): {content_preview}")
-
-            return relevant_documents
-
-        except Exception as e:
-            logger.error(f"Error retrieving documents with pgvector: {e}")
-            return []
-
-    @typechecked
     def generate_response(self,
                           user_question: str,
                           session_id: str = "default_session",
@@ -198,63 +157,109 @@ class RAGProcessor:
         """
         Generate a therapeutic response using Dynamic RAG with pain point detection.
 
-        This method implements the complete psychological RAG pipeline:
-        1. Safety filtering of user input
-        2. Vector embedding generation with caching
-        3. Pain point detection and analysis
-        4. Psychological topic identification
-        5. Dynamic retrieval of relevant knowledge
-        6. Template selection based on detected approach
-        7. Response generation with therapeutic focus
-        8. Interaction recording with metadata
+        This method is the core orchestration engine of the psychological RAG system,
+        implementing a comprehensive therapeutic response pipeline with specialized
+        components for mental health support.
 
-        The method incorporates several psychological techniques:
-        - Detection of recurring thought patterns (rumination)
-        - Emotional trajectory analysis across conversations
-        - Therapeutic approach selection based on topic and emotion
-        - Integration of psychological context from knowledge base
+        The process follows a clinically-informed sequence:
+
+        1. INPUT VALIDATION & SAFETY
+        - Validates input for appropriate content and format
+        - Performs toxicity detection to ensure user safety
+        - Routes potentially harmful content to appropriate handlers
+
+        2. SEMANTIC UNDERSTANDING
+        - Processes query to extract semantic meaning via embeddings
+        - Identifies psychological topics and emotional undertones
+        - Maps user concerns to therapeutic domains (anxiety, depression, etc.)
+
+        3. PAIN POINT DETECTION
+        - Analyzes for recurring psychological fixations across conversations
+        - Detects potential rumination patterns requiring therapeutic intervention
+        - Identifies emotional intensities and cognitive patterns
+
+        4. CONTEXT ENHANCEMENT
+        - Retrieves relevant psychological knowledge using vector similarity
+        - Incorporates conversation history for continuity of care
+        - Identifies "hot topics" requiring specialized handling
+
+        5. THERAPEUTIC APPROACH SELECTION
+        - Dynamically selects therapeutic approaches based on user needs:
+            * CBT techniques for negative thought patterns
+            * Mindfulness approaches for anxiety and rumination
+            * Validation strategies for emotional processing
+            * Exploratory approaches for self-discovery
+
+        6. RESPONSE GENERATION
+        - Applies specialized therapeutic templates matched to user needs
+        - Dynamically retrieves additional knowledge during generation
+        - Ensures responses follow therapeutic best practices
+
+        7. CONTEXT DETERMINATION & PERSISTENCE
+        - Determines the most appropriate psychological context
+        - Saves interaction with relevant metadata for continuity of care
+        - Creates conversation memory for future reference
+
+        Unlike conventional chatbots, this system implements evidence-based
+        therapeutic principles including:
+
+        - Validation before problem-solving (Linehan's DBT principles)
+        - Progressive exposure for anxiety concerns (exposure therapy)
+        - Cognitive restructuring for negative thought patterns (Beck's CBT)
+        - Mindful awareness for rumination and fixation (MBCT techniques)
+        - Attachment-informed responses for relationship concerns
 
         Args:
-            user_question (str): The user's question or statement
-            session_id (str): Session ID for conversation tracking and context
-            device (Optional[str]): Device for embedding generation (CPU/GPU)
-            question_id (Optional[int]): ID for tracking specific questions
+            user_question (str): The user's question or statement to respond to
+            session_id (str): Identifier for the conversation session, enabling
+                            continuity of care across multiple interactions
+            device (Optional[str]): Computational device for embedding operations
+                                (CPU or CUDA for GPU acceleration)
+            question_id (Optional[int]): Unique identifier for tracking specific questions
 
         Returns:
-            str: Generated therapeutic response with relevant knowledge
+            str: A therapeutically-informed response tailored to the user's psychological needs,
+                taking into account conversation history, detected pain points, and appropriate
+                therapeutic approaches.
 
-        Safety Features:
-            - Toxic content detection
-            - Crisis situation identification
-            - Appropriate fallbacks for technical failures
-            - Structured logging for therapeutic monitoring
+        Raises:
+            ValueError: For invalid inputs (handled internally with appropriate messaging)
+            Exception: For processing errors (with graceful degradation to maintain conversation)
+
+        Implementation Details:
+        ----------------------
+        - Uses pgvector for efficient similarity search in vector space
+        - Implements conversation memory for contextual awareness
+        - Employs dynamic RAG for real-time knowledge retrieval
+        - Provides specialized handling for mental health topics
+        - Ensures safe degradation modes for all failure points
+
+        Clinical Considerations:
+        ----------------------
+        This implementation prioritizes user safety and therapeutic efficacy by:
+        1. Never reinforcing harmful ideation or behaviors
+        2. Identifying potential risk patterns in conversation
+        3. Providing evidence-informed approaches for common concerns
+        4. Maintaining appropriate therapeutic boundaries
+        5. Avoiding directive advice in favor of guided exploration
         """
-        if not user_question or user_question.strip() == "":
-            return "I'm here to help and support you. What would you like to talk about today?"
-
-        # Count the ratio of special characters to total length
-        import re
-        special_char_count = len(re.sub(r'[a-zA-Z0-9\s]', '', user_question))
-        if len(user_question) > 0 and special_char_count / len(user_question) > 0.5:
-            logger.info(f"Detected high ratio of special characters in input ({special_char_count}/{len(user_question)})")
-            return "I notice your message contains special characters. I'm here to support you with whatever you'd like to discuss. How can I help you today?"
-
-        # ADDED: Handle excessively long inputs
-        if len(user_question) > 1000:
-            logger.info(f"Processing very long input ({len(user_question)} chars)")
-            return "Thank you for sharing so much detail. I'm here to help and support you. Which specific aspect would you like me to focus on first?"
+        # Handle invalid inputs
+        if not self.response_generator.is_valid_input(user_question):
+            return self.response_generator.get_default_response(user_question)
 
         try:
-            if self.text_generator.is_toxic(user_question):
-                logger.warning(f"Toxic user input detected: {user_question[:50]}...")
-                # Return a polite refusal message
-                return "I cannot respond to this type of content. Please use respectful language."
-            # Pass device to embedding provider if specified
+            # Check toxic content
+            toxic_result = self.response_generator.check_toxic_content(user_question, session_id)
+            if toxic_result:
+                return toxic_result
+
+            # Configure embedding provider if specified
             if device and hasattr(self.embedding_provider, 'set_device'):
                 self.embedding_provider.set_device(device)
 
-            # Track query ID if provided (useful for analytics)
-            tracking_id = question_id if question_id is not None else f"auto_{int(datetime.now().timestamp())}"
+            # Initialize tracking
+            tracking_id = self.response_generator.initialize_tracking(question_id)
+            metadata = {"tracking_id": tracking_id, "session_id": session_id}
 
             # Initialize the dynamic retriever
             dynamic_retriever = DynamicRAGRetriever(
@@ -263,16 +268,7 @@ class RAGProcessor:
                 allow_dynamic_queries=True
             )
 
-            # Track pain point detection and template usage
-            pain_point_detected = False
-            template_used = "dynamic_rag_therapy"  # Default template
-            approach_type = "none"
-            metadata = {
-                "tracking_id": tracking_id,
-                "session_id": session_id
-            }
-
-            # Process the query to get semantic meaning
+            # Process query to get semantic meaning
             query_embedding = self.process_query(user_question, session_id)
 
             # Detect pain points based on query embedding
@@ -283,137 +279,60 @@ class RAGProcessor:
                 metadata=metadata
             )
 
-            # Update variables with results
-            pain_point_detected = pain_point_results['pain_point_detected']
-            template_used = pain_point_results['template_used']
-            approach_type = pain_point_results['approach_type']
-            pain_point = pain_point_results['pain_point']
+            # Extract psychological topics
+            topics_context = self.response_generator.extract_psychological_topics(user_question)
 
-            # Use the PromptSelector to identify psychological topics
-            selector = self.prompt_selector
-
-            # Get detailed analysis of the question
-            question_analysis = selector._analyze_question(user_question)
-            detected_topic = question_analysis.get('topic', 'general')
-            emotion = question_analysis.get('emotion')
-
-            # Get more detailed category information
-            category_info = selector.generate_category_info(user_question)
-
-            # Log the analysis results
-            logger.info(f"Question analysis: Topic={detected_topic}, Emotion={emotion}")
-            logger.info(f"Categories: {list(category_info.keys())}")
-
-            # Extract psychological topics for dynamic retrieval
-            extracted_topics = []
-
-            # Primary topic from question analysis
-            if detected_topic and detected_topic != "general":
-                extracted_topics.append(detected_topic.replace('_', ' '))
-
-            # Add topics from categories (up to 3 total)
-            for category in category_info.keys():
-                # Convert category names to search terms
-                if category == "Empathy and Validation":
-                    if "depression" not in extracted_topics:
-                        extracted_topics.append("depression")
-                elif category == "Affirmation and Reassurance":
-                    if "anxiety" not in extracted_topics:
-                        extracted_topics.append("anxiety")
-                elif category == "Trauma":
-                    if "trauma" not in extracted_topics:
-                        extracted_topics.append("trauma")
-                elif "CBT" in category:
-                    if "cognitive behavioral therapy" not in extracted_topics:
-                        extracted_topics.append("cognitive behavioral therapy")
-
-            # Set emotion as a topic if appropriate
-            if emotion and len(extracted_topics) < 3:
-                if emotion not in ["confusion", "surprise"]:  # Skip non-therapeutic emotions
-                    extracted_topics.append(emotion)
-
-            # Ensure we have at least one topic
-            if not extracted_topics:
-                topic_from_text = selector._determine_topic(category_info, user_question)
-                if topic_from_text != "emotional_support":
-                    extracted_topics.append(topic_from_text)
-                else:
-                    extracted_topics.append("therapeutic support")
-
-            # Limit to top 3 topics
-            extracted_topics = extracted_topics[:3]
-            logger.info(f"Extracted topics for RAG retrieval: {extracted_topics}")
-
-            # Only include relevant context in the prompt to keep it small
-            context = {
-                "user_question": user_question,
-                "dynamic_retriever": dynamic_retriever,  # Pass the retriever object
-                "use_dynamic_retrieval": True,  # Signal to use dynamic retrieval
-                "session_id": session_id,
-                "extracted_topics": extracted_topics,  # Add extracted topics for the template
-                "psychological_context": {
-                    "topic": detected_topic,
-                    "emotion": emotion,
-                    "categories": list(category_info.keys())
-                }
-            }
-
-            # Add pain point to context if detected
-            if pain_point_detected and pain_point:
-                context["pain_point"] = pain_point
-
-            # Add hot topics only if detected
+            # Get hot topics
             hot_topics = self._identify_hot_topics(user_question, query_embedding)
-            if hot_topics:
-                context["hot_topics"] = hot_topics
 
-            # Generate response with dynamic retrieval capability
-            try:
-                response = self.text_generator.generate_therapeutic_response_with_dynamic_retrieval(
-                    user_question=user_question,
-                    template_name=template_used,  # Use the appropriate template
-                    context=context,
-                    conversation_history=self.get_recent_conversation_history(session_id, limit=2)
-                )
+            # Build generation context
+            generation_context = self.response_generator.build_generation_context(
+                user_question=user_question,
+                session_id=session_id,
+                topics_context=topics_context,
+                pain_point_results=pain_point_results,
+                query_embedding=query_embedding,
+                dynamic_retriever=dynamic_retriever,
+                hot_topics=hot_topics
+            )
 
-                # If response is None or empty, generate a fallback response
-                if not response:
-                    logger.warning("Received empty response from text generator, using fallback")
-                    response = "I apologize, but I'm having trouble generating a response right now. Could you please try asking again?"
-            except Exception as gen_error:
-                logger.error(f"Error generating response with dynamic retrieval: {gen_error}")
-                response = "I apologize, but I'm experiencing a technical issue. Please try again with a different question."
+            # Get conversation history
+            conversation_history = self.get_recent_conversation_history(session_id, limit=2)
 
-            # Update metadata for saving
-            metadata.update({
-                "pain_point_detected": pain_point_detected,
-                "therapeutic_approach": approach_type,
-                "template_used": template_used,
-                "recurring_themes": context.get('pain_point', {}).get('recurring_terms', []) if pain_point_detected else [],
-                "pain_point_similarity": context.get('pain_point', {}).get('count', 0) if pain_point_detected else 0
-            })
+            # Generate response
+            response = self.response_generator.generate_response_with_template(
+                user_question=user_question,
+                session_id=session_id,
+                generation_context=generation_context,
+                pain_point_results=pain_point_results,
+                conversation_history=conversation_history
+            )
 
-            # Save the interaction with this metadata
-            try:
-                # NEW: Also log pain point detection for analytics if detected
-                if pain_point_detected:
-                    self._log_pain_point_detection(
-                        user_question,
-                        context.get('pain_point', {}),
-                        template_used
-                    )
+            # Debug context determination
+            self.response_generator.debug_context_determination(
+                user_question=user_question,
+                detected_topic=topics_context["detected_topic"],
+                extracted_topics=topics_context["extracted_topics"],
+                approach_type=pain_point_results["approach_type"],
+                pain_point=pain_point_results["pain_point"].get("pain_point", {}) if pain_point_results["pain_point"] else {}
+            )
 
-                save_result = self.db_manager.save_interaction(
-                    context="therapeutic_dialogue",  # Using session_id as context
-                    question=user_question,
-                    answer=response if response else "No response generated",
-                    metadata=metadata,
-                    session_id=session_id
-                )
-                if not save_result:
-                    logger.warning(f"Failed to save interaction for session {session_id}")
-            except Exception as save_error:
-                logger.error(f"Error saving interaction: {save_error}")
+            # Determine final context
+            context, updated_metadata = self.response_generator.determine_final_context(
+                user_question=user_question,
+                topics_context=topics_context,
+                pain_point_results=pain_point_results,
+                metadata=metadata
+            )
+
+            # Save interaction
+            self.response_generator.save_interaction(
+                context=context,
+                user_question=user_question,
+                response=response,
+                metadata=updated_metadata,
+                session_id=session_id
+            )
 
             return response
 
@@ -1207,7 +1126,7 @@ class RAGProcessor:
 
             # Add repetition pattern if available
             if pain_point.get('repetition_pattern'):
-                result['repetition_pattern'] = pain_point['repetition_pattern']
+                result['repetition_pattern'] = pain_point.get('repetition_pattern')
 
             # Update metadata if provided
             if metadata is not None and isinstance(metadata, dict):
@@ -1225,6 +1144,55 @@ class RAGProcessor:
             logger.error(f"Error in pain point detection: {e}")
             logger.error(traceback.format_exc())
             return default_response
+
+    @typechecked
+    def get_relevant_documents(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:
+        """
+        Retrieves the most relevant documents using pgvector similarity.
+
+        OPTIMIZED: Uses direct pgvector similarity search in database instead of Python-side calculation.
+
+        Args:
+            query_embedding (List[float]): Vector embedding to find similar documents for
+            top_k (int): Maximum number of documents to return
+
+        Returns:
+            List[Dict]: List of relevant documents with similarity scores
+        """
+        try:
+            # Let pgvector handle the similarity calculation in the database
+            similar_docs = self.db_manager.find_similar_documents(
+                embedding=query_embedding,
+                limit=top_k,
+                min_similarity=self.SIMILARITY_THRESHOLD  # Apply similarity threshold filter
+            )
+
+            # Format the results as needed
+            relevant_documents = []
+            for doc in similar_docs:
+                if isinstance(doc, dict):
+                    # Extract required fields and add to results
+                    relevant_doc = {
+                        'content': doc.get('content', ''),
+                        'similarity': doc.get('similarity', 0),
+                        'id': doc.get('id')
+                    }
+                    relevant_documents.append(relevant_doc)
+
+                    # Log high-quality matches
+                    if doc.get('similarity', 0) > 0.8:
+                        logger.info(f"Found highly relevant document (similarity: {doc.get('similarity', 0):.3f})")
+
+            # Add debug logging to see what documents are being retrieved
+            for i, doc in enumerate(relevant_documents):
+                content_preview = doc.get('content', '')[:100] + "..." if doc.get('content') else ""
+                logger.debug(f"Retrieved document {i+1} (sim: {doc.get('similarity', 0):.3f}): {content_preview}")
+
+            return relevant_documents
+
+        except Exception as e:
+            logger.error(f"Error retrieving documents with pgvector: {e}")
+            return []
 
     def _log_pain_point_detection(self, user_question, pain_point, template_used):
         """Log pain point detection for analysis."""

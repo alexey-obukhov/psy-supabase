@@ -292,7 +292,7 @@ def load_enhanced_mental_health_taxonomy():
             "coping", "prevention", "life-threatening", "overwhelming"
         ],
 
-        "emotional_support": [
+        "emotional support": [
             "help", "support", "understand", "listen", "care", "concern"
         ],
     }

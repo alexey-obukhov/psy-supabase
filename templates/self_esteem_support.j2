@@ -14,7 +14,7 @@ USER'S CURRENT MESSAGE:
 "{{ user_question }}"
 
 {% if enhanced_context.psychological_context and enhanced_context.psychological_context.emotional_signals %}
-DETECTED EMOTIONAL SIGNALS: 
+DETECTED EMOTIONAL SIGNALS:
 {{ enhanced_context.psychological_context.emotional_signals|join(", ") }}
 {% endif %}
 

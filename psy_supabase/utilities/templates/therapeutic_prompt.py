@@ -79,14 +79,14 @@ Implementation Notes:
 
 Usage:
     from psy-supabase.utilities.templates.therapeutic_prompt import prompt_templates
-    
+
     # Basic usage
     template_name = "Empathy and Validation"
     formatted_prompt = prompt_templates[template_name].format(
         question=user_question,
         topic="anxiety"
     )
-    
+
     # Advanced usage with the prompt selector
     template_name, enhanced_context = prompt_selector.select_prompt_template(user_question)
     formatted_prompt = prompt_templates[template_name].format(

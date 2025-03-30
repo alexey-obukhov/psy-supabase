@@ -1,3 +1,38 @@
+"""
+embedding_utils.py
+
+This module provides utility functions for formatting embedding vectors to be compatible with PostgreSQL's 
+pgvector extension. These functions ensure that embeddings, which may come in various formats (e.g., lists, 
+numpy arrays, PyTorch tensors), are properly converted into the string format required for storage and retrieval 
+in a PostgreSQL database.
+
+Key Features:
+- Handles embeddings in different formats (lists, numpy arrays, PyTorch tensors).
+- Converts embeddings into a compact, space-free string format compatible with pgvector.
+- Ensures consistency and compatibility for database operations involving vector embeddings.
+
+Functions:
+- format_embedding_for_db_obs(embedding): Formats an embedding vector for PostgreSQL pgvector.
+- format_embedding_for_db(embedding): Formats an embedding vector into a compact string for pgvector.
+
+Usage:
+    from psy_supabase.utilities.embedding_utils import format_embedding_for_db
+
+    # Example embedding (list format)
+    embedding = [0.1, 0.2, 0.3]
+
+    # Format the embedding for PostgreSQL
+    formatted_embedding = format_embedding_for_db(embedding)
+    print(formatted_embedding)  # Output: [0.1,0.2,0.3]
+
+    # Example embedding (numpy array)
+    import numpy as np
+    embedding_np = np.array([0.1, 0.2, 0.3])
+
+    # Format the numpy embedding
+    formatted_embedding_np = format_embedding_for_db(embedding_np)
+    print(formatted_embedding_np)  # Output: [0.1,0.2,0.3]
+"""
 def format_embedding_for_db_obs(embedding):
     """
     Format an embedding vector for PostgreSQL pgvector.
