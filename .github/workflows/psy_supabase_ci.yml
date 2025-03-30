@@ -60,30 +60,21 @@ jobs:
         echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
         echo "USER_ID=${{ secrets.USER_ID }}" >> $GITHUB_ENV
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pylint
-    - name: Run linting
-      continue-on-error: true
-      run: |
-        # Run pylint with config file from root directory
-        pylint --rcfile=.pylintrc $(git ls-files '*.py')
+    # - name: Install dependencies
+    #   run: |
+    #     python -m pip install --upgrade pip
+    #     pip install pylint
+    # - name: Run linting
+    #   continue-on-error: true
+    #   run: |
+    #     # Run pylint with config file from root directory
+    #     pylint --rcfile=.pylintrc $(git ls-files '*.py')
 
-    - name: Pytest dependencies
+    - name: Test with pytest
       run: |
-        # Install pytest dependencies explicitly
+        pip install pytest pytest-cov
         pip install exceptiongroup pluggy
-
-    - name: Run tests
-      continue-on-error: true
-      run: |
-        # Run tests and continue regardless of result
-        python -m pytest -v
-
-        # Create test reports for later analysis
-        mkdir -p test-reports
-        pytest -v --junitxml=test-reports/junit.xml || true
+        pytest tests.py --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
 
     - name: Build package
       run: |
