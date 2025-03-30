@@ -68,7 +68,7 @@ jobs:
       continue-on-error: true
       run: |
         # Run pylint with config file from root directory
-        pylint --rcfile=.pylintrc $(git ls-files '*.py') || echo "Linting had issues, but continuing"
+        pylint --rcfile=.pylintrc $(git ls-files '*.py')
 
     - name: Pytest dependencies
       run: |
@@ -79,7 +79,7 @@ jobs:
       continue-on-error: true
       run: |
         # Run tests and continue regardless of result
-        python -m pytest -v || echo "Tests failed but continuing workflow"
+        python -m pytest -v
 
         # Create test reports for later analysis
         mkdir -p test-reports
