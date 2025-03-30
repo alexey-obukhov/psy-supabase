@@ -1,20 +1,26 @@
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.core.database import DatabaseManager
+from psy_supabase.utilities.common import is_github_actions
 import logging
 import os
-from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+if not is_github_actions():
+    from dotenv import load_dotenv
+    load_dotenv()  # Load environment variables from .env file
+    logger.info("Local development: Loading environment from .env file")
+else:
+    logger.info("CI environment: Using GitHub secrets")
+
 def main():
     """Run a health check on the main components."""
     try:
         logger.info("Starting health check...")
-        load_dotenv()  # Load environment variables
 
         # Initialize with minimal dependencies for testing
         logger.info("Initializing text generator...")
