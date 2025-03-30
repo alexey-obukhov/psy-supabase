@@ -74,7 +74,7 @@ jobs:
       run: |
         pip install pytest pytest-cov
         pip install exceptiongroup pluggy
-        python -m pytest tests/ --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
+        python -m pytest tests/ --doctest-modules --junitxml=junit/test-results.xml --cov=psy_supabase --cov-report=xml --cov-report=html
 
     - name: Build package
       run: |
