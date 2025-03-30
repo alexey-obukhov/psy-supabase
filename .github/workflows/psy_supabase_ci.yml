@@ -239,6 +239,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/psy-supabase-pkg'  # Only deploy on your main branch
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
