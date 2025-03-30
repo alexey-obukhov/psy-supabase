@@ -26,32 +26,49 @@ jobs:
 
     - name: Setup NLP environment
       run: |
-        pip install nltk spacy text2emotion
+        # Install packages based on Python version
+        if [[ "${{ matrix.python-version }}" == "3.8" ]]; then
+          # For Python 3.8 - use older compatible versions
+          pip install nltk==3.8.1
+          pip install numpy==1.24.4  # Force install compatible numpy first
+          pip install --no-build-isolation --only-binary=:all: spacy==3.5.4
+          pip install text2emotion==0.0.5
+        else
+          # For Python 3.10+ - use newer versions
+          pip install nltk spacy text2emotion
+        fi
+        
+        # Download required models
         python -c "import spacy; spacy.cli.download('en_core_web_sm')"
         python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
 
     - name: Install dependencies (consolidated)
       run: |
-          # Set up pip with proper cache
-          python -m pip install --upgrade pip wheel setuptools
+        # Set up pip with proper cache
+        python -m pip install --upgrade pip wheel setuptools
 
-          # CRITICAL FIX: Force install numpy<2.0.0 first to prevent version conflicts
+        if [[ "${{ matrix.python-version }}" == "3.8" ]]; then
+          # For Python 3.8 - stricter constraints
+          pip install numpy==1.22.4  # Known compatible version for Python 3.8
+        else
+          # For Python 3.10 - more flexibility
           pip install numpy==1.24.4
+        fi
 
-          # Install pre-built spaCy wheel to avoid compilation issues
-          pip install --no-build-isolation --only-binary=:all: spacy==3.6.1
+        # Install pre-built spaCy wheel to avoid compilation issues
+        pip install --no-build-isolation --only-binary=:all: spacy==3.6.1
 
-          # Install remaining dependencies with constraints
-          pip install python-dotenv
+        # Install remaining dependencies with constraints
+        pip install python-dotenv
 
-          # Install remaining requirements, but skip already installed packages
-          pip install -r requirements.txt
+        # Install remaining requirements, but skip already installed packages
+        pip install -r requirements.txt
 
-          # Install school-logging explicitly
-          pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
+        # Install school-logging explicitly
+        pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
 
-          # Install your package in development mode
-          pip install -e .
+        # Install your package in development mode
+        pip install -e .
 
     - name: Setup Supabase environment
       run: |
