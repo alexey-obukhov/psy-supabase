@@ -77,7 +77,6 @@ from school_logging.log import ColoredLogger
 from psy_supabase.utilities.common import is_github_actions, get_project_root, get_models_dir, ensure_dir_exists, load_toxicity_model
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
-from psy_supabase.utilities.prompt_selector import PromptSelector
 
 if TYPE_CHECKING:
     from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
@@ -177,6 +176,7 @@ class TextGenerator:
         self._load_model()
 
         # Initialize the prompt selector
+        from psy_supabase.utilities.prompt_selector import PromptSelector
         self.prompt_selector = PromptSelector(generator=self)
 
         # Set cache directory for Detoxify to use our models directory

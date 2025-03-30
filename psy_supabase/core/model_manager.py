@@ -10,7 +10,7 @@ The module also includes utility functions and adapter classes for compatibility
 import gc
 import os
 import traceback
-from typing import List, Optional, Dict, ClassVar
+from typing import List, Optional, Dict, ClassVar, TYPE_CHECKING
 from typeguard import typechecked
 import torch
 import torch.cuda
@@ -18,7 +18,10 @@ from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from school_logging.log import ColoredLogger
 from psy_supabase.utilities.common import get_models_dir, load_toxicity_model as common_load_toxicity_model
-from psy_supabase.core.text_generator import TextGenerator
+
+# Use conditional imports to break the cycle
+if TYPE_CHECKING:
+    from psy_supabase.core.text_generator import TextGenerator
 
 # Create a model manager class to handle loading/unloading
 class ModelManager:
@@ -376,7 +379,6 @@ def get_model_manager(model_name: str = "microsoft/phi-1_5", device: Optional[st
     return ModelManager.get_instance(model_name, device, quantize)
 
 
-# Adapter class for compatibility with ai_providers.py interface
 class EmbeddingProviderAdapter:
     """
     EmbeddingProviderAdapter Class
@@ -385,64 +387,104 @@ class EmbeddingProviderAdapter:
     It is compatible with the `ai_providers.py` interface and supports batch embedding generation.
     """
 
-    def __init__(self, model_name: str = "microsoft/phi-1_5", quantize: bool = False):
-        """
-        Initialize the EmbeddingProviderAdapter.
-
-        Args:
-            model_name: Name of the model to use for embedding generation
-            quantize: Whether to use quantization for the model
-        """
+    def __init__(self, provider_type: str = "local", model_name: str = "microsoft/phi-1_5"):
+        """Initialize the embedding provider."""
+        self.provider_type = provider_type
         self.model_name = model_name
-        self.manager = get_model_manager(model_name, quantize=quantize)
+        self.logger = ColoredLogger(__name__)
 
-    def generate_embedding(self, text: str) -> Optional[List[float]]:
+    def get_embedding_dimension(self) -> int:
         """
-        Generate embedding for a single text.
-
-        Args:
-            text: Text to generate embedding for
+        Return the dimension of embeddings based on the model.
 
         Returns:
-            List of floats representing the embedding vector
+            The embedding dimension (2048 for phi-1.5, 768 for facebook models)
         """
-        return self.manager.generate_embedding(text)
+        if "phi" in self.model_name.lower():
+            return 2048  # For phi-1.5
+        elif "facebook" in self.model_name.lower() or "fb" in self.model_name.lower():
+            return 768  # For Facebook models
+        else:
+            # Default for other models
+            return 1536
 
-    def batch_generate_embeddings(self, texts: List[str]) -> List[Optional[List[float]]]:
+    def generate_embedding(self, text: str) -> List[float]:
         """
-        Generate embeddings for a batch of texts.
+        Generate an embedding for the given text.
+        Uses ModelManager to leverage existing functionality.
 
         Args:
-            texts: List of texts to generate embeddings for
+            text: Text to embed
+
+        Returns:
+            List of floats representing the embedding
+        """
+        if not text or not text.strip():
+            return [0.0] * self.get_embedding_dimension()
+
+        try:
+            # Use the existing ModelManager directly - no circular import needed
+            model_manager = get_model_manager(self.model_name)
+
+            # Generate embedding using existing functionality
+            embedding = model_manager.generate_embedding(text)
+
+            # If embedding failed, use fallback
+            if embedding is None:
+                embedding = model_manager._generate_embedding_with_sentence_transformer(text)
+
+            # If still None, return zeros
+            if embedding is None:
+                self.logger.warning("Embedding generation failed, returning zeros")
+                return [0.0] * self.get_embedding_dimension()
+
+            return embedding
+
+        except Exception as e:
+            self.logger.error(f"Error generating embedding: {e}")
+            return [0.0] * self.get_embedding_dimension()
+
+    def _initialize_provider(self):
+        """
+        Initialize the provider instance.
+        
+        This method is kept for backward compatibility, but the actual initialization
+        is now handled directly in the generate_embedding method.
+        """
+        if self.provider_type == "local":
+            try:
+                # Use the existing model manager directly - no circular import needed
+                self._provider = get_model_manager(self.model_name)
+                self.logger.info(f"Initialized local embedding provider with model: {self.model_name}")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize embedding provider: {e}")
+        else:
+            # For other provider types
+            self.logger.warning(f"Provider type {self.provider_type} initialization not implemented")
+            self._provider = None
+
+    def batch_generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """
+        Generate embeddings for multiple texts.
+        
+        Args:
+            texts: List of texts to embed
 
         Returns:
             List of embedding vectors
         """
-        return self.manager.batch_generate_embeddings(texts)
+        if not texts:
+            return []
 
-    def get_embedding_dimension(self) -> int:
-        """
-        Get the dimension of embeddings produced by this adapter.
+        try:
+            # Get the model manager
+            model_manager = get_model_manager(self.model_name)
 
-        Returns:
-            Integer representing the embedding dimension
-        """
-        if "microsoft/phi-1_5" in self.model_name:
-            return 2048
-        return 768  # Default dimension for other models
-
-    def set_device(self, device: Optional[str]) -> None:
-        """
-        Set the device for the embedding provider.
-
-        Args:
-            device: Device to use (cuda or cpu)
-        """
-        if device is not None and self.manager:
-            self.manager.preferred_device = device
-            # If we have a sentence transformer, update its device too
-            if hasattr(self.manager, 'sentence_transformer') and self.manager.sentence_transformer is not None:
-                self.manager.sentence_transformer = self.manager.sentence_transformer.to(device)
+            # Use the batch function
+            return model_manager.batch_generate_embeddings(texts) or [[0.0] * self.get_embedding_dimension() for _ in texts]
+        except Exception as e:
+            self.logger.error(f"Error in batch embedding: {e}")
+            return [[0.0] * self.get_embedding_dimension() for _ in texts]
 
 
 @typechecked
