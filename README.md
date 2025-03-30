@@ -1,14 +1,14 @@
 # Psy Supabase
 
-[![PsySupabase CI](https://github.com/vertok/psy_supabase/actions/workflows/psy_supabase_ci.yml/badge.svg)](https://github.com/vertok/psy_supabase/actions/workflows/psy_supabase_ci.yml)
+[![PsySupabase CI](https://github.com/alexey-obukhov/psy-supabase/actions/workflows/psy_supabase_ci.yml/badge.svg)](https://github.com/alexey-obukhov/psy-supabase/actions/workflows/psy_supabase_ci.yml)
 [![Python 3.8 | 3.10](https://img.shields.io/badge/python-3.8%20%7C%203.10-blue)](https://www.python.org/downloads/)
 
 ## Code Quality Metrics
 
 | Python Version | PyLint Score | Test Coverage |
 |----------------|--------------|---------------|
-| Python 3.8     | ![PyLint 3.8](https://vertok.github.io/psy_supabase/badges/pylint-py3.8.svg) | ![Coverage 3.8](https://vertok.github.io/psy_supabase/badges/coverage-py3.8.svg) |
-| Python 3.10    | ![PyLint 3.10](https://vertok.github.io/psy_supabase/badges/pylint-py3.10.svg) | ![Coverage 3.10](https://vertok.github.io/psy_supabase/badges/coverage-py3.10.svg) |
+| Python 3.8 | [![PyLint 3.8](https://alexey-obukhov.github.io/psy-supabase/badges/pylint-py3.8.svg)](https://github.com/alexey-obukhov/psy-supabase/blob/psy-supabase-pkg/reports/pylint-report.txt) | [![Coverage 3.8](https://alexey-obukhov.github.io/psy-supabase/badges/coverage-py3.8.svg)](https://github.com/alexey-obukhov/psy-supabase/blob/psy-supabase-pkg/coverage.xml) |
+| Python 3.10 | [![PyLint 3.10](https://alexey-obukhov.github.io/psy-supabase/badges/pylint-py3.10.svg)](https://github.com/alexey-obukhov/psy-supabase/blob/psy-supabase-pkg/reports/pylint-report.txt) | [![Coverage 3.10](https://alexey-obukhov.github.io/psy-supabase/badges/coverage-py3.10.svg)](https://github.com/alexey-obukhov/psy-supabase/blob/psy-supabase-pkg/coverage.xml) |
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
