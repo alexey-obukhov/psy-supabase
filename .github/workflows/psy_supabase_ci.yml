@@ -37,7 +37,7 @@ jobs:
           # For Python 3.10+ - use newer versions
           pip install nltk spacy text2emotion
         fi
-        
+
         # Download required models
         python -c "import spacy; spacy.cli.download('en_core_web_sm')"
         python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
@@ -108,10 +108,10 @@ jobs:
         import os
         import sys
         import transformers.utils.hub
-        
+
         # Store original method
         original_cached_file = transformers.utils.hub.cached_file
-        
+
         # Define patched method
         def patched_cached_file(*args, **kwargs):
             try:
@@ -121,16 +121,16 @@ jobs:
                     print(f'Creating mock data for {args[0]}')
                     return {'model_type': 'roberta', 'hidden_size': 768}
                 raise e
-        
+
         # Apply patch immediately
         transformers.utils.hub.cached_file = patched_cached_file
         print('Successfully patched transformers.utils.hub.cached_file')
         " || echo "Failed to patch transformers"
-        
+
         # Mock specific models
         mkdir -p ~/.cache/huggingface/hub/models--facebook--roberta-hate-speech-dynabench-r4-target/snapshots/main
         mkdir -p ~/.cache/huggingface/hub/models--albert-base-v2/snapshots/main
-        
+
         # Create mock config files for commonly used models
         for model_path in ~/.cache/huggingface/hub/models--*-*/snapshots/main; do
           echo "Creating mock config for $model_path"
@@ -168,14 +168,119 @@ jobs:
           htmlcov/
           coverage.xml
 
+    - name: Create reports directory
+      run: mkdir -p reports
+
+    - name: Generate coverage badge
+      run: |
+        COVERAGE=$(python -c "import xml.etree.ElementTree as ET; print(ET.parse('coverage.xml').getroot().attrib['line-rate'])")
+        COVERAGE_PCT=$(python -c "print(round(float('$COVERAGE') * 100, 2))")
+        echo "COVERAGE_PCT=$COVERAGE_PCT" >> $GITHUB_ENV
+        echo "## Test Coverage: $COVERAGE_PCT%" >> $GITHUB_STEP_SUMMARY
+        # Create a badge JSON file for shields.io
+        COLOR=$(python -c "coverage = float('$COVERAGE_PCT'); print('red' if coverage < 50 else 'yellow' if coverage < 80 else 'green')")
+        echo "{\"schemaVersion\": 1, \"label\": \"coverage\", \"message\": \"$COVERAGE_PCT%\", \"color\": \"$COLOR\"}" > reports/coverage-badge.json
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-${{ matrix.python-version }}-${{ github.run_id }}
+        path: reports/coverage-badge.json
+
+    - name: Run pylint
+      continue-on-error: true
+      run: |
+        pip install pylint
+        pylint psy_supabase --output-format=text > reports/pylint-report.txt || true
+        PYLINT_SCORE=$(sed -n 's/^Your code has been rated at \([-0-9.]*\)\/.*/\1/p' reports/pylint-report.txt)
+        echo "PYLINT_SCORE=$PYLINT_SCORE" >> $GITHUB_ENV
+        echo "## PyLint Score: $PYLINT_SCORE/10" >> $GITHUB_STEP_SUMMARY
+        # Create a badge JSON file for shields.io
+        echo "{\"schemaVersion\": 1, \"label\": \"pylint-py${{ matrix.python-version }}\", \"message\": \"$PYLINT_SCORE/10\", \"color\": \"blue\"}" > reports/pylint-badge.json
+
+    # Generate pylint badge SVG with Python version in filename
+    - name: Generate pylint badge SVG
+      run: |
+        pip install anybadge
+        PYLINT_SCORE="${PYLINT_SCORE:-0.0}"
+        PYLINT_SCORE=$(echo "$PYLINT_SCORE" | sed -E 's/^[[:space:]]*$|^$/0.0/')
+        anybadge --label="pylint-py${{ matrix.python-version }}" --value=$PYLINT_SCORE --file=reports/pylint-py${{ matrix.python-version }}.svg --suffix=/10 3=red 5=orange 8=yellow 10=green
+
+    # Generate coverage badge SVG with Python version in filename
+    - name: Generate coverage badge SVG
+      run: |
+        pip install anybadge
+        COVERAGE_PCT="${COVERAGE_PCT:-0.0}"
+        COVERAGE_PCT=$(echo "$COVERAGE_PCT" | sed -E 's/^[[:space:]]*$|^$/0.0/')
+        anybadge --label="coverage-py${{ matrix.python-version }}" --value=$COVERAGE_PCT --file=reports/coverage-py${{ matrix.python-version }}.svg --suffix=% 50=red 60=orange 80=yellow 100=green
+
+    # Upload badge artifacts with Python version in artifact name
+    - name: Upload badge artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: badges-py${{ matrix.python-version }}-${{ github.sha }}
+        path: |
+          reports/pylint-py${{ matrix.python-version }}.svg
+          reports/coverage-py${{ matrix.python-version }}.svg
+
     - name: Build package
       run: |
         pip install build
         python -m build
 
     - name: Store build artifacts
-      uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392  # v4.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: dist-${{ matrix.python-version }}
         path: dist/
         retention-days: 7
+
+  deploy-badges:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/psy-supabase-pkg'  # Only deploy on your main branch
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create badge directory
+        run: mkdir -p badges
+
+      - name: Download Python 3.8 badges
+        uses: actions/download-artifact@v4
+        with:
+          name: badges-py3.8-${{ github.sha }}
+          path: badges
+
+      - name: Download Python 3.10 badges
+        uses: actions/download-artifact@v4
+        with:
+          name: badges-py3.10-${{ github.sha }}
+          path: badges
+
+      - name: Create badge README
+        run: |
+          cat > badges/README.md << EOF
+          # Code Quality Badges
+
+          These badges show code quality metrics for the psy_supabase project.
+
+          ## Badges
+          - pylint-py3.8.svg: PyLint score for Python 3.8
+          - coverage-py3.8.svg: Test coverage for Python 3.8
+          - pylint-py3.10.svg: PyLint score for Python 3.10
+          - coverage-py3.10.svg: Test coverage for Python 3.10
+
+          Last updated: $(date -u "+%Y-%m-%d %H:%M:%S UTC")
+          EOF
+
+      - name: Display structure of downloaded files
+        run: ls -la badges/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./badges
+          destination_dir: badges
+          keep_files: true
