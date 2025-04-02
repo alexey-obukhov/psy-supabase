@@ -20,8 +20,7 @@ from school_logging.log import ColoredLogger
 from psy_supabase.utilities.common import get_models_dir, load_toxicity_model as common_load_toxicity_model
 
 # Use conditional imports to break the cycle
-if TYPE_CHECKING:
-    from psy_supabase.core.text_generator import TextGenerator
+from psy_supabase.core.text_generator import TextGenerator
 
 # Create a model manager class to handle loading/unloading
 class ModelManager:
@@ -447,7 +446,7 @@ class EmbeddingProviderAdapter:
     def _initialize_provider(self):
         """
         Initialize the provider instance.
-        
+
         This method is kept for backward compatibility, but the actual initialization
         is now handled directly in the generate_embedding method.
         """
@@ -466,7 +465,7 @@ class EmbeddingProviderAdapter:
     def batch_generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for multiple texts.
-        
+
         Args:
             texts: List of texts to embed
 

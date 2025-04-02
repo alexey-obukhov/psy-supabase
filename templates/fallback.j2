@@ -24,7 +24,7 @@ Assistant: {{ exchange.answer }}
 USER'S CURRENT MESSAGE:
 {{ user_question }}
 <|assistant|>
-I understand what you're sharing about {{ extracted_topics[0] if extracted_topics else "your situation" }}. 
+I understand what you're sharing about {{ extracted_topics[0] if extracted_topics else "your situation" }}.
 
 {% if psychological_context and psychological_context.emotion %}
 It sounds like you might be feeling {{ psychological_context.emotion }}. That's completely understandable given what you're experiencing.

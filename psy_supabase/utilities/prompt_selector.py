@@ -1,8 +1,8 @@
 """
 prompt_selector.py
 
-This module implements the `PromptSelector` class, which is responsible for selecting the most appropriate 
-therapeutic prompt template based on user input. It uses semantic matching, keyword associations, and 
+This module implements the `PromptSelector` class, which is responsible for selecting the most appropriate
+therapeutic prompt template based on user input. It uses semantic matching, keyword associations, and
 natural language processing (NLP) techniques to analyze user queries and determine the best response strategy.
 
 Key Features:
@@ -24,7 +24,7 @@ Key Features:
   - Evaluates the quality of AI-generated responses based on length, term overlap, and adherence to the selected prompt template.
 
 Classes:
-- `PromptSelector`: The main class that provides methods for analyzing user input, selecting prompt templates, 
+- `PromptSelector`: The main class that provides methods for analyzing user input, selecting prompt templates,
   and refining therapeutic categories.
 
 Dependencies:

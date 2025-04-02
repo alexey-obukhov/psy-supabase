@@ -564,6 +564,8 @@ class TestRAGProcessor:
         assert len(result) == 2
         assert result[0]['question'] == 'Second question'
         assert result[1]['question'] == 'Third question'
+        assert result[1]['metadata']['topic'] == 'stress'
+        assert result[1]['timestamp'] == '2023-01-01T12:10:00'
 
         # Verify database call
         rag_processor.db_manager.get_conversation_history.assert_called_once_with(session_id)
@@ -583,8 +585,8 @@ class TestRAGProcessor:
             rag_processor.db_manager.find_similar_documents_via_rpc.return_value = similar_docs
 
             conversation_history = [
-                {'questionText': 'What is anxiety?', 'answerText': 'Anxiety is...'},
-                {'questionText': 'Why do I feel anxious?', 'answerText': 'Many factors...'}
+                {'question': 'What is anxiety?', 'answer': 'Anxiety is...'},
+                {'question': 'Why do I feel anxious?', 'answer': 'Many factors...'}
             ]
             rag_processor.db_manager.get_conversation_history.return_value = conversation_history
 

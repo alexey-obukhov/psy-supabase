@@ -1,8 +1,8 @@
 """
 database.py
 
-This module implements the `DatabaseManager` class, which provides a comprehensive interface for interacting 
-with a Supabase database in the context of psychological AI applications. It supports operations such as 
+This module implements the `DatabaseManager` class, which provides a comprehensive interface for interacting
+with a Supabase database in the context of psychological AI applications. It supports operations such as
 schema management, interaction tracking, vector embedding storage, and retrieval of knowledge and conversation history.
 
 Key Features:
@@ -28,7 +28,7 @@ Key Features:
   - Optimize vector indexes and enrich interactions with embeddings.
 
 Classes:
-- `DatabaseManager`: The main class that provides methods for schema management, interaction tracking, 
+- `DatabaseManager`: The main class that provides methods for schema management, interaction tracking,
   knowledge base operations, and psychological analysis.
 
 Dependencies:
@@ -62,11 +62,10 @@ Usage:
     themes = db_manager.extract_psychological_themes(session_id="session_123")
 """
 from supabase import create_client
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional, Any
 import json
 import re
 import traceback
-import numpy as np
 from typeguard import typechecked
 from datetime import datetime
 
@@ -121,107 +120,148 @@ class DatabaseManager:
             return False
 
     def get_conversation_history(self, session_id: str) -> List[Dict]:
-        """Retrieves conversation history for a specific session."""
-        try:
-            # Call the SQL function via RPC
-            response = self.supabase.rpc('get_conversation_history', {
-                'p_schema_name': self.schema_name,
-                'p_session_id': session_id
-            }).execute()
+        """
+        Retrieve conversation history for a specific session.
 
-            # Check if the response contains data
-            if response.data:
-                # Transform the data to have the expected field names
-                transformed_data = []
-                for item in response.data:
-                    transformed_item = {
-                        'interactionID': item.get('interactionid'),
-                        'questionText': self.clean_db_text(item.get('question')),  # in db it is question
-                        'answerText': self.clean_db_text(item.get('answer')),      # in db it is answer
-                        'context': self.clean_db_text(item.get('context')),
-                        'metadata': item.get('metadata'),
-                        'created_at': item.get('created_at')
-                    }
-                    transformed_data.append(transformed_item)
-                return transformed_data
-            else:
-                logger.info(f"No conversation history found for session: {session_id}")
+        Args:
+            session_id: The session ID to fetch history for
+
+        Returns:
+            List of interaction dictionaries
+        """
+        try:
+            if not session_id:
+                logger.warning("No session_id provided to get_conversation_history")
                 return []
+
+            # Log for debugging
+            logger.debug(f"Retrieving conversation history for session: {session_id}")
+
+            response = self.supabase.rpc(
+                'get_conversation_history',
+                {'p_schema_name': self.schema_name, 'p_session_id': session_id}
+            ).execute()
+            if response.data is None:
+                logger.error("No data returned from get_conversation_history")
+                return []
+            # Process the results - handle different response formats
+            result = []
+            for item in response.data:
+                if isinstance(item, dict):
+                    interaction_id = item['interaction_id']
+                    question = item.get('question', '')
+                    answer = item.get('answer', '')
+                    context = item.get('context', '')
+                    metadata = item.get('metadata', {})
+                    created_at = item.get('created_at')
+                    item_session_id = item.get('session_id', session_id)
+
+                    # Create standardized response
+                    transformed_item = {
+                        'interaction_id': interaction_id,
+                        'question': self.clean_db_text(question),
+                        'answer': self.clean_db_text(answer),
+                        'context': self.clean_db_text(context),
+                        'metadata': metadata,
+                        'session_id': item_session_id,
+                        'created_at': created_at
+                    }
+                    result.append(transformed_item)
+
+            logger.debug(f"Found {len(result)} interactions for session {session_id}")
+            return result
+
         except Exception as e:
-            # Log the error with additional context
-            logger.error(f"Error fetching conversation history for session {session_id}: {e}")
+            logger.error(f"Error retrieving conversation history: {e}")
+            logger.error(traceback.format_exc())
             return []
 
-    def add_interaction(self, data_point, session_id: Optional[str] = None):
-        """Adds an interaction to the database."""
+    @typechecked
+    def add_interaction(self,
+                        data_point: Dict[str, Any],
+                        session_id: Optional[str] = None
+                        ) -> Dict[str, Any]:
+        """
+        Add an interaction to the databases interactions table.
+
+        Args:
+            data_point: Dictionary containing interaction data
+            session_id: Optional session identifier
+
+        Returns:
+            Dictionary with operation result
+        """
         try:
-            # Make sure schema exists first
-            self.create_user_schema_sync()
+            question = data_point.get('question', '')
+            answer = data_point.get('answer', '')
+            context = data_point.get('context', '')
+            metadata = data_point.get('metadata', {})
 
-            # Handle metadata properly
-            if isinstance(data_point.get('metadata'), dict):
-                metadata = data_point.get('metadata')  # Keep it as a dict
-            elif isinstance(data_point.get('metadata'), str):
-                metadata = json.loads(data_point.get('metadata'))  # Parse JSON string to dict
-            else:
-                metadata = {}
+            # Ensure metadata is a dictionary
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except:
+                    metadata = {"raw_metadata": metadata}
 
-            # Add session_id to metadata if provided
+            # Add the session_id to metadata for backward compatibility
             if session_id:
                 metadata['session_id'] = session_id
 
-            # Clean and escape the values
-            context = clean_text(data_point.get('context', ''))
-            question = clean_text(data_point.get('question', ''))
-            answer = clean_text(data_point.get('answer', ''))
+            # Log the exact data being inserted for debugging
+            logger.debug(f"Adding interaction with data: {question[:30]}..., session_id: {session_id}")
 
-            # Log what we're trying to do
-            logger.debug(f"Adding interaction to schema: {self.schema_name}")
+            # Bypass RPC completely - use direct table insertion
+            insert_data = {
+                'question': question,
+                'answer': answer,
+                'context': context,
+                'metadata': metadata
+            }
 
-            try:
-                # Try using RPC function first - this is more reliable
-                response = self.supabase.rpc('add_interaction', {
-                    'p_schema_name': self.schema_name,
-                    'p_context': context,
-                    'p_question': question,
-                    'p_answer': answer,
-                    'p_metadata': json.dumps(metadata)  # Convert dict back to JSON string for the RPC call
-                }).execute()
+            # Include session_id if provided
+            if session_id:
+                insert_data['session_id'] = session_id
 
-                if response.data is None:
-                    logger.error("RPC add_interaction failed")
-                    raise Exception("RPC call failed")
+            # Direct table insertion
+            #response = self.supabase.table(table_name).insert(insert_data).execute()
+            response = self.supabase.rpc('add_interaction', {
+                'p_schema_name': self.schema_name,
+                'p_context': context,
+                'p_question': question,
+                'p_answer': answer,
+                'p_metadata': metadata,
+                'p_session_id': session_id
+            }).execute()
 
-                logger.info(f"Successfully added interaction via RPC")
-                return True
+            if not response.data:
+                logger.error("No data returned from insert operation")
+                return {'success': False, 'error': 'No data returned from insert operation'}
 
-            except Exception as inner_e:
-                logger.error(f"Error in RPC call: {str(inner_e)}")
-                # Fall back to direct table insert
-                try:
-                    table_name = f"{self.schema_name}.interactions"
-                    response = self.supabase.table(table_name).insert({
-                        'context': context,
-                        'question': question,
-                        'answer': answer,
-                        'metadata': json.dumps(metadata)  # Convert dict back to JSON string for the table insert
-                    }).execute()
+            # Check if we got data back and extract ID
+            interaction_id = None
+            if response.data > 0:
+                interaction_id = response.data
 
-                    # Check for error using the new pattern
-                    if response.data is None:
-                        logger.error("Table insert failed - no data in response")
-                        return False
+            if interaction_id is None:
+                logger.error(f"Failed to extract interaction ID from response: {response.data}")
+                return {'success': False, 'error': 'Failed to extract interaction ID'}
 
-                    logger.info(f"Successfully added interaction via table insert")
-                    return True
-                except Exception as table_e:
-                    logger.error(f"Table insert also failed: {str(table_e)}")
-                    raise table_e
+            logger.debug(f"Interaction added with ID {interaction_id}")
+
+            # Generate and store embedding if content is valid
+            if question:
+                question_embedding = get_embedding_provider().generate_embedding(question)
+                embedding_result = self.add_embedding_to_interaction(interaction_id, question_embedding)
+                if not embedding_result:
+                    logger.error(f"Failed to add embedding for interaction {interaction_id}")
+                    return {'success': False, 'error': 'Failed to add embedding for interaction'}
+                return {'success': True}
 
         except Exception as e:
-            logger.error(f"Error adding interaction: {str(e)}")
+            logger.error(f"Error adding interaction: {e}")
             logger.error(traceback.format_exc())
-            return False
+            return {'success': False, 'error': str(e)}
 
     def add_interaction_rpc(self, data_point, session_id: Optional[str] = None):
         """Adds an interaction to the database using an RPC call."""
@@ -551,107 +591,203 @@ class DatabaseManager:
 
     @typechecked
     def find_similar_documents(self,
-                               embedding: List[float],
+                               query_text: Optional[str] = None,
+                               embedding: Optional[List[float]] = None,
                                limit: int = 5,
-                               min_similarity: float = 0.7
+                               min_similarity: float = 0.1
                                ) -> List[Dict]:
         """
-        Find documents similar to the given embedding using pgvector.
+        Find documents similar to the query text or embedding using pgvector.
+
+        This is a high-level function that handles both text and embedding inputs.
+        For embedding inputs, it calls find_similar_documents_via_rpc internally.
 
         Args:
-            embedding: Vector embedding to compare against
+            query_text: Text to find similar documents for (optional if embedding is provided)
+            embedding: Vector embedding to compare against (optional if query_text is provided)
             limit: Maximum number of documents to return
-            min_similarity: Minimum cosine similarity threshold
+            min_similarity: Minimum similarity threshold (0-1)
 
         Returns:
-            List of similar documents with similarity scores
+            List of documents with similarity scores
+
+        Note:
+            This is the primary entry point for content-based searches. For direct embedding
+            searches, use find_similar_documents_via_rpc instead.
         """
         try:
-            # Format embedding for PostgreSQL pgvector format
-            vector_str = format_embedding_for_db(embedding)
+            logger.info(f"Finding similar documents in schema: {self.schema_name}")
 
-            # Call the SQL function via RPC
-            response = self.supabase.rpc('find_similar_documents', {
-                'p_schema_name': self.schema_name,
-                'p_embedding': vector_str,
-                'p_limit': limit,
-                'p_min_similarity': min_similarity
-            }).execute()
-
-            if not response.data:
-                logger.warning("No similar documents found.")
+            # Check if we have either query_text or embedding
+            if embedding is None and query_text is None:
+                logger.error("Must provide either query_text or embedding for similarity search")
                 return []
 
-            # Process embeddings from string format to list format
-            processed_documents = []
-            for doc in response.data:
-                processed_doc = dict(doc)  # Make a copy to avoid modifying original
+            # If embedding is not provided but query_text is, generate embedding
+            if embedding is None and query_text is not None:
+                embedding = self.create_embedding(query_text)
+                if not embedding:
+                    logger.error("Failed to generate embedding for query text")
+                    return []
 
-                # Convert string embedding to list if present
-                if 'embedding' in processed_doc and isinstance(processed_doc['embedding'], str):
-                    try:
-                        # Parse the string embedding into a list of floats
-                        embedding_str = processed_doc['embedding'].strip('[]')
-                        processed_doc['embedding'] = [float(x) for x in embedding_str.split(',')]
-                    except ValueError as e:
-                        logger.warning("Failed to parse embedding: %s", e)
+            # Use the core RPC method that does the actual work with the embedding
+            documents = self.find_similar_documents_via_rpc(
+                embedding=embedding,                  # First parameter is embedding
+                session_id=None,                      # Second parameter is session_id
+                similarity_threshold=min_similarity,  # Third parameter is similarity_threshold
+                limit=limit                           # Fourth parameter is limit
+            )
 
-                processed_documents.append(processed_doc)
-
-            return processed_documents
+            return documents
 
         except Exception as e:
-            logger.error("Error finding similar documents: %s", e)
+            logger.error(f"Error finding similar documents: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
 
-    def find_similar_documents_via_rpc(self, session_id: str, embedding: List[float],
-                              similarity_threshold: float = 0.7, limit: int = 3):
+    def find_similar_documents_via_rpc(
+            self,
+            embedding: List[float],
+            session_id: Optional[str] = None,
+            limit: int = 3,
+            similarity_threshold: float = 0.7
+            ) -> List[Optional[Dict]]:
         """
         Find documents similar to the provided embedding using pgvector directly in PostgreSQL.
         This offloads computation from Python/GPU to the database.
 
+        This function is typically called by:
+        1. The high-level find_similar_documents function
+        2. DynamicRAGRetriever.get_knowledge_by_query which passes:
+        - embedding: The query embedding vector
+        - session_id: The current session ID
+        - similarity_threshold: The min_similarity parameter (not match_threshold)
+        - limit: Max number of results to return
+
         Args:
-            session_id: The session ID
-            embedding: Vector embedding as a list of floats
-            similarity_threshold: Minimum similarity threshold
+            embedding: Vector embedding to compare against
+            session_id: Optional session ID to filter documents by session
+            similarity_threshold: Minimum similarity threshold (0-1)
             limit: Maximum number of results to return
 
         Returns:
             List of documents with similarity scores
+
+        Note:
+            This is the core similarity search function used throughout the application.
+            Parameter names must remain consistent (similarity_threshold, not match_threshold).
         """
         try:
             # Format embedding for PostgreSQL pgvector format
+            from psy_supabase.utilities.embedding_utils import format_embedding_for_db
             vector_str = format_embedding_for_db(embedding)
 
-            # Create an optimized dynamic SQL query to leverage pgvector within the specific schema
-            # This performs the similarity search entirely within PostgreSQL
-            query = f"""
-            SELECT
-                id,
-                content,
-                metadata,
-                1 - (embedding <=> '{vector_str}'::vector) as similarity
-            FROM
-                {self.schema_name}.knowledge_base
-            WHERE
-                1 - (embedding <=> '{vector_str}'::vector) > {similarity_threshold}
-            ORDER BY
-                similarity DESC
-            LIMIT {limit};
-            """
+            # Determine the schema and table to search in
+            schema_name = self.schema_name
 
-            logger.info(f"Finding similar documents in schema: {self.schema_name}")
+            # Query the interactions and interaction_embeddings tables
+            if session_id:
+                # Filter by session_id in the dedicated column if it exists
+                check_column_query = f"""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.columns
+                    WHERE table_schema = '{schema_name}'
+                    AND table_name = 'interactions'
+                    AND column_name = 'session_id'
+                );
+                """
+
+                check_response = self.supabase.rpc('sql', {'command': check_column_query}).execute()
+
+                if check_response.data and str(check_response.data).lower().strip() in ('t', 'true'):
+                    # If session_id column exists, use it
+                    query = f"""
+                    SELECT
+                        i.interactionID as id,
+                        i.question as content,
+                        i.metadata,
+                        1 - (ie.embedding <=> '{vector_str}'::vector) as similarity
+                    FROM
+                        {schema_name}.interactions i
+                    JOIN
+                        {schema_name}.interaction_embeddings ie
+                    ON
+                        i.interactionID = ie.interaction_id
+                    WHERE
+                        1 - (ie.embedding <=> '{vector_str}'::vector) > {similarity_threshold}
+                        AND i.session_id = '{session_id}'
+                    ORDER BY
+                        similarity DESC
+                    LIMIT {limit};
+                    """
+                else:
+                    # Fall back to metadata if no session_id column
+                    query = f"""
+                    SELECT
+                        i.interactionID as id,
+                        i.question as content,
+                        i.metadata,
+                        1 - (ie.embedding <=> '{vector_str}'::vector) as similarity
+                    FROM
+                        {schema_name}.interactions i
+                    JOIN
+                        {schema_name}.interaction_embeddings ie
+                    ON
+                        i.interactionID = ie.interaction_id
+                    WHERE
+                        1 - (ie.embedding <=> '{vector_str}'::vector) > {similarity_threshold}
+                        AND i.metadata->>'session_id' = '{session_id}'
+                    ORDER BY
+                        similarity DESC
+                    LIMIT {limit};
+                    """
+            else:
+                # If no session_id, search in all interactions
+                query = f"""
+                SELECT
+                    i.interactionID as id,
+                    i.question as content,
+                    i.metadata,
+                    1 - (ie.embedding <=> '{vector_str}'::vector) as similarity
+                FROM
+                    {schema_name}.interactions i
+                JOIN
+                    {schema_name}.interaction_embeddings ie
+                ON
+                    i.interactionID = ie.interaction_id
+                WHERE
+                    1 - (ie.embedding <=> '{vector_str}'::vector) > {similarity_threshold}
+                ORDER BY
+                    similarity DESC
+                LIMIT {limit};
+                """
+
+            logger.info(f"Finding similar documents in schema: {schema_name}")
             response = self.supabase.rpc('sql', {'command': query}).execute()
 
+            # Process the response to ensure proper formatting
             if response.data:
-                logger.info(f"Found {len(response.data)} similar documents")
-                return response.data
+                results = []
+                for doc in response.data:
+                    if isinstance(doc, dict):
+                        # Parse metadata if it's a string
+                        if 'metadata' in doc and isinstance(doc['metadata'], str):
+                            try:
+                                doc['metadata'] = json.loads(doc['metadata'])
+                            except:
+                                doc['metadata'] = {}
+                        results.append(doc)
+
+                logger.info(f"Found {len(results)} similar documents")
+                return results
             else:
                 logger.warning("No similar documents found")
                 return []
 
         except Exception as e:
             logger.error(f"Error finding similar documents via RPC: {e}")
+            import traceback
             logger.error(traceback.format_exc())
             return []
 
@@ -763,8 +899,8 @@ class DatabaseManager:
                     themes[topic] = themes.get(topic, 0) + 1
 
                 # Extract themes from question and answer content
-                question = interaction.get('questionText', '')
-                answer = interaction.get('answerText', '')
+                question = interaction.get('question', '')
+                answer = interaction.get('answer', '')
 
                 # List of common psychological themes to look for in content
                 theme_keywords = {
@@ -924,9 +1060,9 @@ class DatabaseManager:
 
                 if metadata and 'insight_level' in metadata:
                     insights.append({
-                        'interactionID': interaction.get('interactionID'),
-                        'question': interaction.get('questionText', ''),
-                        'answer': interaction.get('answerText', ''),
+                        'interaction_id': interaction.get('interaction_id'),
+                        'question': interaction.get('question', ''),
+                        'answer': interaction.get('answer', ''),
                         'insight_level': metadata.get('insight_level'),
                         'created_at': interaction.get('created_at')
                     })
@@ -990,8 +1126,8 @@ class DatabaseManager:
             # First search for similar documents using vector similarity with session filtering
             similar_docs = self.find_similar_documents_by_embedding(
                 embedding=embedding_vector,
+                limit=max_results,
                 threshold=0.6,
-                limit=max_results
             )
 
             # If no session_id provided, we can only return knowledge base results
@@ -1009,8 +1145,8 @@ class DatabaseManager:
 
             memory_matches = []
             for interaction in conversation:
-                question = interaction.get('questionText', '')
-                answer = interaction.get('answerText', '')
+                question = interaction.get('question', '')
+                answer = interaction.get('answer', '')
 
                 # Skip empty interactions
                 if not question and not answer:
@@ -1023,7 +1159,7 @@ class DatabaseManager:
                     similarity = matched_terms / max(len(key_terms), 1)
 
                     memory_matches.append({
-                        'interactionID': interaction.get('interactionID'),
+                        'interaction_id': interaction.get('interaction_id'),
                         'context': interaction.get('context'),
                         'question': question,
                         'answer': answer,
@@ -1082,7 +1218,7 @@ class DatabaseManager:
                 metadata = item.get('metadata', {})
 
                 results.append({
-                    'interactionid': item.get('interactionid'),
+                    'interaction_id': item.get('interaction_id'),
                     'question': item.get('question', ''),
                     'answer': item.get('answer', ''),
                     'context': item.get('context', ''),
@@ -1331,7 +1467,7 @@ class DatabaseManager:
             enriched_count = 0
             for interaction in interactions:
                 try:
-                    interaction_id = interaction.get('interactionid')
+                    interaction_id = interaction.get('interaction_id')
                     question = interaction.get('question', '')
                     answer = interaction.get('answer', '')
 
@@ -1344,7 +1480,7 @@ class DatabaseManager:
                         if self.add_embedding_to_interaction(interaction_id, embedding, self.schema_name):
                             enriched_count += 1
                 except Exception as e:
-                    logger.error(f"Error enriching interaction {interaction.get('interactionid')}: {e}")
+                    logger.error(f"Error enriching interaction {interaction.get('interaction_id')}: {e}")
                     continue
 
             return enriched_count
@@ -1632,99 +1768,68 @@ class DatabaseManager:
             logger.error(traceback.format_exc())
             return None
 
-    def find_similar_interactions_by_embedding(self, embedding: List[float], session_id: str,
+    def find_similar_interactions_by_embedding(self, embedding: List[float], session_id: str = None,
                                                limit: int = 5, threshold: float = 0.7) -> List[Dict]:
         """
         Find interactions with similar embeddings using pgvector.
-        This is useful for identifying pain points in conversation patterns.
 
         Args:
             embedding: Query embedding vector
-            session_id: Session identifier
-            limit: Maximum results to return
-            threshold: Minimum similarity threshold
-
-        Returns:
-            List of similar interactions with similarity scores
-
-        Args:
-            embedding: Query embedding vector
-            session_id: Session identifier
-            limit: Maximum results to return
+            session_id: Optional session ID to restrict search
+            limit: Maximum number of results to return
             threshold: Minimum similarity threshold
 
         Returns:
             List of similar interactions with similarity scores
         """
         try:
-            # First check if the interaction_embeddings table has any rows
-            count_query = f"""
-            SELECT COUNT(*) FROM {self.schema_name}.interaction_embeddings;
-            """
-
-            count_response = self.supabase.rpc('sql', {'command': count_query}).execute()
-
-            # If no rows or count is 0, migrate embeddings
-            if not count_response.data or count_response.data == 'r' or count_response.data == '0' or count_response.data == 0:
-                logger.info(f"interaction_embeddings table is empty, migrating embeddings")
-                self.migrate_embeddings_to_interaction_embeddings_table(session_id)
-
             # Format embedding as PostgreSQL vector format
             if isinstance(embedding, list):
                 vector_str = str(embedding).replace(' ', '')
             else:
                 vector_str = str(embedding.tolist()).replace(' ', '')
 
-            # CHANGE HERE: Use "interactionID" instead of "interaction_id" to match DB schema
-            query = f"""
-            SELECT
-                i.interactionID as interaction_id,
-                i.question,
-                i.answer,
-                i.created_at,
-                1 - (ie.embedding <=> '{vector_str}'::vector) as similarity
-            FROM
-                {self.schema_name}.interactions i
-            JOIN
-                {self.schema_name}.interaction_embeddings ie
-            ON
-                i.interactionID = ie.interaction_id
-            WHERE
-                1 - (ie.embedding <=> '{vector_str}'::vector) > {threshold}
-            ORDER BY
-                similarity DESC
-            LIMIT {limit};
-            """
-
-            response = self.supabase.rpc('sql', {'command': query}).execute()
+            # Use direct SQL execution
+            response = self.supabase.rpc('find_similar_interactions', {
+                'p_schema_name': self.schema_name,
+                'p_embedding': vector_str,
+                'p_session_id': session_id,
+                'p_threshold': threshold,
+                'p_limit': limit,
+            }).execute()
 
             if not response.data:
                 return []
 
-            # Process and return results
+            # Process results
             results = []
             for item in response.data:
-                # Handle various response formats
-                if isinstance(item, str):
-                    # Parse CSV-like string format
-                    values = item.split(',')
-                    if len(values) >= 5:
-                        results.append({
-                            'interaction_id': int(values[0]) if values[0].isdigit() else 0,
-                            'question': values[1],
-                            'answer': values[2],
-                            'created_at': values[3],
-                            'similarity': float(values[4]) if values[4] and values[4].replace('.','').isdigit() else 0
-                        })
-                elif isinstance(item, dict):
-                    # Dictionary format
+                if isinstance(item, dict):
+                    question = item.get('question', '')
+                    answer = item.get('answer', '')
+
                     results.append({
-                        'interaction_id': item.get('interaction_id'),
-                        'question': item.get('question', ''),
-                        'answer': item.get('answer', ''),
-                        'created_at': item.get('created_at', ''),
-                        'similarity': item.get('similarity', 0)
+                        'interaction_id': item.get('interaction_id', 0),
+                        'question':       self.clean_db_text(question),
+                        'answer':         self.clean_db_text(answer),
+                        'created_at':     item.get('created_at', ''),
+                        'metadata':       item.get('metadata', {}),
+                        'session_id':     item.get('session_id'),
+                        'similarity':     item.get('similarity', 0)
                     })
+                elif isinstance(item, str):
+                    # Try to handle string format (very rare)
+                    parts = item.split(',')
+                    if len(parts) >= 6:
+                        results.append({
+                            'interaction_id': int(parts[0]) if parts[0].strip().isdigit() else 0,
+                            'question': parts[1].strip() if len(parts) > 1 else '',
+                            'answer': parts[2].strip() if len(parts) > 2 else '',
+                            'created_at': parts[3].strip() if len(parts) > 3 else '',
+                            'metadata': parts[4].strip() if len(parts) > 4 else {},
+                            'session_id': parts[5].strip() if len(parts) > 5 else None,
+                            'similarity': float(parts[6]) if len(parts) > 6 and parts[6].strip().replace('.','').isdigit() else 0
+                        })
 
             return results
         except Exception as e:
@@ -1753,7 +1858,7 @@ class DatabaseManager:
 
             for i, interaction in enumerate(history):
                 # Check if this is the target interaction
-                if str(interaction.get('interactionID')) == str(interaction_id) or \
+                if str(interaction.get('interaction_id')) == str(interaction_id) or \
                    str(interaction.get('interaction_id')) == str(interaction_id):
                     found_interaction = True
 
@@ -1773,9 +1878,9 @@ class DatabaseManager:
 
                         if emotional_state:
                             emotional_responses.append({
-                                'interaction_id': follow_up.get('interactionID'),
+                                'interaction_id': follow_up.get('interaction_id'),
                                 'emotional_state': emotional_state,
-                                'question': follow_up.get('questionText', '')[:100],
+                                'question': follow_up.get('question', '')[:100],
                                 'created_at': follow_up.get('created_at')
                             })
                     break
@@ -1885,8 +1990,8 @@ class DatabaseManager:
             # Get embeddings for past questions using optimized pgvector search
             past_questions = []
             for item in history:
-                interaction_id = item.get('interactionID')
-                past_question = item.get('questionText', '')
+                interaction_id = item.get('interaction_id')
+                past_question = item.get('question', '')
                 if past_question and interaction_id and past_question != question_text:
                     past_questions.append({
                         'id': interaction_id,
@@ -1938,7 +2043,7 @@ class DatabaseManager:
             # Combine and deduplicate results
             seen_ids = set()
             for item in vector_similar_questions:
-                interaction_id = item.get('interaction_id') or item.get('interactionid')
+                interaction_id = item.get('interaction_id') or item.get('interaction_id')
                 if interaction_id and interaction_id not in seen_ids:
                     seen_ids.add(interaction_id)
                     similar_questions.append({
@@ -2115,84 +2220,103 @@ class DatabaseManager:
             return None
 
     def save_interaction(self,
-                         context: str,
-                         question: str,
-                         answer: str,
-                         metadata: Optional[Dict] = None,
-                         session_id: Optional[str] = None
-                         ) -> bool:
+                        context: str,
+                        question: str,
+                        answer: str,
+                        metadata: Optional[Dict] = None,
+                        session_id: Optional[str] = None
+                        ) -> bool:
         """Save an interaction to the database with proper metadata handling."""
         try:
-            # Prepare metadata as JSON string
+            # Ensure schema exists
+            logger.info(f"Ensuring schema exists for user: {self.user_id}")
+            self.create_user_schema_sync()
+
+            # Prepare metadata
             if metadata is None:
                 metadata = {}
 
-            # Add session_id to metadata if provided
+            # CRITICAL FIX: Always add session_id to metadata explicitly
             if session_id is not None:
                 metadata['session_id'] = session_id
-
-            # Convert metadata to string if it's a dict
-            if isinstance(metadata, dict):
-                metadata_str = json.dumps(metadata)
-            else:
-                metadata_str = str(metadata)
+                logger.info(f"Adding session_id to metadata: {session_id}")
 
             # Clean the text data
             clean_context = self._clean_text_for_db(context)
             clean_question = self._clean_text_for_db(question)
             clean_answer = self._clean_text_for_db(answer)
 
-            # Add the interaction using our RPC function
+            # Convert metadata to JSON string
+            if isinstance(metadata, dict):
+                metadata_str = json.dumps(metadata)
+            else:
+                metadata_str = str(metadata)
+
+            logger.info(f"Calling add_interaction RPC with schema: {self.schema_name}, session_id: {session_id}")
+
+            # Add the interaction using our updated RPC function
             response = self.supabase.rpc('add_interaction', {
                 'p_schema_name': self.schema_name,
                 'p_context': clean_context,
                 'p_question': clean_question,
                 'p_answer': clean_answer,
-                'p_metadata': metadata_str
+                'p_metadata': metadata_str,
+                'p_session_id': session_id
             }).execute()
 
+            # Check response
+            logger.info(f"RPC response: {response.data}")
+
             if response.data is None:
-                logger.error("Error saving interaction via RPC")
-                return False
+                logger.error("Error saving interaction via RPC - null response")
 
-            # Extract interaction ID from response
-            interaction_id = int(response.data)
-            logger.info(f"Interaction saved successfully with ID: {interaction_id}")
+                # Try direct SQL as fallback
+                logger.info("Trying direct SQL insertion as fallback")
+                query = f"""
+                INSERT INTO "{self.schema_name}".interactions
+                (context, question, answer, metadata, session_id)
+                VALUES (
+                    '{clean_context.replace("'", "''")}',
+                    '{clean_question.replace("'", "''")}',
+                    '{clean_answer.replace("'", "''")}',
+                    '{metadata_str}'::jsonb,
+                    '{session_id}'
+                )
+                RETURNING "interactionID";
+                """
 
-            # Extract interaction ID from response
-            interaction_id = int(response.data)
-            logger.info(f"Interaction saved successfully with ID: {interaction_id}")
+                try:
+                    fallback_response = self.supabase.rpc('sql', {'command': query}).execute()
+                    if fallback_response.data:
+                        interaction_id = fallback_response.data
+                        logger.info(f"Fallback successful, interaction ID: {interaction_id}")
+                    else:
+                        logger.error("Fallback failed")
+                        return False
+                except Exception as fallback_error:
+                    logger.error(f"Error in SQL fallback: {fallback_error}")
+                    return False
+            else:
+                try:
+                    interaction_id = int(response.data)
+                    logger.info(f"Interaction saved successfully with ID: {interaction_id}")
+                except (ValueError, TypeError):
+                    logger.error(f"Could not parse interaction ID from response: {response.data}")
+                    return False
 
-            # If we have an embedding for the question, store it in interaction_embeddings
-            try:
-                # Generate embedding for the question
+            # Generate embedding for the question if needed
+            if clean_question:
+                logger.info("Generating embedding for question")
                 question_embedding = self.create_embedding(clean_question)
-                logger.debug(f"Generated embedding: type={type(question_embedding)}, length={len(question_embedding) if question_embedding else 'None'}")
 
                 if question_embedding:
                     # Format the embedding for PostgreSQL
                     from psy_supabase.utilities.embedding_utils import format_embedding_for_db
                     embedding_str = format_embedding_for_db(question_embedding)
-                    logger.debug(f"Formatted embedding (first 50 chars): {embedding_str[:50]}...")
-
-                    # First check if interaction_embeddings table exists
-                    check_table_query = f"""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables
-                        WHERE table_schema = '{self.schema_name}' AND table_name = 'interaction_embeddings'
-                    );
-                    """
-                    check_result = self.supabase.rpc('sql', {'command': check_table_query}).execute()
-
-                    if not check_result.data:
-                        logger.warning(f"interaction_embeddings table not found in schema {self.schema_name}, creating it")
-                        create_table_result = self.supabase.rpc('create_user_schema_and_tables', {'schema_name': self.schema_name}).execute()
-                        logger.debug(f"Table creation result: {create_table_result.data}")
 
                     # Store in interaction_embeddings table
                     logger.info(f"Storing embedding for interaction {interaction_id}")
 
-                    # METHOD 1: Store via dedicated function (preferred)
                     embed_response = self.supabase.rpc('add_embedding_to_interaction', {
                         'p_schema_name': self.schema_name,
                         'p_interaction_id': interaction_id,
@@ -2201,44 +2325,16 @@ class DatabaseManager:
 
                     if embed_response.data is True:
                         logger.info(f"Embedding stored successfully for interaction {interaction_id}")
-                        return True
                     else:
                         logger.warning(f"Embedding storage function returned: {embed_response.data}")
-
-                        # METHOD 2: Fall back to direct SQL if the function fails
-                        logger.info("Trying direct SQL insertion...")
-                        embed_query = f"""
-                        INSERT INTO {self.schema_name}.interaction_embeddings
-                        (interaction_id, embedding)
-                        VALUES ({interaction_id}, '{embedding_str}'::vector(2048))
-                        ON CONFLICT (interaction_id) DO UPDATE
-                        SET embedding = '{embedding_str}'::vector(2048);
-                        """
-
-                        direct_result = self.supabase.rpc('sql', {'command': embed_query}).execute()
-                        logger.debug(f"Direct SQL result: {direct_result.data}")
-
-                        # Also update the interactions table for backward compatibility
-                        update_query = f"""
-                        UPDATE {self.schema_name}.interactions
-                        SET embedding = '{embedding_str}'::vector(2048)
-                        WHERE interactionID = {interaction_id};
-                        """
-                        update_result = self.supabase.rpc('sql', {'command': update_query}).execute()
-                        logger.debug(f"Update interactions result: {update_result.data}")
-
                 else:
-                    logger.warning(f"No embedding generated for question: {clean_question[:100]}...")
-
-            except Exception as embed_error:
-                logger.error(f"Error storing embedding: {embed_error}")
-                logger.error(traceback.format_exc())
-                # Continue anyway since the basic interaction was saved
+                    logger.warning(f"No embedding generated for question")
 
             return True
 
         except Exception as e:
             logger.error(f"Error saving interaction: {e}")
+            import traceback
             logger.error(traceback.format_exc())
             return False
 
@@ -2292,7 +2388,7 @@ class DatabaseManager:
                 return {'pain_points': [], 'severity': 'none', 'first_detected_at': None}
 
             # Extract questions and convert to vectors
-            questions = [item.get('questionText', '') for item in history]
+            questions = [item.get('question', '') for item in history]
 
             # Track clusters of similar questions
             question_clusters = []
@@ -2634,10 +2730,13 @@ class DatabaseManager:
     @typechecked
     def find_similar_documents_by_embedding(self,
                                             embedding: list,
-                                            threshold: float = 0.5,
-                                            limit: int = 5):
+                                            limit: int = 5,
+                                            threshold: float = 0.5):
         """
-        Find documents similar to the provided embedding vector.
+        Find documents similar to the provided embedding vector using direct pgvector SQL queries.
+
+        This is a lower-level implementation used primarily for working with the knowledge_base table.
+        For interaction searches and session-specific queries, use find_similar_documents_via_rpc instead.
 
         Args:
             embedding: The embedding vector to compare against
@@ -2646,6 +2745,10 @@ class DatabaseManager:
 
         Returns:
             List of dictionaries containing similar documents
+
+        Note:
+            This function is specialized for knowledge_base table operations and does not
+            support session filtering like find_similar_documents_via_rpc does.
         """
         try:
             # Ensure we have a valid embedding
@@ -2859,3 +2962,22 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error verifying schema structure: {e}")
             return False
+
+    def ensure_schema_exists(self) -> bool:
+        """
+
+        Ensure the user schema exists and is properly set up.
+
+        Returns:
+            bool: True if the schema exists, False otherwise.
+
+        """
+            # Check if the schema already exists
+        response = self.supabase.rpc('ensure_schema_exists', {
+            'schema_name': self.schema_name
+        }).execute()
+
+        if response.data:
+            logger.info("Schema %s already exists.", self.schema_name)
+            return True
+        return False

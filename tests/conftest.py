@@ -249,7 +249,7 @@ def sample_history():
     """
     return [
         {
-            'interactionid': 1,
+            'interaction_id': 1,
             'question': 'How are you feeling today?',
             'answer': 'I am feeling better, thanks for asking.',
             'context': 'Test context',
@@ -257,7 +257,7 @@ def sample_history():
             'created_at': '2023-01-01T12:00:00'
         },
         {
-            'interactionid': 2,
+            'interaction_id': 2,
             'question': 'What has been bothering you lately?',
             'answer': 'I have been stressed about work.',
             'context': 'CBT session',

@@ -42,18 +42,18 @@ def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
     """
     try:
         logger.info(f"Setting up TextGenerator on {DEVICE}...")
-        
+
         # For GitHub Actions, use a fully mocked model
         if RUNNING_IN_GITHUB_ACTIONS:
             # Create a mock model that's good enough for testing
             from unittest.mock import MagicMock
-            
+
             # Create a fully mocked TextGenerator
             text_generator = MagicMock()
             text_generator.device = "cpu"
             text_generator.generate_text.return_value = "This is a mock response for GitHub Actions testing."
             text_generator.generate_therapeutic_response.return_value = "This is a mock therapeutic response."
-            
+
             logger.info("Created mock TextGenerator for GitHub Actions")
         else:
             # Use real TextGenerator with appropriate device
@@ -73,7 +73,7 @@ def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
         rag_processor.dynamic_retriever = mock_dynamic_retriever
 
         yield rag_processor
-        
+
     finally:
         # Cleanup code that runs even if the test fails
         logger.info("Cleaning up TextGenerator resources...")
@@ -89,7 +89,7 @@ def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
 
 class TestResponseQuality:
     """Test suite focused on ensuring high-quality responses."""
-
+    cleanup_memory()
     def test_response_does_not_contain_illustration_paragraph(self, setup_response_generator):
         """Ensure responses don't contain 'Illustration paragraph' pattern."""
         rag_processor = setup_response_generator

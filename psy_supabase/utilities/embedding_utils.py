@@ -1,9 +1,9 @@
 """
 embedding_utils.py
 
-This module provides utility functions for formatting embedding vectors to be compatible with PostgreSQL's 
-pgvector extension. These functions ensure that embeddings, which may come in various formats (e.g., lists, 
-numpy arrays, PyTorch tensors), are properly converted into the string format required for storage and retrieval 
+This module provides utility functions for formatting embedding vectors to be compatible with PostgreSQL's
+pgvector extension. These functions ensure that embeddings, which may come in various formats (e.g., lists,
+numpy arrays, PyTorch tensors), are properly converted into the string format required for storage and retrieval
 in a PostgreSQL database.
 
 Key Features:
@@ -58,6 +58,31 @@ def format_embedding_for_db_obs(embedding):
     return str(embedding_list).replace(' ', '')
 
 def format_embedding_for_db(embedding):
+    """
+    Format an embedding vector for Postgres pgvector.
+
+    Args:
+        embedding: Embedding vector (could be list, numpy array, torch tensor, etc.)
+
+    Returns:
+        Properly formatted string for pgvector
+    """
+    # Handle torch tensors
+    if hasattr(embedding, 'tolist') and callable(getattr(embedding, 'tolist')):
+        # Convert torch tensor or numpy array to list
+        embedding = embedding.tolist()
+
+    # Handle complex number tensors by taking real part only (if needed)
+    if any(isinstance(x, complex) for x in embedding):
+        embedding = [float(x.real) for x in embedding]
+    else:
+        # Ensure all values are floats (not numpy.float32 or similar)
+        embedding = [float(x) for x in embedding]
+
+    # Format as string with square brackets for pgvector
+    return '[' + ','.join(str(x) for x in embedding) + ']'
+
+def format_embedding_for_db_old(embedding):
     """Format embedding vector for PostgreSQL's pgvector extension."""
     if hasattr(embedding, 'tolist') and callable(getattr(embedding, 'tolist')):
         embedding = embedding.tolist()

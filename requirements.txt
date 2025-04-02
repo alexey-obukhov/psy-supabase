@@ -19,6 +19,7 @@ typer==0.15.2
 confection==0.1.5
 
 # ML/NLP
+faiss-cpu==1.8.0.post1
 transformers==4.46.3
 sentence-transformers==3.2.1
 bitsandbytes==0.42.0

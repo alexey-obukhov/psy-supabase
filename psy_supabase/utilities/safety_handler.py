@@ -1,8 +1,8 @@
 """
 safety_handler.py
 
-This module implements the `SafetyHandler` class, which is responsible for detecting and responding to potentially harmful content 
-in user input. It acts as middleware to process queries before they reach the main RAG system, ensuring that harmful or unsafe 
+This module implements the `SafetyHandler` class, which is responsible for detecting and responding to potentially harmful content
+in user input. It acts as middleware to process queries before they reach the main RAG system, ensuring that harmful or unsafe
 content is identified and addressed appropriately.
 
 Key Features:

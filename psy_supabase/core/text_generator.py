@@ -851,8 +851,8 @@ class TextGenerator:
                     conv_text = ""
                     for item in conversation_history[-3:]:  # Last 3 exchanges
                         if isinstance(item, dict):
-                            q = item.get("questionText", item.get("question", ""))
-                            a = item.get("answerText", item.get("answer", ""))
+                            q = item.get("question", item.get("question", ""))
+                            a = item.get("answer", item.get("answer", ""))
                             if q and a:
                                 conv_text += f"User: {q}\nAssistant: {a}\n\n"
                     enhanced_context["conversation_context"] = conv_text.strip()

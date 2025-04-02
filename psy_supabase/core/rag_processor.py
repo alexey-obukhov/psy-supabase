@@ -568,8 +568,8 @@ class RAGProcessor:
 
                     conversation_parts = []
                     for exchange in recent_exchanges:
-                        q = exchange.get('questionText', exchange.get('question', ''))
-                        a = exchange.get('answerText', exchange.get('answer', ''))
+                        q = exchange.get('question', exchange.get('question', ''))
+                        a = exchange.get('answer', exchange.get('answer', ''))
                         if q and a:
                             # Truncate if needed
                             q_short = q if len(q) < 100 else q[:97] + "..."
@@ -822,10 +822,10 @@ class RAGProcessor:
 
             # 3. Use a parameterized SQL query to find similar documents DIRECTLY in PostgreSQL
             similar_docs = self.db_manager.find_similar_documents_via_rpc(
+                embedding=embedding_list,
                 session_id=session_id,
-                embedding=embedding_list,  # Properly formatted embedding
-                similarity_threshold=0.7,
-                limit=3  # Just get top 3 most relevant docs
+                limit=3,
+                similarity_threshold=0.7
             )
 
             # 4. Construct knowledge context from the results PostgreSQL returns
@@ -854,8 +854,8 @@ class RAGProcessor:
 
                 # Format as text, but be strict about length limits
                 for item in recent_history:
-                    q = item.get("questionText", "")[:150]  # Limit question length
-                    a = item.get("answerText", "")[:200]    # Limit answer length
+                    q = item.get("question", "")[:150]  # Limit question length
+                    a = item.get("answer", "")[:200]    # Limit answer length
                     if q and a:
                         conversation_context += f"User: {q}\nAssistant: {a}\n\n"
 
@@ -1052,8 +1052,8 @@ class RAGProcessor:
             formatted_history = []
             for item in recent_history:
                 # Extract question and answer
-                q = item.get('questionText', item.get('question', ''))
-                a = item.get('answerText', item.get('answer', ''))
+                q = item.get('question', item.get('question', ''))
+                a = item.get('answer', item.get('answer', ''))
 
                 # Include metadata if available
                 metadata = item.get('metadata', {})

@@ -355,7 +355,7 @@ def optimize_vectors():
 
                 for interaction in batch:
                     try:
-                        interaction_id = interaction.get('interactionid')
+                        interaction_id = interaction.get('interaction_id')
                         question = interaction.get('question', '')
                         answer = interaction.get('answer', '')
 

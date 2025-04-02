@@ -1,14 +1,12 @@
+from school_logging.log import ColoredLogger
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.utilities.common import is_github_actions
-import logging
 import os
 
 # Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = ColoredLogger(__name__)
 
 if not is_github_actions():
     from dotenv import load_dotenv
@@ -35,15 +33,27 @@ def main():
         logger.info("Initializing database manager...")
         db_manager = DatabaseManager(supabase_key=supabase_key, supabase_url=supabase_url, user_id="new_user_alex")
         logger.info("Database manager initialized successfully.")
+
+        logger.info("Creating user schema...")
+        db_manager.create_user_schema_sync()
+        logger.info("User schema created successfully.")
+
         logger.info("Initializing RAG processor...")
         processor = RAGProcessor(db_manager=db_manager, generator=generator)
+        logger.info("RAG processor initialized successfully.")
 
-        # Test basic functionality
         logger.info("Testing RAG processor with sample question...")
         test_question = "How can I manage everyday anxiety?"
         response = processor.generate_response(test_question, session_id="health_check")
 
         logger.info(f"Sample response: {response[:100]}...")
+
+        logger.info("Cleaning up")
+        cleanup_query = f"""
+        DROP SCHEMA IF EXISTS "{db_manager.schema_name}" CASCADE;
+        """
+        db_manager.supabase.rpc('sql', {'command': cleanup_query}).execute()
+        logger.info("Schema %s dropped", db_manager.schema_name)
         logger.info("Health check completed successfully!")
         return True
     except Exception as e:

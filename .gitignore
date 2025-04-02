@@ -19,3 +19,6 @@ dist/
 models/*
 !models/.gitkeep
 !models/README.md
+
+# Documentation
+docs/

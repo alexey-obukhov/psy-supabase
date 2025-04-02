@@ -40,7 +40,6 @@ def clean_text(text: str) -> str:
     text = text.replace('  ', ' ')                        # Replace double spaces with single space
     return text
 
-
 def tokenize_and_lemmatize(text: str,
                            logger: Optional[ColoredLogger] = None
                            ) -> str:
@@ -80,51 +79,6 @@ def tokenize_and_lemmatize(text: str,
         if logger:
             logger.error(f"Error in tokenize_and_lemmatize: {str(e)}\n{traceback.format_exc()}")
         return text
-
-
-def create_context(df: pd.DataFrame, max_context_turns: int = 3, logger: Optional[ColoredLogger] = None) -> None:
-    """
-    Modifies the DataFrame inplace by generating structured conversation context for each turn.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame containing 'questionID', 'interactionID', and text columns.
-        max_context_turns (int): Maximum number of previous turns to include in context.
-        logger (ColoredLogger, optional): Logger instance for debugging.
-
-    Returns:
-        None: The function modifies the DataFrame inplace.
-    """
-    if logger:
-        logger.name = "CreateContext"
-        logger.info("Creating conversation context inplace with max %d turns per context.", max_context_turns)
-    else:
-        print("Creating conversation context inplace with max %d turns per context." % max_context_turns)
-
-    # Ensure data is sorted correctly for rolling context
-    df.sort_values(['questionID', 'interactionID'], ascending=[True, True], inplace=True)
-
-    # Dictionary to store deque for each questionID
-    context_map = {}
-
-    def generate_context(row):
-        """Generates rolling context for each row using deque."""
-        q_id = row['questionID']
-        if q_id not in context_map:
-            print(f"Question ID {q_id} not found in context_map. adding it...")
-            context_map[q_id] = deque(maxlen=max_context_turns)
-
-        current_turn = f"Q: {row['questionTitle']} A: {row['answerText']}"
-        context = " ".join(context_map[q_id])
-        context_map[q_id].append(current_turn)
-        return context
-
-    # Apply rolling context generation
-    df['context'] = df.apply(generate_context, axis=1)
-
-    if logger:
-        logger.info("Context creation completed successfully (vectorized & inplace).")
-    else:
-        print("Context creation completed successfully (vectorized & inplace).")
 
 def cleanup_memory():
     """Clean up GPU memory."""
