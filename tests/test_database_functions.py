@@ -30,8 +30,8 @@ class TestDatabaseFunctions:
             self.test_user_id = f"test_user_{uuid.uuid4().hex[:8]}"
             self.test_session_id = f"test_session_{uuid.uuid4().hex[:8]}"
 
-            logger.info(f"Test user ID: {self.test_user_id}")
-            logger.info(f"Test session ID: {self.test_session_id}")
+            logger.info("Test user ID: %s", self.test_user_id)
+            logger.info("Test session ID: %s", self.test_session_id)
 
             # Initialize database manager with test user
             self.db_manager = DatabaseManager(
@@ -54,7 +54,7 @@ class TestDatabaseFunctions:
             );
             """
             check_response = self.db_manager.supabase.rpc('sql', {'command': check_query}).execute()
-            logger.info(f"Schema exists check: {check_response.data}")
+            logger.info("Schema exists check: %s", check_response.data)
 
             # Add a small delay to ensure schema creation completes
             time.sleep(2)
@@ -65,7 +65,7 @@ class TestDatabaseFunctions:
 
             logger.info("Setup complete")
         except Exception as e:
-            logger.error(f"Setup error: {e}")
+            logger.error("Setup error: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             raise
@@ -94,12 +94,12 @@ class TestDatabaseFunctions:
         - Incorrect metadata handling related to session_id
         - Data integrity issues between save and retrieve operations
         """        # Log for debugging
-        logger.info(f"Ensuring tables exist before saving interaction")
+        logger.info("Ensuring tables exist before saving interaction")
         self.db_manager.ensure_schema_exists()
 
         # Generate a unique session ID
         session_id = f"test_session_{uuid.uuid4().hex[:8]}"
-        logger.info(f"Attempting to save interaction with session_id: {session_id}")
+        logger.info("Attempting to save interaction with session_id: %s", session_id)
 
         # Add an interaction with this session ID
         result = self.db_manager.add_interaction({
@@ -117,7 +117,7 @@ class TestDatabaseFunctions:
 
         # Retrieve conversation history
         time.sleep(2)  # Wait for processing
-        logger.info(f"Retrieving conversation history for session: {session_id}")
+        logger.info("Retrieving conversation history for session: %s", session_id)
         history = self.db_manager.get_conversation_history(session_id)
 
         # Now assert on the result
@@ -175,7 +175,7 @@ class TestDatabaseFunctions:
                 assert isinstance(result['metadata'], dict), "Metadata should be a dictionary"
                 assert result['metadata'].get('session_id') == self.test_session_id, "Session ID mismatch in results"
 
-        logger.info(f"Found {len(results)} similar documents with session ID")
+        logger.info("Found %s similar documents with session ID", len(results))
 
     def test_dynamic_rag_with_session_id(self):
         """Test DynamicRAGRetriever with session_id."""
@@ -215,28 +215,28 @@ class TestDatabaseFunctions:
         # Test knowledge retrieval with the session context
         query = "What helps with anxiety?"
         result = rag_retriever.get_knowledge_by_query(query, limit=2)
-        logger.info(f"Result: {result}")
+        logger.info("Result: %s", result)
         assert isinstance(result, str), "Result should be a string"
-        logger.info(f"RAG retrieval result: {result}")
+        logger.info("RAG retrieval result: %s", result)
 
         # Test retrieving past interactions
         past = rag_retriever.get_past_interactions(session_id=self.test_session_id, limit=2)
         assert isinstance(past, list), "Past interactions should be a list of dictionaries"
         assert len(past) > 0, "No past interactions retrieved"
 
-        logger.info(f"Past interactions: {past}")
+        logger.info("Past interactions: %s", past)
 
     def teardown_method(self):
         """Clean up after tests."""
-        logger.info(f"Cleaning up test data for user {self.test_user_id}")
+        logger.info("Cleaning up test data for user %s", self.test_user_id)
         # Optional: Delete test schema to clean up
         try:
             self.db_manager.supabase.rpc('sql', {
                 'command': f'DROP SCHEMA IF EXISTS "{self.db_manager.schema_name}" CASCADE;'
             }).execute()
-            logger.info(f"Dropped test schema {self.db_manager.schema_name}")
+            logger.info("Dropped test schema %s", self.db_manager.schema_name)
         except Exception as e:
-            logger.error(f"Error cleaning up: {e}")
+            logger.error("Error cleaning up: %s", e)
 
 
 def run_tests():

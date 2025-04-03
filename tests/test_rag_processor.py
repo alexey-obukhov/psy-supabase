@@ -328,7 +328,7 @@ class TestRAGProcessor:
             return result
 
         except Exception as e:
-            self.logger.error(f"Error in pain point detection: {str(e)}")
+            self.logger.error("Error in pain point detection: %s", str(e))
             # Always return a valid structure even on errors
             return default_response
 

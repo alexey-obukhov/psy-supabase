@@ -42,7 +42,7 @@ class TestTemplateDebugging:
 
             def render(self, **kwargs):
                 self.render_called = True
-                logger.debug(f"Template.render() called with kwargs: {list(kwargs.keys())}")
+                logger.debug("Template.render() called with kwargs: %s", list(kwargs.keys()))
                 return "Rendered template content"
 
         debug_template = DebugTemplate()
@@ -60,12 +60,12 @@ class TestTemplateDebugging:
                     )
 
                     # If we get here without error, show successful flow
-                    logger.info(f"Success! Result: {result}")
-                    logger.info(f"Context accesses: {context.access_log}")
-                    logger.info(f"Template render called: {debug_template.render_called}")
+                    logger.info("Success! Result: %s", result)
+                    logger.info("Context accesses: %s", context.access_log)
+                    logger.info("Template render called: %s", debug_template.render_called)
         except Exception as e:
             # Capture detailed info about the error
-            logger.error(f"Exception caught: {str(e)}")
+            logger.error("Exception caught: %s", str(e))
             logger.error(traceback.format_exc())
 
     def test_debug_prompt_splitting(self, text_generator):
@@ -89,9 +89,9 @@ class TestTemplateDebugging:
                 )
                 checkpoint["value"] = 2
 
-                logger.info(f"Success! Result: {result}")
+                logger.info("Success! Result: %s", result)
         except Exception as e:
-            logger.error(f"Failure at checkpoint {checkpoint['value']}: {str(e)}")
+            logger.error("Failure at checkpoint %s: %s", checkpoint['value'], str(e))
             logger.error(traceback.format_exc())
 
     def test_isolate_mock_issues(self, text_generator):
@@ -102,7 +102,7 @@ class TestTemplateDebugging:
 
         # Create a special mock for tokenizer.encode that prints its argument
         def mock_encode(text, *args, **kwargs):
-            logger.debug(f"tokenizer.encode called with text: {repr(text)[:100]}...")
+            logger.debug("tokenizer.encode called with text: %s...", repr(text)[:100])
             # Check if text is actually a Mock
             if isinstance(text, Mock):
                 logger.error("tokenizer.encode received a Mock object instead of a string!")
@@ -119,9 +119,9 @@ class TestTemplateDebugging:
                     "test_template",
                     {'user_question': "test question"}
                 )
-                logger.info(f"Success! Result: {result}")
+                logger.info("Success! Result: %s", result)
             except Exception as e:
-                logger.error(f"Exception: {str(e)}")
+                logger.error("Exception: %s", str(e))
                 logger.error(traceback.format_exc())
 
     def test_bypass_template_rendering(self, text_generator):
@@ -134,7 +134,7 @@ class TestTemplateDebugging:
                 return "Pre-rendered template content"
 
         def bypass_load_template(name):
-            logger.debug(f"Bypassing template loading for: {name}")
+            logger.debug("Bypassing template loading for: %s", name)
             return BypassTemplate()
 
         # Apply patch
@@ -146,9 +146,9 @@ class TestTemplateDebugging:
                 "test_template",
                 {'user_question': "test question"}
             )
-            logger.info(f"Success with bypassed template! Result: {result}")
+            logger.info("Success with bypassed template! Result: %s", result)
         except Exception as e:
-            logger.error(f"Exception with bypassed template: {str(e)}")
+            logger.error("Exception with bypassed template: %s", str(e))
             logger.error(traceback.format_exc())
         finally:
             # Restore original method
@@ -165,7 +165,7 @@ class TestTemplateDebugging:
 
         def step_logger(step_name):
             steps.append(step_name)
-            logger.debug(f"Executing step: {step_name}")
+            logger.debug("Executing step: %s", step_name)
 
         try:
             with patch.object(text_generator, '_load_template', return_value=mock_template):
@@ -186,17 +186,17 @@ class TestTemplateDebugging:
                 token_count = len(text_generator.tokenizer.encode(prompt))
 
                 step_logger("Token count check")
-                logger.debug(f"Token count: {token_count}")
+                logger.debug("Token count: %d", token_count)
 
                 step_logger("Generating text")
                 response = text_generator.generate_text(prompt)
 
                 step_logger("Complete")
-                logger.info(f"Success! Response: {response}")
+                logger.info("Success! Response: %s", response)
 
         except Exception as e:
-            logger.error(f"Failed at step: {steps[-1]}")
-            logger.error(f"Exception: {str(e)}")
+            logger.error("Failed at step: %s", steps[-1])
+            logger.error("Exception: %s", str(e))
             logger.error(traceback.format_exc())
 
     def test_real_template_with_mock_functions(self, text_generator):
@@ -229,7 +229,7 @@ class TestTemplateDebugging:
 
             # Manually render template
             rendered = real_template.render(**context)
-            logger.info(f"Template rendered successfully: {rendered}")
+            logger.info("Template rendered successfully: %s", rendered)
 
             # Now try the whole function with a patched template
             with patch.object(text_generator, '_load_template', return_value=real_template):
@@ -239,17 +239,17 @@ class TestTemplateDebugging:
                         "test_template",
                         context
                     )
-                    logger.info(f"Function result: {result}")
+                    logger.info("Function result: %s", result)
 
         except Exception as e:
-            logger.error(f"Template test failed: {str(e)}")
+            logger.error("Template test failed: %s", str(e))
             logger.error(traceback.format_exc())
 
     def test_inspect_template_loading_code(self, text_generator):
         """Test focused on the template loading process."""
         # Inspect _load_template method
         template_dir = getattr(text_generator, 'template_dir', 'unknown')
-        logger.info(f"Template directory: {template_dir}")
+        logger.info("Template directory: %s", template_dir)
 
         # Mock the filesystem operations
         mock_template_content = """
@@ -270,15 +270,15 @@ class TestTemplateDebugging:
                     try:
                         # Try to load a template directly
                         template = text_generator._load_template('any_template')
-                        logger.info(f"Template loaded: {type(template)}")
+                        logger.info("Template loaded: %s", type(template))
 
                         # Try rendering it
                         rendered = template.render(user_question="test",
                                                 psychological_context={"emotion": "happy"})
-                        logger.info(f"Template rendered successfully: {rendered[:50]}...")
+                        logger.info("Template rendered successfully: %s...", rendered[:50])
 
                     except Exception as e:
-                        logger.error(f"Template loading failed: {str(e)}")
+                        logger.error("Template loading failed: %s", str(e))
                         logger.error(traceback.format_exc())
 
     def test_pinpoint_template_render_issue(self, text_generator):
@@ -314,7 +314,7 @@ class TestTemplateDebugging:
 
                     def instrumented_encode(text, *args, **kwargs):
                         # THIS IS THE KEY PROBLEM: text might be a Mock instead of a string
-                        logger.info(f"tokenizer.encode called with type: {type(text)}")
+                        logger.info("tokenizer.encode called with type: %s", type(text))
                         if isinstance(text, Mock):
                             logger.error("FOUND THE BUG: encode received a Mock instead of string!")
                             # Return something valid to continue
@@ -333,13 +333,13 @@ class TestTemplateDebugging:
                     )
                     stages.append("After function call")
 
-                    logger.info(f"Result: {result}")
+                    logger.info("Result: %s", result)
                     # Restore original
                     text_generator.tokenizer.encode = original_encode
 
         except Exception as e:
-            logger.error(f"Failed at stage: {stages[-1]}")
-            logger.error(f"Exception: {str(e)}")
+            logger.error("Failed at stage: %s", stages[-1])
+            logger.error("Exception: %s", str(e))
             logger.error(traceback.format_exc())
 
             # Check for the specific iteration error
@@ -385,8 +385,8 @@ class TestTemplateDebugging:
                 )
 
                 # Check success
-                logger.info(f"SUCCESS! Result: {result}")
-                logger.info(f"Template was rendered with context keys: {list(safe_template.calls[0].keys())}")
+                logger.info("SUCCESS! Result: %s", result)
+                logger.info("Template was rendered with context keys: %s", list(safe_template.calls[0].keys()))
 
     def test_example_with_clean_setup(self, mock_model, mock_tokenizer):
         """Test example with clean TextGenerator setup."""

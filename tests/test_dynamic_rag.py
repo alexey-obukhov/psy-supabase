@@ -22,7 +22,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         super().setUp()
 
         # Log that we're setting up the DynamicRAG test
-        self.logger.info(f"Setting up DynamicRAGRetriever test for session {self.test_session_id}")
+        self.logger.info("Setting up DynamicRAGRetriever test for session %s", self.test_session_id)
 
         # Create a mock database manager - use session ID from parent
         self.mock_db = MagicMock()
@@ -53,13 +53,13 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
 
         # Initialize the retriever with mock DB
         self.retriever = DynamicRAGRetriever(self.mock_db, self.session_id)
-        self.logger.info(f"Initialized DynamicRAGRetriever with session ID: {self.session_id}")
+        self.logger.info("Initialized DynamicRAGRetriever with session ID: %s", self.session_id)
 
         # Verify templates directory exists
         if not os.path.exists(self.templates_dir):
-            self.logger.warning(f"Templates directory not found at {self.templates_dir}")
+            self.logger.warning("Templates directory not found at %s", self.templates_dir)
         else:
-            self.logger.debug(f"Templates directory found at {self.templates_dir}")
+            self.logger.debug("Templates directory found at %s", self.templates_dir)
 
 
     def test_template_existence(self):
@@ -315,7 +315,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         try:
             # Setup
             query = "I feel anxious about my exam"
-            self.logger.debug(f"Using session ID: {self.session_id}")
+            self.logger.debug("Using session ID: %s", self.session_id)
 
             # Call the method - should get special handling in the method
             result = self.retriever.get_combined_retrieval_workflow(query, self.session_id)
@@ -325,7 +325,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
             self.logger.info("Combined retrieval workflow test passed")
         except AssertionError as e:
             # If the test fails, run diagnostics
-            self.logger.error(f"Test failed with error: {e}")
+            self.logger.error("Test failed with error: %s", e)
             self.run_diagnostics(e)
             raise  # Re-raise the exception after diagnostics
 
@@ -380,36 +380,36 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
     def run_diagnostics(self, error=None):
         """Run diagnostics when a test fails."""
         if error:
-            self.logger.error(f"Test failed with error: {error}")
+            self.logger.error("Test failed with error: %s", error)
 
         # First run the base diagnostics
         has_real_db, has_mock_db = self.run_diagnostics_summary()
 
         # Then add DynamicRAG-specific diagnostics
         self.logger.info("=== DynamicRAG-Specific Diagnostics ===")
-        self.logger.info(f"DynamicRAGRetriever cache size: {len(self.retriever.query_cache)}")
+        self.logger.info("DynamicRAGRetriever cache size: %d", len(self.retriever.query_cache))
 
         # Add specialized mock checks for this test class
         if has_mock_db:
-            self.logger.info(f"create_embedding call count: {self.mock_db.create_embedding.call_count}")
-            self.logger.info(f"find_similar_interactions_by_embedding call count: {self.mock_db.find_similar_interactions_by_embedding.call_count}")
+            self.logger.info("create_embedding call count: %d", self.mock_db.create_embedding.call_count)
+            self.logger.info("find_similar_interactions_by_embedding call count: %d", self.mock_db.find_similar_interactions_by_embedding.call_count)
 
         # Add DynamicRAG-specific diagnostics
         self.logger.info("=== DynamicRAG-Specific Diagnostics ===")
-        self.logger.info(f"Current session ID: {self.session_id}")
-        self.logger.info(f"DynamicRAGRetriever cache size: {len(self.retriever.query_cache)}")
+        self.logger.info("Current session ID: %s", self.session_id)
+        self.logger.info("DynamicRAGRetriever cache size: %d", len(self.retriever.query_cache))
 
         # Check mock call counts
-        self.logger.info(f"create_embedding call count: {self.mock_db.create_embedding.call_count}")
-        self.logger.info(f"find_similar_interactions_by_embedding call count: {self.mock_db.find_similar_interactions_by_embedding.call_count}")
+        self.logger.info("create_embedding call count: %s", self.mock_db.create_embedding.call_count)
+        self.logger.info("find_similar_interactions_by_embedding call count: %d", self.mock_db.find_similar_interactions_by_embedding.call_count)
 
         # Display template information
         if os.path.exists(self.templates_dir):
             template_files = os.listdir(self.templates_dir)
-            self.logger.info(f"Available templates ({len(template_files)}): {', '.join(template_files)}")
+            self.logger.info("Available templates (%s): %d", len(template_files), ', '.join(template_files))
 
         # Examine the RAG processor configuration
-        self.logger.info(f"DynamicRAGRetriever associative memory initialized: {hasattr(self.retriever, 'associative_memory')}")
+        self.logger.info("DynamicRAGRetriever associative memory initialized: %s", hasattr(self.retriever, 'associative_memory'))
 
     def tearDown(self):
         """DynamicRAG-specific tearDown with more detailed diagnostics."""
@@ -423,7 +423,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
                 self.run_diagnostics()  # Run full diagnostics
 
         except Exception as e:
-            self.logger.error(f"Error in DynamicRAG tearDown: {e}")
+            self.logger.error("Error in DynamicRAG tearDown: %s", e)
 
         # Then call parent tearDown which will run basic diagnostics
         super().tearDown()

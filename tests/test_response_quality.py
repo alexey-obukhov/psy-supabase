@@ -40,7 +40,7 @@ def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
     This fixture includes memory cleanup even if the test fails.
     """
     try:
-        logger.info(f"Setting up TextGenerator on {DEVICE}...")
+        logger.info("Setting up TextGenerator on %s...", DEVICE)
 
         # For GitHub Actions, use a fully mocked model
         if RUNNING_IN_GITHUB_ACTIONS:

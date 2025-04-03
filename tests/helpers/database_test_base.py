@@ -11,8 +11,8 @@ class DatabaseTestBase(TestCase):
         self.logger.info("Setting up database test environment")
         self.test_user_id = f"test_user_{uuid.uuid4().hex[:8]}"
         self.test_session_id = f"test_session_{uuid.uuid4().hex[:10]}"
-        self.logger.info(f"Test user ID: {self.test_user_id}")
-        self.logger.info(f"Test session ID: {self.test_session_id}")
+        self.logger.info("Test user ID: %s", self.test_user_id)
+        self.logger.info("Test session ID: %s", self.test_session_id)
 
     def setup_test_environment(self):
         """Set up the test environment, creating necessary tables."""
@@ -41,7 +41,7 @@ class DatabaseTestBase(TestCase):
                     # Extract and log the actual result data
                     if hasattr(query_result, 'data') and query_result.data:
                         status = query_result.data[0].get('status', 'Unknown')
-                        self.logger.info(f"Database connection test result: {status}")
+                        self.logger.info("Database connection test result: %s", status)
                     else:
                         self.logger.warning("Database connection test returned no data")
 
@@ -51,7 +51,7 @@ class DatabaseTestBase(TestCase):
 
                     if hasattr(schema_result, 'data') and schema_result.data:
                         current_schema = schema_result.data[0].get('schema', 'Unknown')
-                        self.logger.info(f"Currently using schema: {current_schema}")
+                        self.logger.info("Currently using schema: %s", current_schema)
 
                     # Check for tables in the current schema
                     tables_query = """
@@ -63,19 +63,19 @@ class DatabaseTestBase(TestCase):
                     tables_result = db.supabase.rpc('sql', {'command': tables_query}).execute()
 
                     if hasattr(tables_result, 'data') and tables_result.data:
-                        self.logger.info(f"Found {len(tables_result.data)} tables in schema {current_schema}:")
+                        self.logger.info("Found %d tables in schema %s:", len(tables_result.data), current_schema)
                         for table in tables_result.data:
-                            self.logger.info(f"  - {table.get('table_name')} ({table.get('table_type')})")
+                            self.logger.info("  - %s (%s)", table.get('table_name'), table.get('table_type'))
                     else:
-                        self.logger.warning(f"No tables found in schema {current_schema}")
+                        self.logger.warning("No tables found in schema %s", current_schema)
 
                 except Exception as e:
-                    self.logger.error(f"Database connection failed: {e}")
+                    self.logger.error("Database connection failed: %s", e)
             else:
                 self.logger.warning("Using mock database - connectivity tests skipped")
 
         except Exception as e:
-            self.logger.error(f"Error during diagnostics: {e}")
+            self.logger.error("Error during diagnostics: %s", e)
             import traceback
             self.logger.error(traceback.format_exc())
 
@@ -86,7 +86,7 @@ class DatabaseTestBase(TestCase):
     def run_diagnostics_summary(self):
         """Run a basic diagnostic summary that works for all database tests."""
         self.logger.info("=== Basic Database Diagnostics Summary ===")
-        self.logger.info(f"Test session ID: {self.test_session_id}")
+        self.logger.info("Test session ID: %s", self.test_session_id)
 
         # Check if we have a db_manager or mock_db
         has_real_db = hasattr(self, 'db_manager')
@@ -110,4 +110,4 @@ class DatabaseTestBase(TestCase):
             # Always run basic diagnostics
             self.run_diagnostics_summary()
         except Exception as e:
-            self.logger.error(f"Error in base tearDown diagnostics: {e}")
+            self.logger.error("Error in base tearDown diagnostics: %s", e)
