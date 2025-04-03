@@ -49,6 +49,7 @@ Usage:
 import os
 import sys
 import uuid
+from typeguard import typechecked
 from school_logging.log import ColoredLogger
 from collections import Counter
 from typing import List, Dict, Any, Optional, Set
@@ -215,6 +216,7 @@ class PainPointDetectionTester:
 
         logger.info("Test environment setup complete")
 
+    @typechecked
     def _simulate_conversation(self, conversation: Dict[str, Any]) -> Dict[str, Any]:
         """
         Simulate a conversation and track pain point detection.
@@ -249,14 +251,13 @@ class PainPointDetectionTester:
 
             # Get the most recent interaction's metadata
             try:
-                # FIXED: Remove 'limit' parameter which isn't supported
                 history: List[Dict[str, Any]] = self.db_manager.get_conversation_history(self.test_session_id)
 
                 # Get just the latest message (the one we just added)
                 latest_interaction: Dict[str, Any] = history[-1] if history else {}
 
                 # Convert metadata from string to dict if needed
-                metadata: Dict[str, Any] = latest_interaction.get("metadata", {})
+                metadata, _ = latest_interaction.get("metadata", [])
                 if isinstance(metadata, str):
                     try:
                         metadata = json.loads(metadata)
@@ -264,7 +265,7 @@ class PainPointDetectionTester:
                         logger.error("Error parsing metadata JSON: %s", e)
                         metadata = {}
 
-                # IMPROVED: Handle both field naming conventions
+                # Handle both field naming conventions
                 # Extract pain point information with fallbacks
                 pain_point_detected: bool = metadata.get("pain_point_detected", False)
 
@@ -412,8 +413,8 @@ class PainPointDetectionTester:
                 }
             ).execute()
 
+            topics = []
             if response.data:
-                topics = []
                 for item in response.data:
                     topics.append({
                         "topic": item.get('topic', 'Unknown topic'),

@@ -305,7 +305,7 @@ def test_format_of_associated_results(associative_memory, memory_data):
         ["insomnia", "sleep", "anxiety"]
     )
 
-    # Then add associated memory with shared topics
+    # Associated memory with shared topics
     associative_memory.add_memory(
         "Cognitive Behavioral Therapy (CBT) is effective for treating insomnia.",
         ["insomnia", "treatment", "therapy"]

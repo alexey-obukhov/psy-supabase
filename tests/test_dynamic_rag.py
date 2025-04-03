@@ -385,7 +385,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         # First run the base diagnostics
         has_real_db, has_mock_db = self.run_diagnostics_summary()
 
-        # Then add DynamicRAG-specific diagnostics
+        # DynamicRAG-specific diagnostics
         self.logger.info("=== DynamicRAG-Specific Diagnostics ===")
         self.logger.info("DynamicRAGRetriever cache size: %d", len(self.retriever.query_cache))
 

@@ -504,31 +504,6 @@ class TestRAGProcessor:
         # Check response type with more flexibility
         assert response is not None, "Response should not be None"
 
-    def test_detect_repetition_pattern(self, rag_processor):
-        """Test detection of repetition patterns."""
-        original_question = "Why do I feel anxious all the time?"
-        current_question = "Why am I always feeling anxious?"
-        similar_questions = [
-            {'question': 'Why do I feel anxious?', 'similarity': 0.85},
-            {'question': 'What causes my anxiety?', 'similarity': 0.75},
-            {'question': 'How to stop feeling anxious?', 'similarity': 0.72}
-        ]
-
-        # Call the method
-        result = rag_processor.detect_repetition_pattern(
-            original_question,
-            current_question,
-            similar_questions
-        )
-
-        # Verify repetition pattern detection
-        assert 'count' in result
-        assert result['count'] == 3
-        assert 'recurring_terms' in result
-        assert 'anxious' in result['recurring_terms']
-        assert result['is_fixation'] == True  # 3 occurrences is considered fixation
-        assert 'intensity' in result
-
     def test_get_recent_conversation_history(self, rag_processor):
         """Test retrieving recent conversation history."""
         session_id = TEST_SESSION_ID

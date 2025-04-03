@@ -270,7 +270,7 @@ class TestDatabaseManager:
         mock_response.data = SAMPLE_SIMILAR_DOCUMENTS
         db_manager.supabase.rpc.return_value.execute.return_value = mock_response
 
-        # FIXED - Call with named parameters to avoid confusion
+        # Call with named parameters to avoid confusion
         result = db_manager.find_similar_documents(
             embedding=[0.1, 0.2, 0.3],  # Use named parameter
             query_text=None,            # Explicitly set query_text to None

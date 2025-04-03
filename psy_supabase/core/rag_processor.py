@@ -54,15 +54,12 @@ psy_supabase.utilities.prompt_selector: Therapeutic prompt selection
 psy_supabase.utilities.embedding_utils: Vector embedding utilities
 """
 from typing import List, Dict, Any, Optional
-from datetime import datetime
 import json
-import re
 import traceback
 from typeguard import typechecked
 
 from school_logging.log import ColoredLogger
 from psy_supabase.core.database import DatabaseManager
-from psy_supabase.utilities.keep_words import keep_words
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.safety_handler import SafetyHandler
@@ -614,36 +611,6 @@ class RAGProcessor:
                 'has_conversation': False,
                 'user_question': user_question  # Include user question even in error case
             }
-
-    def detect_repetition_pattern(self, original_question: str, current_question: str, similar_questions: List[Dict]) -> Dict:
-        """
-        Analyze repetition patterns in similar questions to detect psychological fixation.
-
-        Args:
-            original_question: The first occurrence of this question
-            current_question: The current question
-            similar_questions: List of similar questions identified
-
-        Returns:
-            Dictionary with repetition pattern data
-        """
-        # Count occurrences of highly similar questions
-        high_similarity_count = sum(1 for q in similar_questions if q['similarity'] > 0.7)
-
-        # Extract key terms that appear in both original and current question
-        original_terms = set(re.findall(r'\b\w+\b', original_question.lower()))
-        current_terms = set(re.findall(r'\b\w+\b', current_question.lower()))
-
-        recurring_terms = original_terms.intersection(current_terms)
-
-        significant_terms = [term for term in recurring_terms if term not in keep_words and len(term) > 2]
-
-        return {
-            'count': high_similarity_count,
-            'recurring_terms': list(significant_terms),
-            'is_fixation': high_similarity_count >= 3,  # Consider it fixation if asked 3+ times
-            'intensity': min(high_similarity_count / 5, 1.0)  # Scale intensity, max 1.0
-        }
 
     def _generate_pain_point_approach(self, original_question: str, current_question: str,
                                       emotions: List[Dict], repetition_pattern: Dict) -> Dict:

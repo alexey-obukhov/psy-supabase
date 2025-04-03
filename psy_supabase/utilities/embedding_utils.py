@@ -33,29 +33,7 @@ Usage:
     formatted_embedding_np = format_embedding_for_db(embedding_np)
     print(formatted_embedding_np)  # Output: [0.1,0.2,0.3]
 """
-def format_embedding_for_db_obs(embedding):
-    """
-    Format an embedding vector for PostgreSQL pgvector.
-
-    Args:
-        embedding: Embedding vector (list, numpy array, or tensor)
-
-    Returns:
-        str: Formatted embedding string for PostgreSQL
-    """
-    # Handle different embedding types
-    if hasattr(embedding, 'tolist') and callable(getattr(embedding, 'tolist')):
-        # Handle numpy arrays or PyTorch tensors
-        embedding_list = embedding.tolist()
-    elif isinstance(embedding, list):
-        # Already a list
-        embedding_list = embedding
-    else:
-        # Try conversion to list
-        embedding_list = list(embedding)
-
-    # Convert to string format expected by pgvector
-    return str(embedding_list).replace(' ', '')
+from typing import List, Dict
 
 def format_embedding_for_db(embedding):
     """
@@ -89,3 +67,36 @@ def format_embedding_for_db_old(embedding):
 
     # Format as [0.1,0.2,0.3,...] - no spaces
     return '[' + ','.join(str(float(x)) for x in embedding) + ']'
+
+def detect_repetition_pattern(original_question: str, current_question: str, similar_questions: List[Dict]) -> Dict:
+    """
+    Analyze repetition patterns in similar questions to detect psychological fixation.
+
+    Args:
+        original_question: The first occurrence of this question
+        current_question: The current question
+        similar_questions: List of similar questions identified
+
+    Returns:
+        Dictionary with repetition pattern data
+    """
+    import re
+    from psy_supabase.utilities.keep_words import keep_words
+
+    # Count occurrences of highly similar questions with threshold 0.7 from supabase queries
+    high_similarity_count = sum(1 for q in similar_questions if q['similarity'] > 0.7)
+
+    # Extract key terms that appear in both original and current question
+    original_terms = set(re.findall(r'\b\w+\b', original_question.lower()))
+    current_terms = set(re.findall(r'\b\w+\b', current_question.lower()))
+
+    recurring_terms = original_terms.intersection(current_terms)
+
+    significant_terms = [term for term in recurring_terms if term not in keep_words and len(term) > 2]
+
+    return {
+        'count': high_similarity_count,
+        'recurring_terms': list(significant_terms),
+        'is_fixation': high_similarity_count >= 3,  # Consider it fixation if asked 3+ times
+        'intensity': min(high_similarity_count / 5, 1.0)  # Scale intensity, max 1.0
+    }

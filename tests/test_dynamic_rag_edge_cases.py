@@ -114,7 +114,7 @@ class TestDynamicRAGIntegration(unittest.TestCase):
         # Setup mock response for create_embedding
         self.mock_db.create_embedding.return_value = [0.1] * 384
 
-        # FIXED: Mock the correct method that's actually being called
+        # Mock the correct method that's actually being called
         self.mock_db.find_similar_interactions_by_embedding.return_value = [
             {
                 "interaction_id": 1,
