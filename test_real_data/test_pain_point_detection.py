@@ -55,7 +55,8 @@ from typing import List, Dict, Any, Optional, Set
 import json
 # import multiprocessing as mp
 from psy_supabase.utilities.common import is_github_actions
-from psy_supabase.utilities.utils import cleanup_memory, stop_words
+from psy_supabase.utilities.utils import cleanup_memory
+from psy_supabase.utilities.stop_words import stop_words
 from psy_supabase.memory.associative_memory import AssociativeMemory
 
 # Set up logging
