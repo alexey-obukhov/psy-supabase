@@ -186,16 +186,16 @@ jobs:
           echo "Warning: coverage.xml not found, using default value"
           COVERAGE="0.0"
         fi
-        
+
         # Calculate percentage with error handling
         COVERAGE_PCT=$(python -c "try: print(round(float('$COVERAGE') * 100, 2)); except: print(0.0)")
-        
+
         echo "COVERAGE_PCT=$COVERAGE_PCT" >> $GITHUB_ENV
         echo "## Test Coverage: $COVERAGE_PCT%" >> $GITHUB_STEP_SUMMARY
-        
+
         # Create a badge JSON file for shields.io
         COLOR=$(python -c "try: coverage = float('$COVERAGE_PCT'); print('red' if coverage < 50 else 'yellow' if coverage < 80 else 'green'); except: print('red')")
-        
+
         echo "{\"schemaVersion\": 1, \"label\": \"coverage\", \"message\": \"$COVERAGE_PCT%\", \"color\": \"$COLOR\"}" > reports/coverage-badge.json
 
     - name: Upload coverage report
