@@ -178,27 +178,19 @@ jobs:
 
     - name: Generate coverage badge
       run: |
-        # Check if coverage.xml exists first
-        if [ -f coverage.xml ]; then
-          # Extract coverage percentage safely
-          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; import sys; \
-            try: print(ET.parse('coverage.xml').getroot().attrib['line-rate']); \
-            except Exception as e: print('0.0'); sys.stderr.write(f'Warning: {str(e)}\n')")
+        mkdir -p reports
 
-          # Convert to percentage
-          COVERAGE_PCT=$(python -c "try: print(round(float('$COVERAGE') * 100, 2)); except: print(0.0)")
-        else
-          echo "Warning: coverage.xml not found, using default value"
-          COVERAGE_PCT="0.0"
-        fi
+        # Extract coverage if coverage.xml exists
+        COVERAGE="0.0"
+        [ -f coverage.xml ] && COVERAGE=$(python -c "import xml.etree.ElementTree as ET; print(ET.parse('coverage.xml').getroot().attrib.get('line-rate', '0.0'))")
+
+        # Convert to percentage
+        COVERAGE_PCT=$(python -c "print(round(float('$COVERAGE') * 100, 2))")
+        COLOR=$(python -c "c=float('$COVERAGE_PCT'); print('red' if c < 50 else 'yellow' if c < 80 else 'green')")
 
         echo "COVERAGE_PCT=$COVERAGE_PCT" >> $GITHUB_ENV
         echo "## Test Coverage: $COVERAGE_PCT%" >> $GITHUB_STEP_SUMMARY
 
-        # Determine badge color
-        COLOR=$(python -c "try: coverage = float('$COVERAGE_PCT'); print('red' if coverage < 50 else 'yellow' if coverage < 80 else 'green'); except: print('red')")
-
-        # Create badge JSON
         echo "{\"schemaVersion\": 1, \"label\": \"coverage\", \"message\": \"$COVERAGE_PCT%\", \"color\": \"$COLOR\"}" > reports/coverage-badge.json
 
     - name: Upload coverage report
