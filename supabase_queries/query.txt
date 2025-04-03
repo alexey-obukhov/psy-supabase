@@ -1,4 +1,4 @@
--- First, drop all existing functions
+-- First, drop all existing functions 
 DROP FUNCTION IF EXISTS get_schema_exists(text);
 DROP FUNCTION IF EXISTS get_conversation_history(text, text);
 DROP FUNCTION IF EXISTS create_new_schema(text);
@@ -12,7 +12,6 @@ DROP FUNCTION IF EXISTS find_similar_documents(text, text, integer, float);
 DROP FUNCTION IF EXISTS add_vector_index_to_knowledge_base(text);
 DROP FUNCTION IF EXISTS create_concept_connections_table(text);
 DROP FUNCTION IF EXISTS connect_psychological_concepts(text, integer, integer, text, float);
-DROP FUNCTION IF EXISTS get_psychological_connections(text, integer, text);
 DROP FUNCTION IF EXISTS mark_therapeutic_insight(text, integer, text);
 DROP FUNCTION IF EXISTS find_psychological_memories(text, text, text, integer, float);
 DROP FUNCTION IF EXISTS analyze_theme_clusters(text, text, float, integer);
@@ -28,14 +27,11 @@ DROP FUNCTION IF EXISTS find_similar_interactions(text, text, int);
 DROP FUNCTION IF EXISTS analyze_conversation_themes(text, int);
 DROP FUNCTION IF EXISTS analyze_emotional_trajectory(text, int);
 DROP FUNCTION IF EXISTS initialize_knowledge_base(text, jsonb);
-DROP FUNCTION IF EXISTS analyze_conversation_topics(text, int);
 DROP FUNCTION IF EXISTS analyze_conversation_topics(text, text, int);
-DROP FUNCTION IF EXISTS optimize_vector_queries(text);
 DROP FUNCTION IF EXISTS get_high_quality_interactions(text, text, float, integer);
 DROP FUNCTION IF EXISTS add_session_id_column(text);
 DROP FUNCTION IF EXISTS ensure_session_id_column(text);
 DROP FUNCTION IF EXISTS get_columns_types(text);
-
 
 
 -- Enable the vector extension
@@ -124,7 +120,7 @@ BEGIN
             content TEXT,
             embedding vector(2048)
         );', schema_name);
-
+        
     -- Create interaction_embeddings table with foreign key to interactions
     EXECUTE format('
         CREATE TABLE IF NOT EXISTS "%s".interaction_embeddings (
@@ -134,12 +130,12 @@ BEGIN
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT unique_interaction UNIQUE(interaction_id)
         );', schema_name, schema_name);
-
+        
     -- Simple index creation with error handling for knowledge_base
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx
-            ON "%s".knowledge_base
+            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx 
+            ON "%s".knowledge_base 
             USING ivfflat (embedding vector_cosine_ops)
             WITH (lists = 100);
         ', schema_name);
@@ -147,12 +143,12 @@ BEGIN
         -- Log the error but continue (index creation is not critical)
         RAISE NOTICE 'Knowledge base index creation failed: %', SQLERRM;
     END;
-
+    
     -- Index for interactions.embedding
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS interactions_embedding_idx
-            ON "%s".interactions
+            CREATE INDEX IF NOT EXISTS interactions_embedding_idx 
+            ON "%s".interactions 
             USING ivfflat (embedding vector_cosine_ops)
             WITH (lists = 100);
         ', schema_name);
@@ -160,12 +156,12 @@ BEGIN
         -- Log the error but continue
         RAISE NOTICE 'Interactions embedding index creation failed: %', SQLERRM;
     END;
-
+    
     -- Index for interaction_embeddings.embedding
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS interaction_embeddings_idx
-            ON "%s".interaction_embeddings
+            CREATE INDEX IF NOT EXISTS interaction_embeddings_idx 
+            ON "%s".interaction_embeddings 
             USING ivfflat (embedding vector_cosine_ops)
             WITH (lists = 100);
         ', schema_name);
@@ -173,9 +169,9 @@ BEGIN
         -- Log the error but continue
         RAISE NOTICE 'Interaction embeddings index creation failed: %', SQLERRM;
     END;
-
+    
     RETURN TRUE;
-
+    
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error creating schema: %', SQLERRM;
     RETURN FALSE;
@@ -253,8 +249,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to get topic-specific interactions
 CREATE OR REPLACE FUNCTION get_topic_interactions(
-    p_schema_name TEXT,
-    p_topic_name TEXT,
+    p_schema_name TEXT, 
+    p_topic_name TEXT, 
     p_session_id TEXT DEFAULT NULL,
     p_max_limit INTEGER DEFAULT 5
 )
@@ -262,7 +258,7 @@ RETURNS TABLE (
     interaction_id INTEGER,
     context TEXT,
     question TEXT,
-    answer TEXT,
+    answer TEXT, 
     metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE
 ) AS $$
@@ -302,12 +298,12 @@ DECLARE
 BEGIN
     -- First ensure the session_id column exists
     PERFORM add_session_id_column(p_schema_name);
-
+    
     -- Add session_id to metadata if provided
     IF p_session_id IS NOT NULL THEN
         p_metadata = p_metadata || jsonb_build_object('session_id', p_session_id);
     END IF;
-
+    
     -- Check if session_id column exists directly rather than relying on the function
     SELECT EXISTS (
         SELECT FROM information_schema.columns
@@ -315,7 +311,7 @@ BEGIN
         AND table_name = 'interactions'
         AND column_name = 'session_id'
     ) INTO has_session_column;
-
+    
     -- Insert with session_id if the column exists
     IF has_session_column AND p_session_id IS NOT NULL THEN
         BEGIN
@@ -349,9 +345,9 @@ BEGIN
         INTO new_id
         USING p_context, p_question, p_answer, p_metadata;
     END IF;
-
+    
     RETURN new_id;
-EXCEPTION
+EXCEPTION 
     WHEN OTHERS THEN
         RAISE NOTICE 'Error in add_interaction: %', SQLERRM;
         RETURN NULL;
@@ -375,10 +371,10 @@ SECURITY DEFINER
 AS $$
 BEGIN
     RETURN QUERY EXECUTE format('
-        SELECT
-            id,
-            content,
-            embedding::text,
+        SELECT 
+            id, 
+            content, 
+            embedding::text, 
             1 - (embedding <=> %s::vector) as similarity
         FROM %I.knowledge_base
         WHERE 1 - (embedding <=> %s::vector) > %L  -- Ensure minimum similarity
@@ -399,21 +395,21 @@ BEGIN
     WHERE table_schema = p_schema_name
     AND table_name = 'interactions'
     AND column_name = 'session_id';
-
+    
     IF NOT FOUND THEN
         -- Add column
         EXECUTE format('
-            ALTER TABLE "%s".interactions
+            ALTER TABLE "%s".interactions 
             ADD COLUMN session_id TEXT;
         ', p_schema_name);
-
+        
         -- Create index
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS idx_%s_interactions_session_id
+            CREATE INDEX IF NOT EXISTS idx_%s_interactions_session_id 
             ON "%s".interactions(session_id);
         ', p_schema_name, p_schema_name);
     END IF;
-
+    
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
     RETURN FALSE;
@@ -427,12 +423,12 @@ BEGIN
     -- Try to create the index
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx
-            ON "%s".knowledge_base
+            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx 
+            ON "%s".knowledge_base 
             USING ivfflat (embedding vector_cosine_ops)
             WITH (lists = 100);
         ', schema_name);
-
+        
         RETURN TRUE;
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Failed to create index: %', SQLERRM;
@@ -456,7 +452,7 @@ BEGIN
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(source_id, target_id)
         );', schema_name);
-
+    
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Failed to create concept_connections table: %', SQLERRM;
@@ -478,61 +474,25 @@ DECLARE
 BEGIN
     -- Ensure the table exists
     PERFORM create_concept_connections_table(p_schema_name);
-
+    
     -- Insert the new connection
     EXECUTE format('
-        INSERT INTO "%s".concept_connections
+        INSERT INTO "%s".concept_connections 
         (source_id, target_id, relationship_type, strength)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (source_id, target_id)
-        DO UPDATE SET
+        ON CONFLICT (source_id, target_id) 
+        DO UPDATE SET 
             relationship_type = $3,
             strength = $4
         RETURNING id;
     ', p_schema_name)
     INTO new_id
     USING p_source_id, p_target_id, p_relationship_type, p_strength;
-
+    
     RETURN new_id;  -- Return the new or updated ID
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error connecting concepts: %', SQLERRM;
     RETURN -1;  -- Return -1 to indicate an error
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Function to get psychological connections
-CREATE OR REPLACE FUNCTION get_psychological_connections(
-    p_schema_name TEXT,
-    p_concept_id INTEGER,
-    p_relationship_type TEXT DEFAULT NULL
-)
-RETURNS TABLE (
-    id INTEGER,
-    source_id INTEGER,
-    target_id INTEGER,
-    relationship_type TEXT,
-    strength FLOAT,
-    created_at TIMESTAMP WITH TIME ZONE
-) AS $$
-BEGIN
-    IF p_relationship_type IS NULL THEN
-        RETURN QUERY EXECUTE format('
-            SELECT id, source_id, target_id, relationship_type, strength, created_at
-            FROM "%s".concept_connections
-            WHERE source_id = $1 OR target_id = $1
-            ORDER BY strength DESC;
-        ', p_schema_name)
-        USING p_concept_id;
-    ELSE
-        RETURN QUERY EXECUTE format('
-            SELECT id, source_id, target_id, relationship_type, strength, created_at
-            FROM "%s".concept_connections
-            WHERE (source_id = $1 OR target_id = $1)
-            AND relationship_type = $2
-            ORDER BY strength DESC;
-        ', p_schema_name)
-        USING p_concept_id, p_relationship_type;
-    END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -545,19 +505,19 @@ CREATE OR REPLACE FUNCTION mark_therapeutic_insight(
 RETURNS BOOLEAN AS $$
 BEGIN
     EXECUTE format('
-        UPDATE "%s".interactions
+        UPDATE "%s".interactions 
         SET metadata = jsonb_set(
-            CASE
-                WHEN metadata IS NULL THEN ''{}''::jsonb
+            CASE 
+                WHEN metadata IS NULL THEN ''{}''::jsonb 
                 WHEN metadata::text = '''' THEN ''{}''::jsonb
-                ELSE metadata::jsonb
-            END,
-            ''{"insight_level"}'',
+                ELSE metadata::jsonb 
+            END, 
+            ''{"insight_level"}'', 
             ''"%s"''::jsonb
         )
         WHERE interaction_id = %s;
     ', p_schema_name, p_insight_level, p_interaction_id);
-
+    
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Failed to mark therapeutic insight: %', SQLERRM;
@@ -585,31 +545,31 @@ BEGIN
     -- Create a session-specific GIN index on metadata->>'session_id' if needed
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS %I_session_idx
+            CREATE INDEX IF NOT EXISTS %I_session_idx 
             ON %I.interactions ((metadata->>''session_id''));
         ', p_schema_name, p_schema_name);
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Session index creation failed: %', SQLERRM;
     END;
-
+    
     -- Use ORDER BY for vector search (faster than filtering with WHERE)
     RETURN QUERY EXECUTE format('
-        SELECT
+        SELECT 
             i.interaction_id,
             i.question,
             i.answer,
             i.context,
             i.metadata,
             1 - (ie.embedding <=> %L::vector) as similarity
-        FROM
+        FROM 
             %I.interactions i
-        JOIN
+        JOIN 
             %I.interaction_embeddings ie
-        ON
+        ON 
             i.interaction_id = ie.interaction_id
-        WHERE
+        WHERE 
             i.metadata->>''session_id'' = %L
-        ORDER BY
+        ORDER BY 
             ie.embedding <=> %L::vector
         LIMIT %s;
     ', p_embedding, p_schema_name, p_schema_name, p_session_id, p_embedding, p_limit);
@@ -634,7 +594,7 @@ BEGIN
     IF p_session_id IS NOT NULL THEN
         RETURN QUERY EXECUTE format('
             WITH psychological_data AS (
-                SELECT
+                SELECT 
                     interaction_id,
                     question,
                     embedding,
@@ -645,7 +605,7 @@ BEGIN
             ),
             -- Calculate similarity matrix between interactions
             similarity_matrix AS (
-                SELECT
+                SELECT 
                     a.interaction_id as id1,
                     b.interaction_id as id2,
                     a.theme,
@@ -656,7 +616,7 @@ BEGIN
             ),
             -- Group by theme and calculate average similarity
             theme_clusters AS (
-                SELECT
+                SELECT 
                     theme,
                     AVG(similarity) AS avg_similarity,
                     COUNT(*) AS cluster_size,
@@ -679,7 +639,7 @@ BEGIN
     ELSE
         RETURN QUERY EXECUTE format('
             WITH psychological_data AS (
-                SELECT
+                SELECT 
                     interaction_id,
                     question,
                     embedding,
@@ -689,7 +649,7 @@ BEGIN
             ),
             -- Calculate similarity matrix between interactions
             similarity_matrix AS (
-                SELECT
+                SELECT 
                     a.interaction_id as id1,
                     b.interaction_id as id2,
                     a.theme,
@@ -700,7 +660,7 @@ BEGIN
             ),
             -- Group by theme and calculate average similarity
             theme_clusters AS (
-                SELECT
+                SELECT 
                     theme,
                     AVG(similarity) AS avg_similarity,
                     COUNT(*) AS cluster_size,
@@ -743,27 +703,27 @@ BEGIN
     -- Create a positive emotional progress vector (this is a simplification)
     RETURN QUERY EXECUTE format('
         WITH emotional_states AS (
-            SELECT
+            SELECT 
                 interaction_id,
                 metadata->''emotional_state'' AS state,
                 (metadata->''emotional_intensity'')::FLOAT AS intensity,
                 embedding,
                 created_at
             FROM "%s".interactions
-            WHERE
+            WHERE 
                 metadata->''session_id'' = %L AND
                 metadata->''emotional_state'' IS NOT NULL AND
                 embedding IS NOT NULL
             ORDER BY created_at
         )
-        SELECT
+        SELECT 
             ROW_NUMBER() OVER (ORDER BY created_at) AS segment_id,
             curr.state AS start_state,
             lead(curr.state) OVER (ORDER BY curr.created_at) AS end_state,
             curr.intensity AS start_intensity,
             lead(curr.intensity) OVER (ORDER BY curr.created_at) AS end_intensity,
             1 - (curr.embedding <=> lead(curr.embedding) OVER (ORDER BY curr.created_at)) AS vector_movement,
-            CASE
+            CASE 
                 WHEN curr.intensity > lead(curr.intensity) OVER (ORDER BY curr.created_at) THEN 1.0
                 ELSE 0.5
             END AS similarity_to_progress
@@ -788,7 +748,7 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
     -- First verify the concept exists
-    PERFORM FROM information_schema.tables
+    PERFORM FROM information_schema.tables 
     WHERE table_schema = p_schema_name
     AND table_name = 'knowledge_base';
 
@@ -804,7 +764,7 @@ BEGIN
         ),
         -- Find semantically related concepts
         related_concepts AS (
-            SELECT
+            SELECT 
                 %L AS source_id,
                 target.id AS target_id,
                 (1 - (source.embedding <=> target.embedding)) AS semantic_similarity
@@ -815,7 +775,7 @@ BEGIN
         ),
         -- Check for explicit connections
         explicit_connections AS (
-            SELECT
+            SELECT 
                 source_id,
                 target_id,
                 strength AS relationship_strength
@@ -823,16 +783,16 @@ BEGIN
             WHERE source_id = %L OR target_id = %L
         )
         -- Combine semantic and explicit connections
-        SELECT
+        SELECT 
             rc.source_id,
             rc.target_id,
             rc.semantic_similarity,
             COALESCE(ec.relationship_strength, 0) AS relationship_strength
         FROM related_concepts rc
-        LEFT JOIN explicit_connections ec
+        LEFT JOIN explicit_connections ec 
             ON (rc.source_id = ec.source_id AND rc.target_id = ec.target_id)
             OR (rc.source_id = ec.target_id AND rc.target_id = ec.source_id)
-        ORDER BY
+        ORDER BY 
             -- Prioritize concepts with both semantic similarity and explicit connections
             (rc.semantic_similarity + COALESCE(ec.relationship_strength, 0)) DESC;
     ', p_schema_name, p_concept_id, p_concept_id, p_schema_name, p_concept_id, p_threshold, p_schema_name, p_concept_id, p_concept_id);
@@ -864,7 +824,7 @@ BEGIN
         embedding_json TEXT,
         session_id TEXT
     ) ON COMMIT DROP;
-
+    
     -- Collect data from all specified sessions
     FOREACH session_id IN ARRAY p_session_ids
     LOOP
@@ -872,13 +832,13 @@ BEGIN
             -- Get interaction data from this session
             EXECUTE format('
                 INSERT INTO session_data
-                SELECT
+                SELECT 
                     metadata->''topic'' AS topic,
                     question,
                     embedding::text AS embedding_json,
                     %L AS session_id
                 FROM "%s".interactions
-                WHERE
+                WHERE 
                     metadata->''topic'' IS NOT NULL AND
                     embedding IS NOT NULL;
             ', session_id, session_id);
@@ -887,11 +847,11 @@ BEGIN
             CONTINUE; -- Skip to next session
         END;
     END LOOP;
-
+    
     -- Find patterns across sessions
     RETURN QUERY
     WITH topic_sessions AS (
-        SELECT
+        SELECT 
             topic,
             COUNT(DISTINCT session_id) AS session_count,
             ARRAY_AGG(DISTINCT question) FILTER (WHERE question IS NOT NULL) AS questions
@@ -908,12 +868,12 @@ BEGIN
             -- In real implementation, you'd use proper vector operators
             AVG(1 - (a.embedding_json::vector <=> b.embedding_json::vector)) AS similarity
         FROM session_data a
-        JOIN session_data b ON
-            a.topic = b.topic AND
+        JOIN session_data b ON 
+            a.topic = b.topic AND 
             a.session_id < b.session_id -- Compare different sessions
         GROUP BY a.topic, a.session_id, b.session_id
     )
-    SELECT
+    SELECT 
         ts.topic::TEXT AS pattern_topic,
         ts.session_count AS session_occurrences,
         AVG(es.similarity) AS avg_embedding_similarity,
@@ -940,8 +900,8 @@ BEGIN
     -- Create index on interactions table with HNSW (faster)
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS %I_interactions_hnsw_idx
-            ON "%I".interactions
+            CREATE INDEX IF NOT EXISTS %I_interactions_hnsw_idx 
+            ON "%I".interactions 
             USING hnsw (embedding vector_cosine_ops)
             WITH (ef_construction = 200, m = 16);
         ', p_schema_name, p_schema_name);
@@ -949,8 +909,8 @@ BEGIN
         -- Fall back to IVFFlat if HNSW failed
         BEGIN
             EXECUTE format('
-                CREATE INDEX IF NOT EXISTS %I_interactions_ivf_idx
-                ON "%I".interactions
+                CREATE INDEX IF NOT EXISTS %I_interactions_ivf_idx 
+                ON "%I".interactions 
                 USING ivfflat (embedding vector_cosine_ops)
                 WITH (lists = 100);
             ', p_schema_name, p_schema_name);
@@ -958,12 +918,12 @@ BEGIN
             RAISE NOTICE 'Failed to create interactions index: %', SQLERRM;
         END;
     END;
-
+    
     -- Create index on interaction_embeddings table with HNSW
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS %I_interaction_embeddings_hnsw_idx
-            ON "%I".interaction_embeddings
+            CREATE INDEX IF NOT EXISTS %I_interaction_embeddings_hnsw_idx 
+            ON "%I".interaction_embeddings 
             USING hnsw (embedding vector_cosine_ops)
             WITH (ef_construction = 200, m = 16);
         ', p_schema_name, p_schema_name);
@@ -971,8 +931,8 @@ BEGIN
         -- Fall back to IVFFlat if HNSW failed
         BEGIN
             EXECUTE format('
-                CREATE INDEX IF NOT EXISTS %I_interaction_embeddings_ivf_idx
-                ON "%I".interaction_embeddings
+                CREATE INDEX IF NOT EXISTS %I_interaction_embeddings_ivf_idx 
+                ON "%I".interaction_embeddings 
                 USING ivfflat (embedding vector_cosine_ops)
                 WITH (lists = 100);
             ', p_schema_name, p_schema_name);
@@ -980,12 +940,12 @@ BEGIN
             RAISE NOTICE 'Failed to create interaction_embeddings index: %', SQLERRM;
         END;
     END;
-
+    
     -- Create index on knowledge_base table with HNSW
     BEGIN
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS %I_knowledge_base_hnsw_idx
-            ON "%I".knowledge_base
+            CREATE INDEX IF NOT EXISTS %I_knowledge_base_hnsw_idx 
+            ON "%I".knowledge_base 
             USING hnsw (embedding vector_cosine_ops)
             WITH (ef_construction = 200, m = 16);
         ', p_schema_name, p_schema_name);
@@ -993,8 +953,8 @@ BEGIN
         -- Fall back to IVFFlat if HNSW failed
         BEGIN
             EXECUTE format('
-                CREATE INDEX IF NOT EXISTS %I_knowledge_base_ivf_idx
-                ON "%I".knowledge_base
+                CREATE INDEX IF NOT EXISTS %I_knowledge_base_ivf_idx 
+                ON "%I".knowledge_base 
                 USING ivfflat (embedding vector_cosine_ops)
                 WITH (lists = 100);
             ', p_schema_name, p_schema_name);
@@ -1002,7 +962,7 @@ BEGIN
             RAISE NOTICE 'Failed to create knowledge_base index: %', SQLERRM;
         END;
     END;
-
+    
     -- Create session filter index for better filtering performance
     BEGIN
         EXECUTE format('
@@ -1012,7 +972,7 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Failed to create session metadata index: %', SQLERRM;
     END;
-
+    
     -- Update statistics for better query planning
     BEGIN
         EXECUTE format('ANALYZE "%I".interactions;', p_schema_name);
@@ -1021,7 +981,7 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Failed to update table statistics: %', SQLERRM;
     END;
-
+    
     RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -1040,9 +1000,9 @@ RETURNS TABLE (
 BEGIN
     RETURN QUERY EXECUTE format('
         WITH recent_interactions AS (
-            SELECT
-                id,
-                content,
+            SELECT 
+                id, 
+                content, 
                 embedding,
                 metadata->''topic'' AS topic,
                 created_at
@@ -1050,7 +1010,7 @@ BEGIN
             WHERE created_at > NOW() - interval ''%s days''
         ),
         embedding_clusters AS (
-            SELECT
+            SELECT 
                 id,
                 content,
                 topic,
@@ -1059,7 +1019,7 @@ BEGIN
             JOIN recent_interactions b ON a.id != b.id AND a.topic = b.topic
             GROUP BY a.id, a.content, a.topic
         )
-        SELECT
+        SELECT 
             topic::TEXT AS pattern_group,
             AVG(avg_similarity) AS avg_similarity,
             COUNT(*) AS interaction_count,
@@ -1082,20 +1042,20 @@ RETURNS BOOLEAN AS $$
 BEGIN
     -- Update the embedding in interactions table
     EXECUTE format('
-        UPDATE "%s".interactions
-        SET embedding = %L::vector
+        UPDATE "%s".interactions 
+        SET embedding = %L::vector 
         WHERE interaction_id = %s
     ', p_schema_name, p_embedding, p_interaction_id);
-
+    
     -- Insert or update the embedding in interaction_embeddings table
     EXECUTE format('
-        INSERT INTO "%s".interaction_embeddings
+        INSERT INTO "%s".interaction_embeddings 
         (interaction_id, embedding)
         VALUES (%s, %L::vector)
-        ON CONFLICT (interaction_id)
+        ON CONFLICT (interaction_id) 
         DO UPDATE SET embedding = %L::vector
     ', p_schema_name, p_interaction_id, p_embedding, p_embedding);
-
+    
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Failed to add embedding: %', SQLERRM;
@@ -1117,16 +1077,16 @@ BEGIN
     -- Make sure embedding column exists
     BEGIN
         EXECUTE format('
-            ALTER TABLE "%s".interactions
+            ALTER TABLE "%s".interactions 
             ADD COLUMN IF NOT EXISTS embedding vector(2048);
         ', p_schema_name);
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error adding embedding column: %', SQLERRM;
     END;
-
+    
     -- Get interactions without embeddings
     RETURN QUERY EXECUTE format('
-        SELECT
+        SELECT 
             interaction_id,
             question,
             answer
@@ -1151,7 +1111,7 @@ BEGIN
     EXECUTE format('
         ANALYZE "%s".interactions;
     ', p_schema_name);
-
+    
     -- Update statistics for the knowledge_base table if it exists
     BEGIN
         EXECUTE format('
@@ -1160,7 +1120,7 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Knowledge base table may not exist: %', SQLERRM;
     END;
-
+    
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error updating statistics: %', SQLERRM;
@@ -1184,7 +1144,7 @@ CREATE OR REPLACE FUNCTION find_similar_interactions(
 ) AS $$
 BEGIN
     RETURN QUERY EXECUTE format('
-        SELECT
+        SELECT 
             id::TEXT as interaction_id,
             question,
             answer,
@@ -1211,7 +1171,7 @@ CREATE OR REPLACE FUNCTION analyze_conversation_themes(
 BEGIN
     RETURN QUERY EXECUTE format('
         WITH themes AS (
-            SELECT
+            SELECT 
                 CASE
                     WHEN metadata->''topic'' IS NOT NULL THEN metadata->''topic''
                     ELSE ''general''
@@ -1264,53 +1224,53 @@ DECLARE
 BEGIN
     -- Create schema and tables if they don't exist
     PERFORM create_user_schema_and_tables(p_schema_name);
-
+    
     -- Check if knowledge base already has entries
-    IF (SELECT COUNT(*) FROM information_schema.tables
-        WHERE table_schema = p_schema_name AND table_name = 'knowledge_base') > 0
+    IF (SELECT COUNT(*) FROM information_schema.tables 
+        WHERE table_schema = p_schema_name AND table_name = 'knowledge_base') > 0 
     THEN
         IF (SELECT COUNT(*) FROM (
             SELECT 1 FROM "%s".knowledge_base LIMIT 1
-        ) AS tmp) > 0
+        ) AS tmp) > 0 
         THEN
             RETURN TRUE;
         END IF;
     END IF;
-
+    
     -- Insert each entry
     FOR i IN 0..jsonb_array_length(p_entries)-1 LOOP
         entry := p_entries->i;
         content := entry->>'content';
         embedding := entry->>'embedding';
-
+        
         BEGIN
             EXECUTE format('
                 INSERT INTO "%s".knowledge_base (content, embedding)
                 VALUES (%L, %L::vector)
             ', p_schema_name, content, embedding);
-
+            
             success_count := success_count + 1;
         EXCEPTION WHEN OTHERS THEN
             RAISE NOTICE 'Error inserting knowledge entry: %', SQLERRM;
         END;
     END LOOP;
-
+    
     -- Also check if we need to create interaction_embeddings for existing interactions
     BEGIN
         -- Create interaction_embeddings entries for any interactions that have embeddings
         EXECUTE format('
             INSERT INTO "%s".interaction_embeddings (interaction_id, embedding)
-            SELECT
-                interaction_id,
+            SELECT 
+                interaction_id, 
                 embedding
             FROM "%s".interactions
-            WHERE
+            WHERE 
                 embedding IS NOT NULL AND
                 interaction_id NOT IN (
                     SELECT interaction_id FROM "%s".interaction_embeddings
                 )
         ', p_schema_name, p_schema_name, p_schema_name);
-
+        
         -- Update table statistics for better query planning
         EXECUTE format('ANALYZE "%s".knowledge_base;', p_schema_name);
         EXECUTE format('ANALYZE "%s".interactions;', p_schema_name);
@@ -1318,7 +1278,7 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error syncing interaction embeddings: %', SQLERRM;
     END;
-
+    
     RETURN success_count > 0;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error initializing knowledge base: %', SQLERRM;
@@ -1342,32 +1302,32 @@ BEGIN
     -- Check if we have enough embeddings to analyze
     EXECUTE format('
         SELECT EXISTS (
-            SELECT 1 FROM %I.interaction_embeddings
+            SELECT 1 FROM %I.interaction_embeddings 
             LIMIT 3
         )', p_schema_name) INTO has_embeddings;
-
+    
     IF NOT has_embeddings THEN
         RETURN QUERY SELECT 'Not enough conversation data for analysis'::TEXT, 0::INTEGER;
         RETURN;
     END IF;
-
+    
     -- Use pgvector to cluster similar questions
     IF p_session_id IS NOT NULL THEN
         -- Use session_id filter in metadata
         RETURN QUERY EXECUTE format('
             WITH embedding_clusters AS (
-                SELECT
+                SELECT 
                     i.question,
                     ie.embedding,
                     COALESCE(i.metadata->>''topic'', ''general'')::TEXT as base_topic
                 FROM %I.interaction_embeddings ie
                 JOIN %I.interactions i ON ie.interaction_id = i.interaction_id
-                WHERE i.question IS NOT NULL
+                WHERE i.question IS NOT NULL 
                   AND LENGTH(i.question) > 10
                   AND i.metadata->>''session_id'' = %L
             ),
             vector_similarity_groups AS (
-                SELECT
+                SELECT 
                     a.base_topic,
                     a.question,
                     -- Use the dedicated function for consistency
@@ -1384,16 +1344,16 @@ BEGIN
                 GROUP BY base_topic
                 HAVING COUNT(DISTINCT question) >= %L
             )
-            SELECT
+            SELECT 
                 topic::TEXT,
                 frequency::INTEGER
             FROM topic_clusters
             ORDER BY frequency DESC
-
+            
             -- Add fallback topic if no clusters detected
             UNION ALL
-            SELECT
-                CASE WHEN NOT EXISTS (SELECT 1 FROM topic_clusters)
+            SELECT 
+                CASE WHEN NOT EXISTS (SELECT 1 FROM topic_clusters) 
                     THEN ''No significant topics identified''::TEXT
                     ELSE NULL
                 END as topic,
@@ -1404,7 +1364,7 @@ BEGIN
         -- No session filter - use all interactions
         RETURN QUERY EXECUTE format('
             WITH embedding_clusters AS (
-                SELECT
+                SELECT 
                     i.question,
                     ie.embedding,
                     COALESCE(i.metadata->>''topic'', ''general'')::TEXT as base_topic
@@ -1413,7 +1373,7 @@ BEGIN
                 WHERE i.question IS NOT NULL AND LENGTH(i.question) > 10
             ),
             vector_similarity_groups AS (
-                SELECT
+                SELECT 
                     a.base_topic,
                     a.question,
                     -- Use the dedicated function for consistency
@@ -1430,16 +1390,16 @@ BEGIN
                 GROUP BY base_topic
                 HAVING COUNT(DISTINCT question) >= %L
             )
-            SELECT
+            SELECT 
                 topic::TEXT,
                 frequency::INTEGER
             FROM topic_clusters
             ORDER BY frequency DESC
-
+            
             -- Add fallback topic if no clusters detected
             UNION ALL
-            SELECT
-                CASE WHEN NOT EXISTS (SELECT 1 FROM topic_clusters)
+            SELECT 
+                CASE WHEN NOT EXISTS (SELECT 1 FROM topic_clusters) 
                     THEN ''No significant topics identified''::TEXT
                     ELSE NULL
                 END as topic,
@@ -1447,7 +1407,7 @@ BEGIN
             WHERE NOT EXISTS (SELECT 1 FROM topic_clusters)
         ', p_schema_name, p_schema_name, p_min_count);
     END IF;
-
+    
 EXCEPTION WHEN OTHERS THEN
     RETURN QUERY SELECT ('Error: ' || SQLERRM)::TEXT, 0::INTEGER;
 END;
@@ -1509,13 +1469,13 @@ BEGIN
             -- Drop existing indexes to recreate optimized ones
             DROP INDEX IF EXISTS "%s".knowledge_base_embedding_idx;
             DROP INDEX IF EXISTS "%s".knowledge_base_hnsw_embedding_idx;
-
+            
             -- Create optimized HNSW index - much faster for RAG queries
-            CREATE INDEX knowledge_base_hnsw_embedding_idx
-            ON "%s".knowledge_base
+            CREATE INDEX knowledge_base_hnsw_embedding_idx 
+            ON "%s".knowledge_base 
             USING hnsw (embedding vector_cosine_ops)
             WITH (ef_construction = 128, m = 16, ef = 64);
-
+            
             -- Set statistics for better query planning
             ALTER TABLE "%s".knowledge_base ALTER COLUMN embedding SET STATISTICS 1000;
             ANALYZE "%s".knowledge_base;
@@ -1524,79 +1484,38 @@ BEGIN
         RAISE NOTICE 'Index creation issue: %', SQLERRM;
         -- Fall back to IVFFlat if HNSW isn't supported
         EXECUTE format('
-            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx
-            ON "%s".knowledge_base
+            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx 
+            ON "%s".knowledge_base 
             USING ivfflat (embedding vector_cosine_ops)
             WITH (lists = 100);
         ', p_schema_name);
     END;
-
+    
     -- Also optimize the interactions table indexes
     BEGIN
         EXECUTE format('
             -- Create optimized index for interactions table
             DROP INDEX IF EXISTS "%s".interactions_embedding_idx;
             DROP INDEX IF EXISTS "%s".interactions_hnsw_embedding_idx;
-
-            CREATE INDEX interactions_hnsw_embedding_idx
-            ON "%s".interactions
+            
+            CREATE INDEX interactions_hnsw_embedding_idx 
+            ON "%s".interactions 
             USING hnsw (embedding vector_cosine_ops)
             WITH (ef_construction = 128, m = 16, ef = 64);
-
+            
             ALTER TABLE "%s".interactions ALTER COLUMN embedding SET STATISTICS 1000;
             ANALYZE "%s".interactions;
         ', p_schema_name, p_schema_name, p_schema_name, p_schema_name, p_schema_name);
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Interactions index creation issue: %', SQLERRM;
     END;
-
+    
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error optimizing vector indexes: %', SQLERRM;
     RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION get_psychological_connections(
-    p_schema_name TEXT,
-    p_concept_id INTEGER,
-    p_relationship_type TEXT DEFAULT NULL,
-    p_session_id TEXT DEFAULT NULL
-)
-RETURNS TABLE (
-    id INTEGER,
-    source_id INTEGER,
-    target_id INTEGER,
-    relationship_type TEXT,
-    strength FLOAT,
-    created_at TIMESTAMP WITH TIME ZONE
-) AS $$
-BEGIN
-    IF p_session_id IS NOT NULL THEN
-        -- Filter by session ID in metadata
-        RETURN QUERY EXECUTE format('
-            SELECT
-                id, source_id, target_id, relationship_type, strength, created_at
-            FROM "%s".concept_connections c
-            WHERE (source_id = %s OR target_id = %s)
-                AND (c.metadata->>''session_id'' = %L)
-                AND (%L IS NULL OR relationship_type = %L)
-            ORDER BY strength DESC;
-        ', p_schema_name, p_concept_id, p_concept_id, p_session_id, p_relationship_type, p_relationship_type);
-    ELSE
-        -- No session filter
-        RETURN QUERY EXECUTE format('
-            SELECT
-                id, source_id, target_id, relationship_type, strength, created_at
-            FROM "%s".concept_connections
-            WHERE (source_id = %s OR target_id = %s)
-                AND (%L IS NULL OR relationship_type = %L)
-            ORDER BY strength DESC;
-        ', p_schema_name, p_concept_id, p_concept_id, p_relationship_type, p_relationship_type);
-    END IF;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 
 CREATE OR REPLACE FUNCTION get_high_quality_interactions(
     p_schema_name TEXT,
@@ -1686,21 +1605,21 @@ BEGIN
         AND table_name = 'interactions'
         AND column_name = 'session_id'
     ) INTO column_exists;
-
+    
     IF NOT column_exists THEN
         -- Add the column if it doesn't exist
         EXECUTE format('
-            ALTER TABLE "%s".interactions
+            ALTER TABLE "%s".interactions 
             ADD COLUMN session_id TEXT;
-
+            
             -- Create an index for faster queries
-            CREATE INDEX idx_%s_interactions_session_id
+            CREATE INDEX idx_%s_interactions_session_id 
             ON "%s".interactions(session_id);
         ', p_schema_name, p_schema_name, p_schema_name);
-
+        
         RETURN TRUE;
     END IF;
-
+    
     RETURN TRUE;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error adding session_id column: %', SQLERRM;
@@ -1721,7 +1640,7 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT
+    SELECT 
         (vector1 <=> vector2)::float AS distance,
         (1 - (vector1 <=> vector2))::float AS similarity;
 END;
@@ -1730,7 +1649,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 CREATE OR REPLACE FUNCTION get_columns_types(p_table_name text)
-RETURNS TABLE ( column_name text,data_type text ) AS
+RETURNS TABLE ( column_name text,data_type text ) AS 
 $BODY$
     BEGIN
         RETURN QUERY EXECUTE format($$SELECT column_name::text,data_type::text FROM information_schema.columns WHERE table_name ='$$|| '%I' ||$$';$$,p_table_name);

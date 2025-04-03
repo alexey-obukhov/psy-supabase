@@ -364,55 +364,6 @@ class DatabaseManager:
             logger.error(traceback.format_exc())
             return False
 
-    def create_user_schema_syncold(self) -> bool:
-        """Creates a user-specific schema and tables if they don't exist (synchronous version)."""
-        try:
-            # First check if schema already exists
-            schema_check = self.supabase.rpc(
-                'get_schema_exists',
-                {'p_schema_name': self.schema_name}
-            ).execute()
-
-            # If schema exists, no need to create it
-            if schema_check.data:
-                logger.debug("Schema '%s' already exists, skipping creation", self.schema_name)
-                return True
-
-            # Continue with schema creation for new users
-            response = self.supabase.rpc('create_user_schema_and_tables', {'schema_name': self.schema_name}).execute()
-
-            # Check schema creation response
-            if response.data is None:
-                logger.error("Schema creation failed for user %s - no data in response", self.user_id)
-                return False
-            elif response.data is False:
-                error_message = response.error if response.error else "Schema creation failed"
-                logger.error("Error creating schema for user %s: %s", self.user_id, error_message)
-                return False
-
-            # Now optimize vector queries
-            p_response = self.supabase.rpc('optimize_vector_queries', {'p_schema_name': self.schema_name}).execute()
-            if p_response.data is None or p_response.data is False:
-                logger.warning("Vector optimization failed for schema %s", self.schema_name)
-                # Continue anyway since basic schema creation worked
-            else:
-                logger.info("Vector statistics optimized for schema %s", self.schema_name)
-
-            logger.info("Schema '%s' and tables created successfully.", self.schema_name)
-
-            # Verify the schema structure after creation
-            if self.verify_schema_structure():
-                logger.info("Schema structure verification successful for %s", self.schema_name)
-            else:
-                logger.warning("Schema structure verification failed for %s", self.schema_name)
-
-            return True
-
-        except Exception as e:
-            logger.error("Error creating schema for user %s: %s", self.user_id, e)
-            logger.error(traceback.format_exc())
-            return False
-
     def get_interaction_history(self, user_id: str):
         """ Get interaction history from the user's schema """
         logger.info("Retrieving interaction history for user: %s with schema %s", user_id, self.schema_name)
@@ -969,58 +920,6 @@ class DatabaseManager:
         except Exception as e:
             logger.error("Error marking therapeutic insight: %s", e)
             return False
-
-    def get_psychological_connections(self, concept_id: int, relationship_type: Optional[str] = None, session_id: Optional[str] = None):
-        """
-        Retrieves psychological connections for a given concept.
-
-        Args:
-            concept_id: ID of the concept to find connections for
-            relationship_type: Optional type of relationship to filter by
-            session_id: Optional session ID to filter by (stored in metadata)
-
-        Returns:
-            List of connections for the concept
-        """
-        try:
-            params = {
-                'p_schema_name': self.schema_name,
-                'p_concept_id': concept_id
-            }
-
-            if relationship_type:
-                params['p_relationship_type'] = relationship_type
-
-            if session_id:
-                params['p_session_id'] = session_id
-
-            response = self.supabase.rpc('get_psychological_connections', params).execute()
-
-            if response.data is None:
-                logger.error("Error retrieving psychological connections")
-                return []
-
-            # Process results to identify the connected concept
-            connections = []
-            for row in response.data:
-                # Determine if the concept is the source or target
-                is_source = row.get('source_id') == concept_id
-                connected_id = row.get('target_id') if is_source else row.get('source_id')
-
-                connections.append({
-                    'connection_id': row.get('id'),
-                    'concept_id': concept_id,
-                    'connected_id': connected_id,
-                    'relationship_type': row.get('relationship_type'),
-                    'strength': row.get('strength'),
-                    'direction': 'outgoing' if is_source else 'incoming',
-                    'created_at': row.get('created_at')
-                })
-
-            return connections
-        except Exception as e:
-            logger.error("Error retrieving psychological connections: %s", e)
-            return []
 
     def get_session_summary(self, session_id: str):
         """
