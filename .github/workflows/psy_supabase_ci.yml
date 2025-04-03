@@ -178,50 +178,24 @@ jobs:
 
     - name: Generate coverage badge
       run: |
-        # First check if coverage.xml exists and has content
-        if [ -s coverage.xml ]; then
-          echo "Using existing coverage.xml"
-
-          # Try with python to extract the line-rate attribute
-          COVERAGE=$(python -c "
-          import xml.etree.ElementTree as ET
-          import os
-
-          try:
-              root = ET.parse('coverage.xml').getroot()
-              line_rate = root.get('line-rate')
-              if line_rate is None:
-                  print('0.0')
-              else:
-                  print(line_rate)
-          except Exception as e:
-              print('0.0')  # Default to 0 on any error
-          ")
+        # Check if coverage.xml exists first
+        if [ -f coverage.xml ]; then
+          # Extract coverage using a simple one-liner with error handling
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; import sys; try: print(ET.parse('coverage.xml').getroot().attrib['line-rate']); except Exception as e: print('0.0'); sys.stderr.write(f'Warning: {str(e)}\n')")
         else
-          echo "No valid coverage data found"
+          echo "Warning: coverage.xml not found, using default value"
           COVERAGE="0.0"
         fi
-
-        # Calculate percentage and handle errors
-        COVERAGE_PCT=$(python -c "
-        try:
-            print(round(float('${COVERAGE}') * 100, 2))
-        except:
-            print(0.0)
-        ")
-
+        
+        # Calculate percentage with error handling
+        COVERAGE_PCT=$(python -c "try: print(round(float('$COVERAGE') * 100, 2)); except: print(0.0)")
+        
         echo "COVERAGE_PCT=$COVERAGE_PCT" >> $GITHUB_ENV
         echo "## Test Coverage: $COVERAGE_PCT%" >> $GITHUB_STEP_SUMMARY
-
+        
         # Create a badge JSON file for shields.io
-        COLOR=$(python -c "
-        try:
-            coverage = float('$COVERAGE_PCT')
-            print('red' if coverage < 50 else 'yellow' if coverage < 80 else 'green')
-        except:
-            print('red')
-        ")
-
+        COLOR=$(python -c "try: coverage = float('$COVERAGE_PCT'); print('red' if coverage < 50 else 'yellow' if coverage < 80 else 'green'); except: print('red')")
+        
         echo "{\"schemaVersion\": 1, \"label\": \"coverage\", \"message\": \"$COVERAGE_PCT%\", \"color\": \"$COLOR\"}" > reports/coverage-badge.json
 
     - name: Upload coverage report
