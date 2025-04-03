@@ -223,6 +223,108 @@ jobs:
           reports/pylint-py${{ matrix.python-version }}.svg
           reports/coverage-py${{ matrix.python-version }}.svg
 
+    - name: Create reports directories
+      run: |
+        mkdir -p reports/health_check
+        mkdir -p reports/db_debug
+        mkdir -p reports/real_data_tests
+
+    - name: Run health check
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        # Create log file for health check with appropriate Python version
+        python${{ matrix.python-version }} health_check.py 2>&1 | tee reports/health_check/results.log
+        # Extract summary information
+        echo "## Health Check Summary (Python ${{ matrix.python-version }})" > reports/health_check/summary.md
+        grep -E 'CUDA|Python|Platform|Memory' reports/health_check/results.log >> reports/health_check/summary.md || true
+        echo "Health check completed at $(date)" >> reports/health_check/summary.md
+        # Add to GitHub step summary
+        cat reports/health_check/summary.md >> $GITHUB_STEP_SUMMARY
+
+    - name: Run database debug
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        # Create log file for database debug with appropriate Python version
+        python${{ matrix.python-version }} debug_database.py 2>&1 | tee reports/db_debug/results.log
+        # Extract summary information
+        echo "## Database Debug Summary (Python ${{ matrix.python-version }})" > reports/db_debug/summary.md
+        grep -E 'Connection|Schema|Tables|Records|Query' reports/db_debug/results.log >> reports/db_debug/summary.md || true
+        echo "Database debug completed at $(date)" >> reports/db_debug/summary.md
+        # Add to GitHub step summary
+        cat reports/db_debug/summary.md >> $GITHUB_STEP_SUMMARY
+
+    - name: Run real data tests
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        cd test_real_data
+        mkdir -p ../reports/real_data_tests
+        # Create summary file
+        echo "## Real Data Tests Results (Python ${{ matrix.python-version }})" > ../reports/real_data_tests/summary.md
+        echo "| Test File | Status | Duration | Notes |" >> ../reports/real_data_tests/summary.md
+        echo "|-----------|--------|----------|-------|" >> ../reports/real_data_tests/summary.md
+
+        # Run each test and collect results
+        for test_file in test_*.py; do
+          echo "Running $test_file"
+          test_name=$(basename "$test_file" .py)
+          log_file="../reports/real_data_tests/${test_name}.log"
+          start_time=$(date +%s)
+
+          # Run test with timing and capture output
+          if python3 "$test_file" > "$log_file" 2>&1; then
+            status="✅ Passed"
+            notes=""
+          else
+            status="❌ Failed"
+            # Extract error message
+            notes=$(grep -A 3 -B 3 "Error|Exception|Traceback" "$log_file" | head -n 1 | cut -c 1-50)
+            notes="${notes}..."
+          fi
+
+          # Calculate duration
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+
+          # Add to summary table
+          echo "| $test_name | $status | ${duration}s | $notes |" >> ../reports/real_data_tests/summary.md
+        done
+
+        # Return to original directory
+        cd ..
+
+        # Add to GitHub step summary
+        cat reports/real_data_tests/summary.md >> $GITHUB_STEP_SUMMARY
+
+        # Check if any tests failed
+        if grep -q "❌ Failed" reports/real_data_tests/summary.md; then
+          echo "::warning::Some real data tests failed. Check the logs for details."
+        fi
+
+    - name: Upload real data test reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: real-data-reports-${{ matrix.python-version }}-${{ github.run_id }}
+        path: reports/real_data_tests
+
+    - name: Upload health and debug reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: health-debug-reports-${{ matrix.python-version }}-${{ github.run_id }}
+        path: |
+          reports/health_check
+          reports/db_debug
+
     - name: Build package
       run: |
         pip install build
