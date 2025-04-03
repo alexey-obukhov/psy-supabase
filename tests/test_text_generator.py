@@ -67,7 +67,7 @@ class TestTextGenerator:
                     context
                 )
 
-                # Verify emotion was analyzed correctly
+                # Verify emotion was analysed correctly
                 text_generator.prompt_selector.analyze_question.assert_called_once()
                 assert "Generated happy response" in result
 
@@ -95,7 +95,7 @@ class TestTextGenerator:
                     context
                 )
 
-                # Verify emotion was analyzed correctly
+                # Verify emotion was analysed correctly
                 text_generator.prompt_selector.analyze_question.assert_called_once()
                 assert "Generated sad response" in result
 
@@ -123,7 +123,7 @@ class TestTextGenerator:
                     context
                 )
 
-                # Verify emotion was analyzed correctly
+                # Verify emotion was analysed correctly
                 mock_selector.analyze_question.assert_called_once()
                 assert "Generated angry response" in result
 
@@ -152,7 +152,7 @@ class TestTextGenerator:
                     context
                 )
 
-                # Verify emotion was analyzed correctly
+                # Verify emotion was analysed correctly
                 mock_selector.analyze_question.assert_called_once()
                 assert "Generated anxious response" in result
 
@@ -175,7 +175,7 @@ class TestTextGenerator:
             context
         )
 
-        # Verify emotion was analyzed correctly as neutral
+        # Verify emotion was analysed correctly as neutral
         mock_selector.analyze_question.assert_called_once()
         assert 'neutral' in mock_selector.analyze_question.return_value.values()
 
@@ -291,13 +291,13 @@ class TestTextGenerator:
             self.text_generator = MagicMock(spec=TextGenerator)
 
         # Mock response with expected content
-        self.text_generator.generate_text.return_value = "I apologize, but I'm having trouble processing your question."
+        self.text_generator.generate_text.return_value = "I apologise, but I'm having trouble processing your question."
 
         # Call the method
         response = self.text_generator.generate_text("ERROR")
 
         # Verify the mock returned what we set
-        assert "I apologize, but I'm having trouble" in response
+        assert "I apologise, but I'm having trouble" in response
 
     def test_emotion_detection_integration(self, text_generator):
         """Test the full emotion detection and response generation flow."""
@@ -355,7 +355,7 @@ class TestTextGenerator:
         # Create a simple logger to track method calls
         calls = []
 
-        # Create a spy for any method that might analyze emotions
+        # Create a spy for any method that might analyse emotions
         def spy_method(name):
             def logger_func(*args, **kwargs):
                 calls.append(name)
@@ -395,7 +395,7 @@ class TestTextGenerator:
         # Use helper to create consistent mocks
         mock_template = self.setup_mocks_for_generation(text_generator)
 
-        # Create a custom analyze method to track calls
+        # Create a custom analyse method to track calls
         original_analyze_method = None
         analyze_was_called = False
 
@@ -404,7 +404,7 @@ class TestTextGenerator:
             analyze_was_called = True
             return {'topic': 'joy', 'emotion': 'happy', 'confidence': 0.85}
 
-        # Patch all methods that might analyze emotions
+        # Patch all methods that might analyse emotions
         with patch.object(text_generator, '_load_template', return_value=mock_template):
             with patch.object(text_generator, 'generate_text', return_value="Generated response"):
                 # Create a mock prompt selector

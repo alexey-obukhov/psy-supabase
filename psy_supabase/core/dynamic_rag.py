@@ -320,7 +320,7 @@ class DynamicRAGRetriever:
         Analyze the emotion expressed in the text.
 
         Args:
-            text: The text to analyze
+            text: The text to analyse
 
         Returns:
             Dictionary with emotion analysis
@@ -372,7 +372,7 @@ class DynamicRAGRetriever:
             }
 
         except Exception as e:
-            logger.error(f"Error analyzing emotion: {e}")
+            logger.error(f"Error analysing emotion: {e}")
             return {'sentiment': 0, 'emotions': {}, 'dominant_emotion': None, 'confidence': 0.0}
 
     def reset_cache(self):

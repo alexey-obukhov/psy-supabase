@@ -115,7 +115,7 @@ def analyze_emotion(text: str) -> Dict[str, float]:
     Analyze emotions in text using text2emotion.
 
     Args:
-        text: Text to analyze
+        text: Text to analyse
 
     Returns:
         Dictionary of emotion scores or empty dict if analysis fails
@@ -126,7 +126,7 @@ def analyze_emotion(text: str) -> Dict[str, float]:
     try:
         return te.get_emotion(text)
     except Exception as e:
-        logger.error(f"Error analyzing emotion: {e}")
+        logger.error(f"Error analysing emotion: {e}")
         return {}
 
 # Convenience functions
@@ -139,7 +139,7 @@ def extract_entities(text: str, model_name: str = "en_core_web_sm") -> List[Dict
     Extract named entities from text.
 
     Args:
-        text: Text to analyze
+        text: Text to analyse
         model_name: Name of spaCy model to use
 
     Returns:

@@ -552,7 +552,7 @@ class TestDatabaseManager:
             assert 'Control' in result
 
     def test_analyze_emotional_vector_trajectory(self, db_manager):
-        """Test analyzing emotional vector trajectory with valid data."""
+        """Test analysing emotional vector trajectory with valid data."""
         # Step 1: Mock the table insert response
         mock_insert_response = Mock()
         mock_insert_response.data = [{'id': 1}, {'id': 2}, {'id': 3}]  # Successful inserts

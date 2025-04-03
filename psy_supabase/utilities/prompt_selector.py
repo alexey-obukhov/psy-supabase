@@ -3,7 +3,7 @@ prompt_selector.py
 
 This module implements the `PromptSelector` class, which is responsible for selecting the most appropriate
 therapeutic prompt template based on user input. It uses semantic matching, keyword associations, and
-natural language processing (NLP) techniques to analyze user queries and determine the best response strategy.
+natural language processing (NLP) techniques to analyse user queries and determine the best response strategy.
 
 Key Features:
 - **Therapeutic Prompt Selection**:
@@ -13,7 +13,7 @@ Key Features:
 - **Natural Language Processing (NLP)**:
   - Tokenizes and lemmatizes user input to extract key concepts.
   - Uses spaCy for named entity recognition (NER) and advanced text processing.
-  - Cleans and normalizes user input for consistent analysis.
+  - Cleans and normalises user input for consistent analysis.
 
 - **Category and Topic Analysis**:
   - Maps user input to therapeutic categories such as "Empathy and Validation" or "Providing Suggestions."
@@ -24,7 +24,7 @@ Key Features:
   - Evaluates the quality of AI-generated responses based on length, term overlap, and adherence to the selected prompt template.
 
 Classes:
-- `PromptSelector`: The main class that provides methods for analyzing user input, selecting prompt templates,
+- `PromptSelector`: The main class that provides methods for analysing user input, selecting prompt templates,
   and refining therapeutic categories.
 
 Dependencies:
@@ -116,7 +116,7 @@ class PromptSelector:
         self.topic_keywords = load_enhanced_mental_health_taxonomy()
 
     def clean_text(self, text: str) -> str:
-        """Clean text by removing unwanted characters and normalizing it."""
+        """Clean text by removing unwanted characters and normalising it."""
         from psy_supabase.utilities.nlp_utils import clean_text as nlp_clean_text
 
         # Use the shared clean_text function
@@ -473,7 +473,7 @@ class PromptSelector:
                 analysis["metrics"]["template_adherence"] = "medium"
 
         except Exception as e:
-            logger.error(f"Error analyzing response effectiveness: {e}")
+            logger.error(f"Error analysing response effectiveness: {e}")
             analysis["metrics"]["error"] = str(e)
 
         return analysis
@@ -589,13 +589,13 @@ class PromptSelector:
                 analysis["confidence"] = min(0.95, analysis["confidence"] * 1.1)
 
             # Log the analysis results
-            logger.info(f"Question analyzed - Topic: {analysis['topic']} ({analysis['confidence']:.2f}), "
+            logger.info(f"Question analysed - Topic: {analysis['topic']} ({analysis['confidence']:.2f}), "
                     f"Emotion: {analysis['emotion'] or 'none'} ({analysis['emotion_intensity']:.2f})")
 
             return analysis
 
         except Exception as e:
-            logger.error(f"Error analyzing question: {e}")
+            logger.error(f"Error analysing question: {e}")
             logger.error(traceback.format_exc())
             return {
                 "topic": "general",

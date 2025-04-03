@@ -5,7 +5,7 @@ This module provides various utility functions used throughout the PSY Supabase 
 for text cleaning, natural language processing, memory management, and configuration:
 
 Text Processing:
-- clean_text: Sanitizes and normalizes text by handling Unicode, HTML entities, and special characters
+- clean_text: Sanitizes and normalises text by handling Unicode, HTML entities, and special characters
 - tokenize_and_lemmatize: Processes text using spaCy for advanced NLP tasks
 
 System Management:

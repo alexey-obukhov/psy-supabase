@@ -119,7 +119,7 @@ class ModelManager:
 
     def get_local_model_path(self):
         """Get the local path for the model"""
-        # Use just the model name without organization prefix for folder
+        # Use just the model name without organisation prefix for folder
         model_folder = self.model_name.split('/')[-1] if '/' in self.model_name else self.model_name
         return os.path.join(self.MODELS_DIR, model_folder)
 

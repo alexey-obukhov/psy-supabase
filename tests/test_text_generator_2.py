@@ -210,7 +210,7 @@ class TestTherapeuticResponse:
     def test_error_handling(self):
         """Test error handling in therapeutic response generation."""
         # Set a specific response for this test
-        expected_response = "I apologize, but I'm having trouble processing your question."
+        expected_response = "I apologise, but I'm having trouble processing your question."
         self.generator.generate_text.return_value = expected_response
 
         # Call method that should trigger error handling
@@ -220,7 +220,7 @@ class TestTherapeuticResponse:
         print(f"Actual response: {response}")
 
         # Assert
-        assert "I apologize, but I'm having trouble processing your question" in response
+        assert "I apologise, but I'm having trouble processing your question" in response
 
     def test_emotion_analysis_with_debug(self, text_generator):
         """Test with additional debugging to locate the issue."""

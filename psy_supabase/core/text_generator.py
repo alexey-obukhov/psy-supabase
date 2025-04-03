@@ -1186,11 +1186,11 @@ class TextGenerator:
 
             except Exception as e:
                 logger.error(f"Error generating therapeutic response: {str(e)}")
-                return "I apologize, but I'm having trouble processing your question."
+                return "I apologise, but I'm having trouble processing your question."
 
         except Exception as outer_e:
             logger.error(f"Error in generate_therapeutic_response: {str(outer_e)}")
-            return "I apologize, but I'm having trouble understanding your question."
+            return "I apologise, but I'm having trouble understanding your question."
 
     def _get_breakup_recovery_steps(self) -> str:
         """Provides concrete steps for breakup recovery."""
@@ -1259,7 +1259,7 @@ class TextGenerator:
         response handling.
 
         Args:
-            text (str): User message to analyze
+            text (str): User message to analyse
 
         Returns:
             bool: True if crisis content is detected, False otherwise
@@ -1756,7 +1756,7 @@ class TextGenerator:
                 logger.debug(f"First 100 chars of response: {response[:100]}")
             except Exception as gen_error:
                 logger.error(f"Error generating text: {gen_error}")
-                return "I apologize, but I'm having trouble generating a response right now."
+                return "I apologise, but I'm having trouble generating a response right now."
 
             # Clean the response
             try:
@@ -1770,7 +1770,7 @@ class TextGenerator:
         except Exception as e:
             logger.error(f"Error in dynamic RAG generation: {e}")
             logger.error(traceback.format_exc())
-            return "I apologize, but I encountered an error while processing your question. Could you please try again?"
+            return "I apologise, but I encountered an error while processing your question. Could you please try again?"
 
     # Add this defensive code for psychological context handling
     def _update_psychological_context(self, context, user_question):
@@ -1811,7 +1811,7 @@ class TextGenerator:
             })
 
             # Log what we found
-            logger.info(f"Question analyzed - Topic: {topic} ({confidence:.2f}), Emotion: {emotion} ({confidence:.2f}) for question {user_question}")
+            logger.info(f"Question analysed - Topic: {topic} ({confidence:.2f}), Emotion: {emotion} ({confidence:.2f}) for question {user_question}")
 
         except Exception as e:
             logger.error(f"Error in emotion analysis: {str(e)}")
@@ -1819,7 +1819,7 @@ class TextGenerator:
     def get_test_response(self, prompt: str, **kwargs) -> str:
         """Return a predictable response for tests."""
         if 'error' in prompt.lower():
-            return "I apologize, but I'm having trouble processing your question."
+            return "I apologise, but I'm having trouble processing your question."
         if kwargs.get('conversation_history'):
             history = kwargs['conversation_history'][0] if kwargs['conversation_history'] else ""
             return f"Previous question: {history} Here's my response..."

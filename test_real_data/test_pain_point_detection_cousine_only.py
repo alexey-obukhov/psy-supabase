@@ -15,7 +15,7 @@ Key Features:
   - Ensures the system identifies relevant therapeutic approaches and recurring themes.
 
 - **Vector-Based Topic Analysis**:
-  - Uses pgvector clustering to analyze conversation topics and compare them with expected themes.
+  - Uses pgvector clustering to analyse conversation topics and compare them with expected themes.
   - Evaluates the match between detected and expected themes for accuracy.
 
 - **Test Environment Setup**:
@@ -144,7 +144,7 @@ TEST_CONVERSATIONS: List[Dict[str, Any]] = [
         "name": "Self-Worth Struggle",
         "questions": [
             "Sometimes I feel like I'm just taking up space in this world.",
-            "Why do I always apologize for things that aren't my fault?",
+            "Why do I always apologise for things that aren't my fault?",
             "I turned down a promotion because I don't think I'm good enough for it.",
             "I can't accept compliments without explaining why the person is actually wrong about me."
         ],
@@ -426,7 +426,7 @@ class PainPointDetectionTester:
                 return [{"topic": "No significant topics identified", "frequency": 0}]
 
         except Exception as e:
-            logger.error(f"Error analyzing topics: {e}")
+            logger.error(f"Error analysing topics: {e}")
             return [{"topic": f"Error: {str(e)}", "frequency": 0}]
 
 def analyze_test_results(results: List[Dict[str, Any]]) -> None:

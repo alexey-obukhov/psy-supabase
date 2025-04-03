@@ -10,7 +10,7 @@ def mock_generator():
     # Define test-specific responses
     mock.token_count_test_response = "Generated specific output for a long prompt."
     mock.conversation_history_test_response = "Previous question: How can I improve my relationship? Here's my response..."
-    mock.error_test_response = "I apologize, but I'm having trouble processing your question."
+    mock.error_test_response = "I apologise, but I'm having trouble processing your question."
 
     return mock
 
@@ -76,4 +76,4 @@ def test_error_handling(mock_text_gen_class, mock_generator):
     print(f"Actual response: {response}")
 
     # Verify
-    assert "I apologize, but I'm having trouble processing your question" in response
+    assert "I apologise, but I'm having trouble processing your question" in response

@@ -15,7 +15,7 @@ Key Features:
   - Ensures the system identifies relevant therapeutic approaches and recurring themes.
 
 - **Vector-Based Topic Analysis**:
-  - Uses pgvector clustering to analyze conversation topics and compare them with expected themes.
+  - Uses pgvector clustering to analyse conversation topics and compare them with expected themes.
   - Evaluates the match between detected and expected themes for accuracy.
 
 - **Test Environment Setup**:
@@ -550,7 +550,7 @@ class PainPointDetectionTester:
         Analyze topics in the test conversation using pgvector clustering.
 
         Args:
-            session_id: Optional session ID to analyze (defaults to self.test_session_id)
+            session_id: Optional session ID to analyse (defaults to self.test_session_id)
 
         Returns:
             List of topic dictionaries with topic name and frequency
@@ -583,7 +583,7 @@ class PainPointDetectionTester:
                 return [{"topic": "No significant topics identified", "frequency": 0}]
 
         except Exception as e:
-            logger.error(f"Error analyzing topics: {e}")
+            logger.error(f"Error analysing topics: {e}")
             return [{"topic": f"Error: {str(e)}", "frequency": 0}]
 
 def analyze_test_results(results: List[Dict[str, Any]]) -> None:

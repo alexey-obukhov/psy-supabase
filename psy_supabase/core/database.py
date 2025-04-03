@@ -11,7 +11,7 @@ Key Features:
   - Ensure schema structure and optimize vector operations for efficient queries.
 
 - **Interaction Management**:
-  - Add, retrieve, and analyze user interactions, including questions, answers, and metadata.
+  - Add, retrieve, and analyse user interactions, including questions, answers, and metadata.
   - Support for embedding generation and storage for vector similarity searches.
 
 - **Knowledge Base Operations**:
@@ -1252,12 +1252,12 @@ class DatabaseManager:
             }).execute()
 
             if response.data is None:
-                logger.error("Error analyzing theme clusters")
+                logger.error("Error analysing theme clusters")
                 return []
 
             return response.data
         except Exception as e:
-            logger.error(f"Error analyzing theme clusters: {e}")
+            logger.error(f"Error analysing theme clusters: {e}")
             return []
 
     def analyze_emotional_vector_trajectory(self, session_id: str):
@@ -1284,7 +1284,7 @@ class DatabaseManager:
 
             return response.data
         except Exception as e:
-            logger.error("Error analyzing emotional vector trajectory for session %s: %s", session_id, e)
+            logger.error("Error analysing emotional vector trajectory for session %s: %s", session_id, e)
             return []
 
     def find_concept_connections(self, concept_id: int, session_id: Optional[str] = None, threshold: float = 0.7):
@@ -1321,7 +1321,7 @@ class DatabaseManager:
         Find psychological patterns that appear across multiple therapy sessions.
 
         Args:
-            session_ids: List of session IDs to analyze
+            session_ids: List of session IDs to analyse
 
         Returns:
             List of patterns with occurrence data
@@ -1841,7 +1841,7 @@ class DatabaseManager:
         Analyzes emotional responses to a specific interaction to understand its psychological impact.
 
         Args:
-            interaction_id: ID of the interaction to analyze
+            interaction_id: ID of the interaction to analyse
             session_id: Session identifier
 
         Returns:
@@ -1889,7 +1889,7 @@ class DatabaseManager:
 
             return emotional_responses
         except Exception as e:
-            logger.error(f"Error analyzing emotional response to interaction: {e}")
+            logger.error(f"Error analysing emotional response to interaction: {e}")
             return []
 
     def get_therapeutic_insights_for_interaction(self, interaction_id: int, session_id: str) -> List[Dict]:
@@ -1961,7 +1961,7 @@ class DatabaseManager:
                                        pain_threshold: float = 0.85
                                        ) -> Dict:
         """
-        Identifies potential psychological pain points by analyzing the current question
+        Identifies potential psychological pain points by analysing the current question
         against past user messages using advanced vector similarity.
 
         Args:
@@ -1998,7 +1998,7 @@ class DatabaseManager:
                         'created_at': item.get('created_at')
                     })
 
-            # No past questions to analyze
+            # No past questions to analyse
             if not past_questions:
                 return {}
 
@@ -2368,7 +2368,7 @@ class DatabaseManager:
         Detect pain points from conversation history using vector similarity.
 
         Args:
-            session_id: The session ID to analyze
+            session_id: The session ID to analyse
             threshold: Similarity threshold for clustering (0.0-1.0)
             min_occurrences: Minimum number of occurrences to consider a pain point
 
@@ -2722,7 +2722,7 @@ class DatabaseManager:
             return results
 
         except Exception as e:
-            logger.error(f"Error analyzing pain points over time: {e}")
+            logger.error(f"Error analysing pain points over time: {e}")
             return []
 
     @typechecked
@@ -2814,7 +2814,7 @@ class DatabaseManager:
         Analyze emotional signals from user interactions in the current session.
 
         Args:
-            session_id: The session ID to analyze
+            session_id: The session ID to analyse
 
         Returns:
             Dictionary with emotional signals and their frequencies
@@ -2824,7 +2824,7 @@ class DatabaseManager:
             if not session_id:
                 return {"error": "No session ID provided"}
 
-            # Query to analyze emotional content across user messages
+            # Query to analyse emotional content across user messages
             query = f"""
             WITH user_messages AS (
                 SELECT
@@ -2929,7 +2929,7 @@ class DatabaseManager:
             }
 
         except Exception as e:
-            logger.error(f"Error analyzing emotional signals: {e}")
+            logger.error(f"Error analysing emotional signals: {e}")
             return {"error": str(e), "signals": [], "primary_emotion": "neutral"}
 
     def verify_schema_structure(self) -> bool:

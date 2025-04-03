@@ -362,7 +362,7 @@ def chat():
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
         logger.error(traceback.format_exc())
-        return jsonify({"response": "I apologize, but I encountered an error. Could you try expressing your concern in a different way?"}), 500
+        return jsonify({"response": "I apologise, but I encountered an error. Could you try expressing your concern in a different way?"}), 500
 
 @app.route('/add_document', methods=['POST'])
 def add_document():

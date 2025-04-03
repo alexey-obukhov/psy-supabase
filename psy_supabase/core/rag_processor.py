@@ -12,7 +12,7 @@ Key Components:
 2. Pain Point Detection: Identifies psychological fixations and recurring concerns
 3. Therapeutic Approach Selection: Dynamically selects appropriate therapeutic approaches
 4. Context Enhancement: Enriches responses with relevant psychological knowledge
-5. Memory Management: Records and analyzes conversation history for psychological patterns
+5. Memory Management: Records and analyses conversation history for psychological patterns
 6. Safety Monitoring: Detects and handles potentially harmful content
 7. Dynamic RAG Integration: Real-time knowledge retrieval during response generation
 
@@ -99,7 +99,7 @@ class RAGProcessor:
         VECTOR_CACHE_ENABLED (bool): Enable vector caching for similar questions
 
     Pain Point Detection:
-        The system identifies potential psychological pain points by analyzing:
+        The system identifies potential psychological pain points by analysing:
         1. Repetition patterns in user questions
         2. Emotional signals in conversation history
         3. Vector similarity to known psychological concerns
@@ -650,7 +650,7 @@ class RAGProcessor:
         """
         Generate appropriate therapeutic approach based on detected pain points and question evolution.
 
-        This method implements a clinical decision system that analyzes:
+        This method implements a clinical decision system that analyses:
         1. Question evolution: Whether the user is asking essentially the same question repeatedly
         or if their questions are evolving in a healthy way
         2. Emotional patterns: The dominant emotional states detected in user messages

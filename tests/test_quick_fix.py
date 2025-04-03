@@ -16,8 +16,8 @@ def test_mock_exact_responses():
         {
             "test_name": "error_handling",
             "input": "ERROR",
-            "mock_response": "I apologize, but I'm having trouble processing your question.",
-            "expected_substring": "I apologize, but I'm having trouble"
+            "mock_response": "I apologise, but I'm having trouble processing your question.",
+            "expected_substring": "I apologise, but I'm having trouble"
         }
     ]
 

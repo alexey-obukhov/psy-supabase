@@ -65,7 +65,7 @@ SUPPORTIVE_TERMS: List[str] = [
     "help", "support", "understand", "listen", "hear",
     "validat", "care", "concern", "empath", "compassion",
     "acknowledge", "comfort", "reassure", "encourage",
-    "validate", "recognize", "relate", "connect",
+    "validate", "recognise", "relate", "connect",
     "sympath", "feel", "emotion", "experienc"]
 
 # Sample data with embeddings that should be processed

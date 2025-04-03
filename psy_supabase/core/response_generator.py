@@ -239,13 +239,13 @@ class ResponseGenerator:
             # If response is None or empty, generate a fallback response
             if not response:
                 logger.warning("Received empty response from text generator, using fallback")
-                response = "I apologize, but I'm having trouble generating a response right now. Could you please try asking again?"
+                response = "I apologise, but I'm having trouble generating a response right now. Could you please try asking again?"
 
             return response
 
         except Exception as gen_error:
             logger.error(f"Error generating response with dynamic retrieval: {gen_error}")
-            return "I apologize, but I'm experiencing a technical issue. Please try again with a different question."
+            return "I apologise, but I'm experiencing a technical issue. Please try again with a different question."
 
     def determine_final_context(self, user_question: str, topics_context: Dict,
                               pain_point_results: Dict, metadata: Dict) -> Tuple[str, Dict]:
