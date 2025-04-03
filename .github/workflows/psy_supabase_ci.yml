@@ -70,6 +70,21 @@ jobs:
         # Install your package in development mode
         pip install -e .
 
+    - name: Install transformer packages
+      run: |
+        # Clear any cached transformer packages
+        pip uninstall -y transformers sentence-transformers
+
+        # Install the specific versions from your requirements.txt
+        pip install transformers==4.46.3
+        pip install sentence-transformers==3.2.1
+
+        # Verify installed versions
+        python -c "import transformers; import sentence_transformers; print(f'Transformers version: {transformers.__version__}'); print(f'Sentence-transformers version: {sentence_transformers.__version__}')"
+
+        # Check if is_torch_npu_available exists
+        python -c "import transformers; print('is_torch_npu_available exists:', hasattr(transformers, 'is_torch_npu_available'))"
+
     - name: Setup Supabase environment
       run: |
         # Set up environment variables for Supabase
@@ -78,8 +93,8 @@ jobs:
         echo "USER_ID=${{ secrets.USER_ID }}" >> $GITHUB_ENV
 
     - name: Test with pytest
-      continue-on-error: true  # Add this to prevent CI failure
-      id: pytest  # Add ID to track status
+      continue-on-error: true
+      id: pytest
       run: |
         # Install pytest dependencies
         pip install pytest pytest-cov exceptiongroup pluggy
@@ -87,16 +102,18 @@ jobs:
         # Create directory for test results
         mkdir -p junit
 
-        # Pre-download transformers models to avoid connection issues
-        pip install transformers==4.31.0 -U  # Ensure stable version
+        # Ensure we're using the correct transformers version (don't downgrade)
         pip install torch==2.0.1 # Install specific PyTorch version
+
+        # Check transformers version - don't reinstall to avoid downgrade
+        python -c "import transformers; print(f'Using transformers version {transformers.__version__}')"
+
+        # Create HF cache directory
+        mkdir -p ~/.cache/huggingface
 
         # Setup HF_HUB_OFFLINE and TRANSFORMERS_OFFLINE for fallback
         echo "HF_HUB_OFFLINE=1" >> $GITHUB_ENV
         echo "TRANSFORMERS_OFFLINE=1" >> $GITHUB_ENV
-
-        # Create HF cache directory
-        mkdir -p ~/.cache/huggingface
 
         # Try to pre-download common models used in tests
         echo "Downloading models for offline use..."
@@ -126,28 +143,6 @@ jobs:
         transformers.utils.hub.cached_file = patched_cached_file
         print('Successfully patched transformers.utils.hub.cached_file')
         " || echo "Failed to patch transformers"
-
-        # Mock specific models
-        mkdir -p ~/.cache/huggingface/hub/models--facebook--roberta-hate-speech-dynabench-r4-target/snapshots/main
-        mkdir -p ~/.cache/huggingface/hub/models--albert-base-v2/snapshots/main
-
-        # Create mock config files for commonly used models
-        for model_path in ~/.cache/huggingface/hub/models--*-*/snapshots/main; do
-          echo "Creating mock config for $model_path"
-          echo '{
-            "architectures": ["RobertaForSequenceClassification"],
-            "model_type": "roberta",
-            "hidden_size": 768,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 6
-          }' > "$model_path/config.json"
-        done
-
-        # Run tests with modified environment
-        echo "Running tests..."
-        PYTHONPATH=$PYTHONPATH:~/.cache/ HF_HUB_DISABLE_SYMLINKS_WARNING=1 TRANSFORMERS_TEST=1 \
-          python -m pytest tests/ --doctest-modules --junitxml=junit/test-results.xml \
-          --cov=psy_supabase --cov-report=xml --cov-report=html || echo "pytest_failed=true" >> $GITHUB_OUTPUT
 
     - name: Test Summary
       run: |
@@ -265,6 +260,9 @@ jobs:
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         PYTHONPATH: ${{ github.workspace }}
       run: |
+        # Check transformers version first
+        python${{ matrix.python-version }} -c "import transformers, sys; print(f'Python {sys.version}'); print(f'Transformers {transformers.__version__}')"
+
         cd test_real_data
         mkdir -p ../reports/real_data_tests
         # Create summary file
@@ -274,20 +272,25 @@ jobs:
 
         # Run each test and collect results
         for test_file in test_*.py; do
-          echo "Running $test_file"
+          echo "Running $test_file using Python ${{ matrix.python-version }}"
           test_name=$(basename "$test_file" .py)
-          log_file="../reports/real_data_tests/${test_name}.log"
+          log_file="../reports/real_data_tests/${test_name}_py${{ matrix.python-version }}.log"
           start_time=$(date +%s)
 
-          # Run test with timing and capture output
-          if python3 "$test_file" > "$log_file" 2>&1; then
+          # Run test with timing and capture output - using correct Python version
+          if python${{ matrix.python-version }} "$test_file" > "$log_file" 2>&1; then
             status="✅ Passed"
             notes=""
           else
             status="❌ Failed"
             # Extract error message
-            notes=$(grep -A 3 -B 3 "Error|Exception|Traceback" "$log_file" | head -n 1 | cut -c 1-50)
-            notes="${notes}..."
+            grep -E "Error:|Exception:|Traceback" "$log_file" | head -n 10 > "../reports/real_data_tests/${test_name}_error.txt"
+            notes=$(head -n 1 "../reports/real_data_tests/${test_name}_error.txt" | cut -c 1-50)
+            if [ -z "$notes" ]; then
+              notes="See log for details"
+            else
+              notes="${notes}..."
+            fi
           fi
 
           # Calculate duration
