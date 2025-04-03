@@ -49,14 +49,13 @@ Usage:
 import os
 import sys
 import uuid
-import time
 from school_logging.log import ColoredLogger
 from collections import Counter
-from typing import List, Dict, Any, Optional, Union, Set
+from typing import List, Dict, Any, Optional, Set
 import json
 # import multiprocessing as mp
 from psy_supabase.utilities.common import is_github_actions
-from psy_supabase.utilities.utils import cleanup_memory
+from psy_supabase.utilities.utils import cleanup_memory, stop_words
 from psy_supabase.memory.associative_memory import AssociativeMemory
 
 # Set up logging
@@ -71,7 +70,7 @@ else:
     logger.info("CI environment: Using GitHub secrets")
 
 device: str = "cpu"  # "cuda" if torch.cuda.is_available() else "cpu"
-logger.info(f"Using device: {device}")
+logger.info("Using device: %s", device)
 
 # Add parent directory to path to import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -175,7 +174,7 @@ class PainPointDetectionTester:
         """Initialize test environment and components."""
         # Create a unique test user ID for this test run
         self.test_user_id = f"test_user_{uuid.uuid4().hex[:8]}"
-        logger.info(f"Using test user ID: {self.test_user_id}")
+        logger.info("Using test user ID: %s", self.test_user_id)
 
         # Create a unique schema name for testing based on the user ID
         self.test_session_id = f"test_pain_point_{uuid.uuid4().hex[:10]}"
@@ -232,12 +231,12 @@ class PainPointDetectionTester:
                 if themes:
                     theme_desc = f"Common themes in {conversation['name']}: {', '.join(themes)}"
                     self.associative_memory.add_memory(theme_desc, themes)
-                    logger.info(f"Added theme memory: {theme_desc}")
+                    logger.info("Added theme memory: %s", theme_desc)
 
                 if approaches:
                     approach_desc = f"Therapeutic approaches for {conversation['name']}: {', '.join(approaches)}"
                     self.associative_memory.add_memory(approach_desc, approaches + themes)
-                    logger.info(f"Added approach memory: {approach_desc}")
+                    logger.info("Added approach memory: %s", approach_desc)
 
             # Add example questions with themes
             for question in conversation["questions"]:
@@ -249,7 +248,7 @@ class PainPointDetectionTester:
                 # Add to associative memory
                 self.associative_memory.add_memory(question, topics)
 
-        logger.info(f"Initialized associative memory with {len(self.associative_memory.memories)} entries")
+        logger.info("Initialized associative memory with %d entries", len(self.associative_memory.memories))
 
     def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
         """Extract simple keywords from text for topic generation."""
@@ -259,13 +258,6 @@ class PainPointDetectionTester:
 
         # Remove punctuation and convert to lowercase
         text = re.sub(r'[^\w\s]', '', text.lower())
-
-        # Remove common stop words
-        stop_words = {'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about',
-                     'as', 'of', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be', 'been',
-                     'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-                     'should', 'may', 'might', 'must', 'can', 'could', 'i', 'you', 'he', 'she',
-                     'it', 'we', 'they', 'this', 'that', 'these', 'those'}
 
         words = [word for word in text.split() if word not in stop_words and len(word) > 3]
 
@@ -313,7 +305,7 @@ class PainPointDetectionTester:
 
             # Process results as JSON string to avoid parsing issues
             if hasattr(column_result, 'model_dump_json') and callable(column_result.model_dump_json):
-                logger.info(f"Raw column query response: {column_result.model_dump_json()}")
+                logger.info("Raw column query response: %s", column_result.model_dump_json())
 
             # Get interaction table columns directly
             logger.info("=== Table Schema Information ===")
@@ -333,16 +325,16 @@ class PainPointDetectionTester:
                     # Execute as separate SQL query
                     table_result = self.db_manager.supabase.rpc('sql', {'command': table_query}).execute()
 
-                    logger.info(f"Table: {table}")
+                    logger.info("Table: %s", table)
                     if hasattr(table_result, 'data') and table_result.data:
                         for item in table_result.data:
                             if isinstance(item, dict):
                                 col_name = item.get('column_name', '')
                                 data_type = item.get('data_type', '')
                                 nullable = item.get('is_nullable', '')
-                                logger.info(f"  - {col_name} ({data_type}, nullable: {nullable})")
+                                logger.info("  - %s (%s, nullable: %s)", col_name, data_type, nullable)
                 except Exception as e:
-                    logger.error(f"Error getting schema for table {table}: {e}")
+                    logger.error("Error getting schema for table %s: %s", table, e)
 
             # Get row counts
             for table in tables:
@@ -356,13 +348,13 @@ class PainPointDetectionTester:
                         else:
                             count = count_result.data[0]
 
-                    logger.info(f"{table} row count: {count}")
+                    logger.info("%s row count: %s", table, count)
                 except Exception as e:
-                    logger.error(f"Error getting row count for {table}: {e}")
+                    logger.error("Error getting row count for %s: %s", table, e)
 
             return {"status": "completed"}
         except Exception as e:
-            logger.error(f"Error in database diagnostics: {e}")
+            logger.error("Error in database diagnostics: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             return {"error": str(e)}
@@ -374,7 +366,7 @@ class PainPointDetectionTester:
 
             # Use a much simpler approach that will work even if responses are returned character-by-character
             for table_name in ['interactions', 'interaction_embeddings']:
-                logger.info(f"\n=== STRUCTURE FOR TABLE: {table_name} ===")
+                logger.info("\n=== STRUCTURE FOR TABLE: %s ===", table_name)
 
                 # Run individual queries for each piece of information we need
 
@@ -401,10 +393,10 @@ class PainPointDetectionTester:
                         # Try to interpret as boolean
                         table_exists = exists_response.data[0] in (True, 'true', 't', '1')
 
-                logger.info(f"Table exists: {table_exists}")
+                logger.info("Table exists: %s", table_exists)
 
                 if not table_exists:
-                    logger.info(f"Table {table_name} does not exist. Skipping.")
+                    logger.info("Table %s does not exist. Skipping.", table_name)
                     continue
 
                 # 2. Get row count
@@ -429,7 +421,7 @@ class PainPointDetectionTester:
                         except (ValueError, TypeError):
                             row_count = 0
 
-                logger.info(f"Row count: {row_count}")
+                logger.info("Row count: %d", row_count)
 
                 # 3. Get column names one at a time
                 logger.info("Columns:")
@@ -447,9 +439,9 @@ class PainPointDetectionTester:
                 # Process column names
                 if columns_response.data:
                     # Output raw data for debugging
-                    logger.info(f"Raw column data type: {type(columns_response.data)}")
+                    logger.info("Raw column data type: %s", type(columns_response.data))
                     if len(columns_response.data) > 0:
-                        logger.info(f"First item type: {type(columns_response.data[0])}")
+                        logger.info("First item type: %s", type(columns_response.data[0]))
 
                     column_names = []
 
@@ -479,7 +471,7 @@ class PainPointDetectionTester:
                     # Log found columns
                     if column_names:
                         for col in column_names:
-                            logger.info(f"  - {col}")
+                            logger.info("  - %s", col)
                     else:
                         logger.info("  Could not parse column names")
                 else:
@@ -514,7 +506,7 @@ class PainPointDetectionTester:
                         # If it's character-by-character
                         primary_key = ''.join(pk_response.data)
 
-                logger.info(f"Primary key: {primary_key}")
+                logger.info("Primary key: %s", primary_key)
 
                 # 5. Manual information based on expected schema
                 logger.info("Expected schema:")
@@ -535,7 +527,7 @@ class PainPointDetectionTester:
             return True
 
         except Exception as e:
-            logger.error(f"Error in direct table check: {e}")
+            logger.error("Error in direct table check: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             return False
@@ -576,14 +568,14 @@ class PainPointDetectionTester:
                         "topic": item.get('topic', 'Unknown topic'),
                         "frequency": item.get('frequency', 0)
                     })
-                logger.info(f"Topic analysis found {len(topics)} topics")
+                logger.info("Topic analysis found %d topics", len(topics))
                 return topics
             else:
                 logger.info("No significant topics identified")
                 return [{"topic": "No significant topics identified", "frequency": 0}]
 
         except Exception as e:
-            logger.error(f"Error analysing topics: {e}")
+            logger.error("Error analysing topics: %s", e)
             return [{"topic": f"Error: {str(e)}", "frequency": 0}]
 
 def analyze_test_results(results: List[Dict[str, Any]]) -> None:
@@ -594,23 +586,23 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
         results: List of test results from run_tests()
     """
     logger.info("=== PAIN POINT DETECTION TEST RESULTS ===")
-    logger.info(f"Conversations tested: {len(results)}")
+    logger.info("Conversations tested: %d", len(results))
 
     # Overall statistics
     total_exchanges: int = sum(len(r["exchanges"]) for r in results)
     total_detected: int = sum(r["pain_points_detected"] for r in results)
     detection_rate: float = (total_detected / total_exchanges) * 100 if total_exchanges > 0 else 0
 
-    logger.info(f"Total exchanges: {total_exchanges}")
-    logger.info(f"Total pain points detected: {total_detected}")
+    logger.info("Total exchanges: %d", total_exchanges)
+    logger.info("Total pain points detected: %d", total_detected)
     logger.info(f"Overall detection rate: {detection_rate:.2f}%")
 
     # Analyze each conversation
     logger.info("\nDetailed results by conversation:")
     for i, result in enumerate(results):
-        logger.info(f"\n{result['name']}:")
+        logger.info("\n%s:", result['name'])
         logger.info(f"  Detection rate: {(result['pain_points_detected'] / len(result['exchanges'])) * 100:.2f}%")
-        logger.info(f"  First detected at: Question #{result['first_detection_at'] if result['first_detection_at'] else 'N/A'}")
+        logger.info("  First detected at: Question #%s", result['first_detection_at'] if result['first_detection_at'] else 'N/A')
 
         # Analyze approach types detected
         all_approach_types: List[str] = []
@@ -642,9 +634,9 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                     match_percentage: float = (len(matches) / len(normalized_expected)) * 100 if normalized_expected else 0
                     logger.info(f"  Approach type match: {match_percentage:.2f}% ({len(matches)}/{len(normalized_expected)})")
                     if matches:
-                        logger.info(f"    Matched types: {', '.join(matches)}")
+                        logger.info("    Matched types: %s", ', '.join(matches))
                     if misses:
-                        logger.info(f"    Missed types: {', '.join(misses)}")
+                        logger.info("    Missed types: %s", ', '.join(misses))
 
         # Analyze themes detected
         all_themes: List[str] = []
@@ -667,9 +659,9 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                                not t["topic"].startswith("No ")]
 
             if meaningful_topics:
-                logger.info(f"  Vector-based topic analysis:")
+                logger.info("  Vector-based topic analysis:")
                 for topic in sorted(meaningful_topics, key=lambda x: x["frequency"], reverse=True):
-                    logger.info(f"    - {topic['topic']} (frequency: {topic['frequency']})")
+                    logger.info("    - %s (frequency: %s)", topic['topic'], topic['frequency'])
 
                 # Compare with expected themes
                 if i < len(TEST_CONVERSATIONS):
@@ -691,11 +683,11 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                         match_percentage = (len(matches) / len(expected_themes)) * 100 if expected_themes else 0
                         logger.info(f"  Vector topic match: {match_percentage:.2f}% ({len(matches)}/{len(expected_themes)})")
                         if matches:
-                            logger.info(f"    Matched themes: {', '.join(matches)}")
+                            logger.info("    Matched themes: %s", ', '.join(matches))
                         if misses:
-                            logger.info(f"    Missed themes: {', '.join(misses)}")
+                            logger.info("    Missed themes: %s", ', '.join(misses))
             else:
-                logger.info(f"  Vector-based topic analysis: No significant topics identified")
+                logger.info("  Vector-based topic analysis: No significant topics identified")
 
 def main() -> None:
     """Run the pain point detection database diagnostics."""
@@ -710,7 +702,7 @@ def main() -> None:
         tester: PainPointDetectionTester = PainPointDetectionTester()
         logger.info("=== Running Database Diagnostics ===")
         diagnostics = tester.diagnose_database_issues()
-        logger.info(f"Database diagnostics completed: {diagnostics}")
+        logger.info("Database diagnostics completed: %s", diagnostics)
 
         # Run direct table check
         logger.info("=== Running Direct Table Check ===")
@@ -718,7 +710,7 @@ def main() -> None:
 
         tester.cleanup()
     except Exception as e:
-        logger.error(f"Error running diagnostics: {e}")
+        logger.error("Error running diagnostics: %s", e)
         import traceback
         logger.error(traceback.format_exc())
 

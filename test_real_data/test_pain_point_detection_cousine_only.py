@@ -51,7 +51,7 @@ import sys
 import uuid
 from school_logging.log import ColoredLogger
 from collections import Counter
-from typing import List, Dict, Any, Optional, Union, Set
+from typing import List, Dict, Any, Optional, Set
 import json
 # import multiprocessing as mp
 from psy_supabase.utilities.common import is_github_actions
@@ -69,7 +69,7 @@ else:
     logger.info("CI environment: Using GitHub secrets")
 
 device: str = "cpu"  # "cuda" if torch.cuda.is_available() else "cpu"
-logger.info(f"Using device: {device}")
+logger.info("Using device: %s", device)
 
 # Add parent directory to path to import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -168,11 +168,11 @@ class PainPointDetectionTester:
         """Initialize test environment and components."""
         # Create a unique test user ID for this test run
         self.test_user_id = f"test_user_{uuid.uuid4().hex[:8]}"
-        logger.info(f"Using test user ID: {self.test_user_id}")
+        logger.info("Using test user ID: %s", self.test_user_id)
 
         # Create a unique schema name for testing based on the user ID
         self.test_session_id = f"test_pain_point_{uuid.uuid4().hex[:10]}"
-        #logger.info(f"Using test session ID: {self.test_session_id}")
+        logger.info("Using test session ID: %s", self.test_session_id)
 
         # Initialize database manager with Supabase credentials and test user
         self.db_manager = DatabaseManager(
@@ -225,7 +225,7 @@ class PainPointDetectionTester:
         Returns:
             Dictionary with conversation results
         """
-        logger.info(f"Testing conversation: {conversation['name']}")
+        logger.info("Testing conversation: %s", conversation['name'])
 
         results: Dict[str, Any] = {
             "name": conversation["name"],
@@ -237,7 +237,7 @@ class PainPointDetectionTester:
 
         # Process each question in sequence
         for i, question in enumerate(conversation["questions"]):
-            logger.info(f"Question {i+1}: {question[:50]}...")
+            logger.info("Question %d: %s...", i+1, question[:50])
 
             # Generate response through the RAG processor
             response: str = self.rag_processor.generate_response(
@@ -261,7 +261,7 @@ class PainPointDetectionTester:
                     try:
                         metadata = json.loads(metadata)
                     except Exception as e:
-                        logger.error(f"Error parsing metadata JSON: {e}")
+                        logger.error("Error parsing metadata JSON: %s", e)
                         metadata = {}
 
                 # IMPROVED: Handle both field naming conventions
@@ -334,7 +334,7 @@ class PainPointDetectionTester:
                             f"Approach: {therapeutic_approach}, Template: {template_used}")
 
             except Exception as e:
-                logger.error(f"Error processing results: {e}")
+                logger.error("Error processing results: %s", e)
                 # Add fallback to error exception handling...
 
                 # Simple fallback with just the question and response
@@ -361,7 +361,7 @@ class PainPointDetectionTester:
 
         for conversation in TEST_CONVERSATIONS:
             # Add a small delay between conversations
-            logger.info(f"Starting test for: {conversation['name']}")
+            logger.info("Starting test for: %s", conversation['name'])
 
             # Simulate the conversation
             result: Dict[str, Any] = self._simulate_conversation(conversation)
@@ -372,18 +372,18 @@ class PainPointDetectionTester:
             result["vector_topics"] = self.analyze_conversation_topics()
 
             # Log summary of this conversation test
-            logger.info(f"Completed test for: {conversation['name']}")
-            logger.info(f"  Pain points detected: {result['pain_points_detected']} out of {len(conversation['questions'])}")
+            logger.info("Completed test for: %s", conversation['name'])
+            logger.info("  Pain points detected: %s out of %d", result['pain_points_detected'], len(conversation['questions']))
             if result["first_detection_at"]:
-                logger.info(f"  First detected at question #{result['first_detection_at']}")
-            logger.info(f"  Templates used: {', '.join(result['templates_used'])}")
+                logger.info("  First detected at question #%s", result['first_detection_at'])
+            logger.info("  Templates used: %s", ', '.join(result['templates_used']))
 
             # Log topic analysis results
             if result["vector_topics"]:
                 topic_str = ", ".join([f"{t['topic']}({t['frequency']})" for t in result["vector_topics"]
                                       if not t["topic"].startswith("Error") and not t["topic"].startswith("No ")])
                 if topic_str:
-                    logger.info(f"  Vector topics identified: {topic_str}")
+                    logger.info("  Vector topics identified: %s", topic_str)
 
             logger.info("----------------------------------------")
 
@@ -419,14 +419,14 @@ class PainPointDetectionTester:
                         "topic": item.get('topic', 'Unknown topic'),
                         "frequency": item.get('frequency', 0)
                     })
-                logger.info(f"Topic analysis found {len(topics)} topics")
+                logger.info("Topic analysis found %d topics", len(topics))
                 return topics
             else:
                 logger.info("No significant topics identified")
                 return [{"topic": "No significant topics identified", "frequency": 0}]
 
         except Exception as e:
-            logger.error(f"Error analysing topics: {e}")
+            logger.error("Error analysing topics: %s", e)
             return [{"topic": f"Error: {str(e)}", "frequency": 0}]
 
 def analyze_test_results(results: List[Dict[str, Any]]) -> None:
@@ -437,23 +437,23 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
         results: List of test results from run_tests()
     """
     logger.info("=== PAIN POINT DETECTION TEST RESULTS ===")
-    logger.info(f"Conversations tested: {len(results)}")
+    logger.info("Conversations tested: %d", len(results))
 
     # Overall statistics
     total_exchanges: int = sum(len(r["exchanges"]) for r in results)
     total_detected: int = sum(r["pain_points_detected"] for r in results)
     detection_rate: float = (total_detected / total_exchanges) * 100 if total_exchanges > 0 else 0
 
-    logger.info(f"Total exchanges: {total_exchanges}")
-    logger.info(f"Total pain points detected: {total_detected}")
+    logger.info("Total exchanges: %d", total_exchanges)
+    logger.info("Total pain points detected: %d", total_detected)
     logger.info(f"Overall detection rate: {detection_rate:.2f}%")
 
     # Analyze each conversation
     logger.info("\nDetailed results by conversation:")
     for i, result in enumerate(results):
-        logger.info(f"\n{result['name']}:")
+        logger.info("\n%s:", result['name'])
         logger.info(f"  Detection rate: {(result['pain_points_detected'] / len(result['exchanges'])) * 100:.2f}%")
-        logger.info(f"  First detected at: Question #{result['first_detection_at'] if result['first_detection_at'] else 'N/A'}")
+        logger.info("  First detected at: Question #%s", result['first_detection_at'] if result['first_detection_at'] else 'N/A')
 
         # Analyze approach types detected
         all_approach_types: List[str] = []
@@ -484,9 +484,9 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                 match_percentage: float = (len(matches) / len(normalized_expected)) * 100 if normalized_expected else 0
                 logger.info(f"  Approach type match: {match_percentage:.2f}% ({len(matches)}/{len(normalized_expected)})")
                 if matches:
-                    logger.info(f"    Matched types: {', '.join(matches)}")
+                    logger.info("    Matched types: %s", ', '.join(matches))
                 if misses:
-                    logger.info(f"    Missed types: {', '.join(misses)}")
+                    logger.info("    Missed types: %s", ', '.join(misses))
 
         # Analyze themes detected
         all_themes: List[str] = []
@@ -509,9 +509,9 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                                not t["topic"].startswith("No ")]
 
             if meaningful_topics:
-                logger.info(f"  Vector-based topic analysis:")
+                logger.info("  Vector-based topic analysis:")
                 for topic in sorted(meaningful_topics, key=lambda x: x["frequency"], reverse=True):
-                    logger.info(f"    - {topic['topic']} (frequency: {topic['frequency']})")
+                    logger.info("    - %s (frequency: %s)", topic['topic'], topic['frequency'])
 
                 # Compare with expected themes
                 expected_conversation: Dict[str, Any] = TEST_CONVERSATIONS[i]
@@ -532,11 +532,11 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                     match_percentage = (len(matches) / len(expected_themes)) * 100 if expected_themes else 0
                     logger.info(f"  Vector topic match: {match_percentage:.2f}% ({len(matches)}/{len(expected_themes)})")
                     if matches:
-                        logger.info(f"    Matched themes: {', '.join(matches)}")
+                        logger.info("    Matched themes: %s", ', '.join(matches))
                     if misses:
-                        logger.info(f"    Missed themes: {', '.join(misses)}")
+                        logger.info("    Missed themes: %s", ', '.join(misses))
             else:
-                logger.info(f"  Vector-based topic analysis: No significant topics identified")
+                logger.info("  Vector-based topic analysis: No significant topics identified")
 
 def main() -> None:
     """Run the pain point detection tests."""
@@ -553,7 +553,7 @@ def main() -> None:
         analyze_test_results(results)
         tester.cleanup()
     except Exception as e:
-        logger.error(f"Error running tests: {e}")
+        logger.error("Error running tests: %s", e)
         import traceback
         logger.error(traceback.format_exc())
 
