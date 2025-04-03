@@ -331,7 +331,6 @@ class DatabaseManager:
 
             # Now optimize vector queries - try both function names to handle inconsistency
             try:
-                # First try the original function name used in your tests
                 p_response = self.supabase.rpc('optimize_vector_queries', {'p_schema_name': self.schema_name}).execute()
                 if p_response.data is None or p_response.data is False:
                     logger.warning(f"Vector optimization failed for schema {self.schema_name}")
@@ -2394,7 +2393,7 @@ class DatabaseManager:
             question_clusters = []
 
             # For each question, check if it forms a cluster with others
-            for i, question in enumerate(questions):
+            for primary_idx, question in enumerate(questions):
                 # Skip empty questions
                 if not question.strip():
                     continue
@@ -2403,28 +2402,27 @@ class DatabaseManager:
                 similar_indices = []
 
                 # Get the vector for this question (using standard embedding function)
-                # In a real implementation, you'd use your actual embedding function
-                for j, other_question in enumerate(questions):
-                    if i == j:  # Skip comparing to self
+                for compare_idx, other_question in enumerate(questions):
+                    if primary_idx == compare_idx:  # Skip comparing to self
                         continue
 
-                    # In production, you'd use vector similarity here
-                    # For testing, we'll use simple text matching as a proxy
+                    # In production, to use vector similarity here
+                    #todo For testing - simple text matching as a proxy
                     similarity = self._text_similarity(question, other_question)
 
                     if similarity > threshold:
-                        similar_indices.append(j)
+                        similar_indices.append(compare_idx)
 
                 # If we found enough similar questions, we have a cluster
                 if len(similar_indices) + 1 >= min_occurrences:  # +1 to include the current question
                     # Create a pain point cluster
                     cluster = {
-                        'indices': [i] + similar_indices,
-                        'questions': [questions[i]] + [questions[j] for j in similar_indices],
+                        'indices': [primary_idx] + similar_indices,
+                        'questions': [questions[primary_idx]] + [questions[s_i] for s_i in similar_indices],
                         'recurring_terms': self._extract_recurring_terms(
-                            [questions[i]] + [questions[j] for j in similar_indices]
+                            [questions[primary_idx]] + [questions[s_i] for s_i in similar_indices]
                         ),
-                        'first_occurrence': min([i] + similar_indices),
+                        'first_occurrence': min([primary_idx] + similar_indices),
                         'count': len(similar_indices) + 1
                     }
 

@@ -403,5 +403,3 @@ class TestTemplateDebugging:
 
             # Apply our testing setup
             setup_text_generator_for_testing(fresh_generator)
-
-            # Now run your specialized template tests...

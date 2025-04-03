@@ -31,7 +31,6 @@ def cleanup_gpu_memory():
     # Teardown: clean up memory after test completes (or fails)
     logger.info("Cleaning up GPU memory after test...")
 
-    # Use your existing utility function
     cleanup_memory()
 
 @pytest.fixture

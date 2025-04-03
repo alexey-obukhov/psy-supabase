@@ -1,16 +1,34 @@
 """
 Model Manager Module
 
-This module provides a `ModelManager` class to handle the loading, caching, and management of machine learning models.
-It supports both text generation and toxicity detection models, as well as embedding generation using sentence-transformers.
+This module provides a `ModelManager` class that manages multiple AI models used in the PSY
+therapeutic assistant:
 
-The module also includes utility functions and adapter classes for compatibility with other interfaces.
+1. **Text Generation**: Microsoft Phi-1.5 model for generating therapeutic responses
+2. **Embedding Generation**: SentenceTransformer model for creating vector representations of text
+3. **Content Moderation**: Toxicity detection model for ensuring safe conversations
+
+The `ModelManager` handles:
+- Model downloading and local caching to reduce startup time
+- Device management (CPU/GPU switching)
+- Memory optimization with quantization options
+- Automatic fallbacks when primary models encounter issues
+
+Key components:
+- `ModelManager`: Core class managing model instances and memory
+- `EmbeddingProviderAdapter`: Standardized interface for embedding generation
+- `get_model_manager()`: Factory function to get model instances
+- `get_embedding_provider()`: Creates a simple embedding interface
+
+This design centralizes model management for efficiency and provides a clean API
+for other components to access AI capabilities without handling the underlying
+complexity of model loading and memory management.
 """
 
 import gc
 import os
 import traceback
-from typing import List, Optional, Dict, ClassVar, TYPE_CHECKING
+from typing import List, Optional, Dict, ClassVar
 from typeguard import typechecked
 import torch
 import torch.cuda
@@ -86,7 +104,7 @@ class ModelManager:
         """
         self.model_name = model_name
         self.preferred_device = device
-        self.quantize = quantize  # New parameter
+        self.quantize = quantize
         self.generator = None
         self.embedding_model = None
         self.toxicity_model = None
@@ -489,15 +507,18 @@ class EmbeddingProviderAdapter:
 @typechecked
 def get_embedding_provider(model_name: Optional[str] = None) -> EmbeddingProviderAdapter:
     """
-    Get embedding provider compatible with ai_providers.py interface.
-    This provides a bridge to the ModelManager for code that expects
-    the ai_providers.py interface.
+    Get a standardized embedding provider for vector representations of text.
+
+    This function creates an EmbeddingProviderAdapter that provides a simplified
+    interface for generating embeddings in both single and batch operations.
+    It abstracts away the complexity of the underlying ModelManager while ensuring
+    consistent handling of embedding generation throughout the application.
 
     Args:
-        model_name: Optional model name
+        model_name: Optional model name to use for embeddings (default: "microsoft/phi-1.5")
 
     Returns:
-        Object with generate_embedding method
+        EmbeddingProviderAdapter with consistent generate_embedding methods
     """
     # Use model name if provided, otherwise use default
     model = model_name if model_name else "microsoft/phi-1_5"

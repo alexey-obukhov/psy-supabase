@@ -1,6 +1,4 @@
 """
-2025, Dresden Alexey Obukhov, alexey.obukhov@hotmail.com
-
 This module defines a tuple of words that should be preserved during the tokenization and lemmatization process
 in the `tokenize_and_lemmatize` function of the `data_augmentation.py` module. These words include key pronouns
 and verbs that are important for maintaining the context and meaning of the text data.

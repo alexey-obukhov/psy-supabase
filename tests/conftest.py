@@ -631,7 +631,6 @@ def mock_db_manager_with_test_values():
 
     return manager
 
-# Add this fixture to your conftest.py
 @pytest.fixture
 def non_toxic_rag_processor(mock_db_manager_with_spy, mock_text_generator):
     """Create a RAG processor that won't detect toxicity."""

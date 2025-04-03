@@ -13,24 +13,18 @@ from psy_supabase.utilities.common import get_project_root
 from tests.helpers.database_test_base import DatabaseTestBase
 
 
+
 class TestDynamicRAGRetriever(DatabaseTestBase):
     """Test suite for DynamicRAGRetriever functionality and template selection."""
 
     def setUp(self):
         """Set up test environment before each test."""
-        # First call the parent's setUp to get the standard test IDs and logger
-        super().setUp()
-
-        # Log that we're setting up the DynamicRAG test
-        self.logger.info(f"Setting up DynamicRAGRetriever test for session {self.test_session_id}")
-
-        # Create a mock database manager - use session ID from parent
+        # Create a mock database manager
         self.mock_db = MagicMock()
 
         # Set up common embedding response
         self.mock_embedding = [0.1] * 384  # Typical embedding size
         self.mock_db.create_embedding.return_value = self.mock_embedding
-        self.logger.debug("Configured mock embedding vector with 384 dimensions")
 
         # Setup mock for detect_pain_points method
         mock_pain_points = {
@@ -43,24 +37,19 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         # Setup mock for other methods used in tests
         self.mock_db.get_conversation_history = MagicMock(return_value=[])
         self.mock_db.find_similar_interactions_by_embedding = MagicMock(return_value=[])
-        self.logger.debug("Initialized all database mock methods")
 
-        # Use session ID from parent class - note this change
-        self.session_id = self.test_session_id  # Use parent's generated ID
+        # Set up session ID
+        self.session_id = "test_session_123"
 
         # Define templates directory path
         self.templates_dir = os.path.join(get_project_root(), "templates")
 
         # Initialize the retriever with mock DB
         self.retriever = DynamicRAGRetriever(self.mock_db, self.session_id)
-        self.logger.info(f"Initialized DynamicRAGRetriever with session ID: {self.session_id}")
 
         # Verify templates directory exists
         if not os.path.exists(self.templates_dir):
-            self.logger.warning(f"Templates directory not found at {self.templates_dir}")
-        else:
-            self.logger.debug(f"Templates directory found at {self.templates_dir}")
-
+            print(f"Warning: Templates directory not found at {self.templates_dir}")
 
     def test_template_existence(self):
         """Verify that essential templates exist in the templates directory."""
@@ -276,14 +265,15 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
     def test_get_past_interactions(self):
         """Test retrieval of past interactions by session ID."""
         # Setup mock
+        session_id = "test_session_1234"
         mock_history = [{"question": "Test?", "answer": "Answer"}]
         self.mock_db.get_conversation_history.return_value = mock_history
 
         # Call the method
-        result = self.retriever.get_past_interactions(self.session_id)
+        result = self.retriever.get_past_interactions(session_id)
 
         # Verify the mock database method was called
-        self.mock_db.get_conversation_history.assert_called_once_with(self.session_id)
+        self.mock_db.get_conversation_history.assert_called_once_with(session_id)
 
         # Verify the result
         self.assertEqual(result, mock_history)
@@ -292,6 +282,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         """Test retrieval of interactions by topic."""
         # Setup
         topic = "anxiety"
+        session_id = "test_session"
         mock_embedding = [0.1] * 10
         mock_results = [{"question": "I am anxious", "answer": "That's normal"}]
 
@@ -300,34 +291,26 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         self.mock_db.find_similar_interactions_by_embedding.return_value = mock_results
 
         # Call the method
-        result = self.retriever.get_past_interactions_by_topic(topic, self.session_id)
+        result = self.retriever.get_past_interactions_by_topic(topic, session_id)
 
         # Assertions
         self.mock_db.create_embedding.assert_called_once_with(topic)
         self.mock_db.find_similar_interactions_by_embedding.assert_called_once_with(
-            embedding=mock_embedding, session_id=self.session_id, limit=5
+            embedding=mock_embedding, session_id=session_id, limit=5
         )
         self.assertEqual(result, mock_results)
 
     def test_combined_retrieval_workflow(self):
         """Test the combined retrieval workflow with examination anxiety."""
-        self.logger.info("Running test_combined_retrieval_workflow")
-        try:
-            # Setup
-            query = "I feel anxious about my exam"
-            self.logger.debug(f"Using session ID: {self.session_id}")
+        # Setup
+        query = "I feel anxious about my exam"
+        session_id = "test_session_1234"
 
-            # Call the method - should get special handling in the method
-            result = self.retriever.get_combined_retrieval_workflow(query, self.session_id)
+        # Call the method - should get special handling in the method
+        result = self.retriever.get_combined_retrieval_workflow(query, session_id)
 
-            # Verify result matches expected output for this special test case
-            self.assertIn("anxious about my exam", result)
-            self.logger.info("Combined retrieval workflow test passed")
-        except AssertionError as e:
-            # If the test fails, run diagnostics
-            self.logger.error(f"Test failed with error: {e}")
-            self.run_diagnostics(e)
-            raise  # Re-raise the exception after diagnostics
+        # Verify result matches expected output for this special test case
+        self.assertIn("anxious about my exam", result)
 
     def test_get_pain_point(self):
         """Test detection of pain points."""
@@ -377,56 +360,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
             "Anxiety Support"
         )
 
-    def run_diagnostics(self, error=None):
-        """Run diagnostics when a test fails."""
-        if error:
-            self.logger.error(f"Test failed with error: {error}")
-
-        # First run the base diagnostics
-        has_real_db, has_mock_db = self.run_diagnostics_summary()
-
-        # Then add DynamicRAG-specific diagnostics
-        self.logger.info("=== DynamicRAG-Specific Diagnostics ===")
-        self.logger.info(f"DynamicRAGRetriever cache size: {len(self.retriever.query_cache)}")
-
-        # Add specialized mock checks for this test class
-        if has_mock_db:
-            self.logger.info(f"create_embedding call count: {self.mock_db.create_embedding.call_count}")
-            self.logger.info(f"find_similar_interactions_by_embedding call count: {self.mock_db.find_similar_interactions_by_embedding.call_count}")
-
-        # Add DynamicRAG-specific diagnostics
-        self.logger.info("=== DynamicRAG-Specific Diagnostics ===")
-        self.logger.info(f"Current session ID: {self.session_id}")
-        self.logger.info(f"DynamicRAGRetriever cache size: {len(self.retriever.query_cache)}")
-
-        # Check mock call counts
-        self.logger.info(f"create_embedding call count: {self.mock_db.create_embedding.call_count}")
-        self.logger.info(f"find_similar_interactions_by_embedding call count: {self.mock_db.find_similar_interactions_by_embedding.call_count}")
-
-        # Display template information
-        if os.path.exists(self.templates_dir):
-            template_files = os.listdir(self.templates_dir)
-            self.logger.info(f"Available templates ({len(template_files)}): {', '.join(template_files)}")
-
-        # Examine the RAG processor configuration
-        self.logger.info(f"DynamicRAGRetriever associative memory initialized: {hasattr(self.retriever, 'associative_memory')}")
-
-    def tearDown(self):
-        """DynamicRAG-specific tearDown with more detailed diagnostics."""
-        try:
-            # Clean up DynamicRAG-specific resources first
-            self.retriever.query_cache.clear()
-
-            # Run DynamicRAG-specific diagnostics on suspicious activity
-            if self.mock_db.find_similar_interactions_by_embedding.call_count > 10:  # Example condition
-                self.logger.warning("Unusually high number of DB calls detected")
-                self.run_diagnostics()  # Run full diagnostics
-
-        except Exception as e:
-            self.logger.error(f"Error in DynamicRAG tearDown: {e}")
-
-        # Then call parent tearDown which will run basic diagnostics
-        super().tearDown()
+    # Add additional tests for other methods: analyze_emotion, analyze_topics, get_related_concepts
 
 if __name__ == '__main__':
     unittest.main()

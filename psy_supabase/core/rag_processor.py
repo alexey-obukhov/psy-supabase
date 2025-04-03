@@ -958,7 +958,6 @@ class RAGProcessor:
                 return hot_topics
 
             # Otherwise, try vector search
-            # This could use pgvector to find similar topics in your knowledge base
             if query_embedding:
                 # Only include relevant hot topics (above threshold)
                 threshold = 0.75  # Higher threshold for hot topics

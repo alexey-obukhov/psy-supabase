@@ -238,7 +238,7 @@ jobs:
   deploy-badges:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/psy-supabase-pkg'  # Only deploy on your main branch
+    if: github.ref == 'refs/heads/psy-supabase-pkg'
     permissions:
       contents: write
     steps:

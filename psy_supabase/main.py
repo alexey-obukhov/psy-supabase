@@ -1,6 +1,78 @@
 """
-Main module for PSY Supabase application providing therapy AI assistant services.
-Handles API endpoints for chat, document management, and memory optimization.
+# PSY Supabase: An AI Therapy Assistant
+
+This project implements a therapeutic AI assistant using retrieval-augmented generation (RAG)
+and associative memory to provide mental health support conversations.
+
+## Technical Overview
+
+This project uses a multi-model architecture to provide comprehensive therapeutic capabilities:
+
+1. **Microsoft Phi-1.5**: A lightweight yet capable language model with 1.3 billion parameters,
+   used for primary response generation. This model offers good performance with reasonable
+   hardware requirements, making it accessible for deployment on consumer hardware.
+
+2. **Sentence-Transformers (all-MiniLM-L6-v2)**: Powers the associative memory component,
+   creating 384-dimensional embeddings that connect related psychological concepts and enable
+   semantic similarity calculations.
+
+3. **Facebook RoBERTa Hate Speech Detector**: Uses the facebook/roberta-hate-speech-dynabench-r4-target
+   model to perform content moderation and toxicity detection. This specialized model ensures
+   conversations remain safe, appropriate, and therapeutic by identifying potentially harmful
+   content before processing.
+
+These models are augmented with:
+
+1. **Retrieval-Augmented Generation (RAG)**: Enhances responses by retrieving relevant past
+   interactions and knowledge documents from a Supabase vector database.
+
+2. **Associative Memory**: Creates connections between related psychological concepts,
+   allowing the system to draw on related information (e.g., connecting "anxiety" with
+   "stress management techniques").
+
+3. **Dynamic Template Selection**: Chooses appropriate therapeutic response templates based
+   on detected pain points and conversation context.
+
+4. **PostgreSQL Vector Search**: Implements semantic similarity search using pgvector
+   to find relevant knowledge and past interactions.
+
+## Key Components
+
+- **RAGProcessor**: Orchestrates the retrieval and generation process
+- **DynamicRAGRetriever**: Handles semantic search with caching
+- **AssociativeMemory**: Links related psychological concepts
+- **DatabaseManager**: Manages the Supabase vector database
+- **Flask API**: Provides REST endpoints for the frontend application
+
+## Configuration
+
+The system supports various environment variables:
+- `SUPABASE_URL` and `SUPABASE_KEY`: Required for database access
+- `INTELLIGENT_PROCESS_ENABLED`: Toggle advanced processing features (default: true)
+
+## Hardware Requirements
+
+- **CPU Mode**: Works on any modern CPU with 8GB+ RAM
+- **GPU Mode (Recommended)**: CUDA-compatible GPU with 6GB+ VRAM
+- **Storage**: Minimum 1GB for model weights and application
+
+## License
+
+The code in this project is licensed under the MIT License. See LICENSE for details.
+
+> Note: While this project uses the microsoft/phi-1_5 model, users should ensure they comply
+> with Microsoft's licensing terms for the model itself, which may differ from the project code license.
+
+## Citation
+
+If you use this project in your research or derivative work, please cite:
+@software{psy_supabase, author = {Alexey Obukhov}, title = {PSY Supabase: An AI Therapy Assistant}, year = {2025}, url = {https://github.com/alexey-obukhov/psy-supabase} }
+
+## Disclaimer
+
+This AI assistant is designed as a research tool and technology demonstration. It is not a
+replacement for professional mental health services. The system should not be used to diagnose
+or treat any medical or psychological condition.
 """
 
 # Standard library imports
@@ -23,7 +95,7 @@ from typeguard import install_import_hook
 # Local imports
 from psy_supabase.utilities.common import is_github_actions
 from psy_supabase.utilities.nlp_utils import get_spacy_model
-from psy_supabase.utilities.utils import cleanup_memory
+from psy_supabase.utilities.utils import cleanup_memory, parse_bool_env
 from psy_supabase.utilities.logging_config import configure_logging
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.database import DatabaseManager
@@ -83,7 +155,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # Move these variables to module level so they're available regardless of how the app runs
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_KEY")
-intelligent_processing_enabled = os.environ.get("INTELLIGENT_PROCESS_ENABLED", True)
+intelligent_processing_enabled = parse_bool_env("INTELLIGENT_PROCESS_ENABLED", True)
+logger.info(f"Intelligent processing enabled: {intelligent_processing_enabled}")
 
 # Validate environment variables at module level
 if not supabase_url or not supabase_key:
@@ -248,7 +321,7 @@ def chat():
         generator = model_manager.get_generator()
 
         # Create a RAG processor using the retrieved documents
-        rag_processor = RAGProcessor(g.db_manager, generator, intelligent_processing_enabled)
+        rag_processor = RAGProcessor(g.db_manager, generator, True)
 
         try:
             # Generate response
@@ -262,18 +335,23 @@ def chat():
             # Validate response before returning
             if not response or len(response.strip()) < 10:
                 logger.error(f"Invalid response generated: {response}")
-                response = (
-                    "I understand you're having difficulty with asking questions. "
-                    "Would you like to explore what makes this challenging for you? I'm here to support you."
-                )
-
-            # Additional safety check for inappropriate response patterns
-            if any(pattern in response for pattern in ["# YOUR CODE HERE", "SOLUTION:", "Answer the following:", "# 1.", "# 2."]):
-                logger.error(f"Code template detected in response: {response}")
-                response = (
-                    "I notice you're concerned about asking questions and feeling stuck. "
-                    "Many people find this challenging. Would you like to explore what might help you feel more comfortable asking questions?"
-                )
+                if "anxiety" in question.lower() or "worry" in question.lower() or "stress" in question.lower():
+                    response = (
+                        "I notice you mentioned anxiety or stress. This is a common concern. "
+                        "I'd like to understand more about your specific experience. "
+                        "Could you tell me when you typically feel this way?"
+                    )
+                elif "depress" in question.lower() or "sad" in question.lower() or "down" in question.lower():
+                    response = (
+                        "Thank you for sharing these feelings with me. Depression and sadness can be challenging. "
+                        "I'm here to listen and support you. Would it help to talk about what might be contributing to these feelings?"
+                    )
+                else:
+                    # More general fallback that doesn't make assumptions
+                    response = (
+                        "I want to make sure I understand your concerns correctly. Could you share a bit more "
+                        "about what you're experiencing? I'm here to listen and support you."
+                    )
         finally:
             # Always ensure we free memory for expensive operations
             # Chat is the most memory-intensive operation, so we clean up explicitly

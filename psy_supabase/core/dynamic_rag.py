@@ -30,6 +30,7 @@ Usage:
 """
 import json
 from typing import List, Dict, TYPE_CHECKING, Any
+from psy_supabase.utilities.stop_words import stop_words
 from school_logging.log import ColoredLogger
 
 # Import the AssociativeMemory class
@@ -134,12 +135,6 @@ class DynamicRAGRetriever:
         text = re.sub(r'[^\w\s]', '', text.lower())
 
         # Remove common stop words
-        stop_words = {'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about',
-                     'as', 'of', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be', 'been',
-                     'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-                     'should', 'may', 'might', 'must', 'can', 'could', 'i', 'you', 'he', 'she',
-                     'it', 'we', 'they', 'this', 'that', 'these', 'those'}
-
         words = [word for word in text.split() if word not in stop_words and len(word) > 3]
 
         # Count word frequencies and return top keywords

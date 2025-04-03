@@ -322,7 +322,7 @@ class TextGenerator:
 
             # Check token count and limit if necessary
             token_count = len(self.tokenizer.encode(prompt))
-            max_context_tokens = 2048  # Set your model's context window size here
+            max_context_tokens = 2048  # model's context window size
             logger.info(f"Prompt token count: {token_count} (limit: {max_context_tokens})")
 
             if token_count > max_context_tokens:
@@ -344,16 +344,11 @@ class TextGenerator:
                 logger.debug(f"Truncated prompt starts with: {prompt_start}...")
                 logger.debug(f"Truncated prompt ends with: ...{prompt_end}")
 
-            # CRITICAL FIX: Check for phi-1.5 templating pattern in prompt
+            # Check for phi-1.5 templating pattern in prompt
             if "<|im_start|>assistant" in prompt and prompt.endswith("<|im_start|>assistant\n"):
                 # Force a different response starter to avoid the template pattern
                 prompt = prompt + "I understand your concern about "
                 logger.info("Added prompt starter text to avoid template response pattern")
-
-            # Fix any "I understand your feelings about" patterns with blank spaces
-            if "I understand your feelings about" in prompt:
-                prompt = prompt.replace("I understand your feelings about", "I hear your concerns about")
-                logger.info("Fixed known problematic pattern in prompt")
 
             # Generate text with the prepared prompt
             logger.info("Generating text with prompt of length %d (tokens: %d)", len(prompt), token_count)
@@ -1013,7 +1008,7 @@ class TextGenerator:
 
             # DEFENSIVE CODING: Template loading and rendering
             try:
-                # NEW CODE: Check for special inputs before loading the regular template
+                # Check for special inputs before loading the regular template
                 special_prompt = self._prepare_prompt_for_generation(user_question, template_name, context)
 
                 # If we got a special prompt, use it directly
@@ -1311,16 +1306,7 @@ class TextGenerator:
             # DEBUGGING - log raw response to understand what's being generated
             logger.debug(f"Raw response before cleaning: {response[:100]}...")
 
-            # STEP 1: CHECK FOR SERIOUS ISSUES REQUIRING IMMEDIATE FALLBACK
-            critical_patterns = [
-                "# YOUR CODE HERE", "# SOLUTION:", "```python", "```javascript", "def ", "class ", "function "
-            ]
-
-            if any(pattern in response for pattern in critical_patterns):
-                logger.critical("Critical pattern detected in response")
-                return self._get_emergency_fallback(question)
-
-            # STEP 1.5: CHECK FOR EDUCATIONAL/LECTURE CONTENT LEAKAGE
+            # STEP 1: CHECK FOR EDUCATIONAL/LECTURE CONTENT LEAKAGE
             educational_markers = [
                 "Title:", "Chapter:", "Section:", "Introduction:", "Welcome to",
                 "In this section", "we will explore", "we will delve into",
@@ -1376,9 +1362,6 @@ class TextGenerator:
             # Remove role references but be less aggressive
             response = re.sub(r"^As (?:a|your) therapist,?\s+", "", response, flags=re.IGNORECASE)
             response = re.sub(r"^In my role as (?:a|your) therapist,?\s+", "", response, flags=re.IGNORECASE)
-
-            # CRITICAL FIX: Less aggressive cleaning for numbered lists and bullet points
-            # We want to keep these helpful structures
 
             # Remove leading quote marks
             response = response.strip('"\'')

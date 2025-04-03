@@ -1,7 +1,23 @@
 """
-2025, Dresden Alexey Obukhov, alexey.obukhov@hotmail.com
+Utility functions for text processing and system management.
 
-This module provides utility functions for text cleaning and decoding.
+This module provides various utility functions used throughout the PSY Supabase application
+for text cleaning, natural language processing, memory management, and configuration:
+
+Text Processing:
+- clean_text: Sanitizes and normalizes text by handling Unicode, HTML entities, and special characters
+- tokenize_and_lemmatize: Processes text using spaCy for advanced NLP tasks
+
+System Management:
+- cleanup_memory: Frees GPU memory and performs garbage collection
+- parse_bool_env: Safely parses boolean environment variables
+
+Data Resources:
+- load_enhanced_mental_health_taxonomy: Provides a comprehensive taxonomy of mental health terms
+  organized by categories like Depression, Anxiety, Trauma, etc.
+
+These utilities are designed to be reusable across different components of the application
+and provide consistent text processing and system management capabilities.
 """
 
 import re
@@ -102,6 +118,12 @@ def cleanup_memory():
         logger.info("Memory cleanup completed")
     except Exception as e:
         logger.error(f"Error during memory cleanup: {e}")
+
+def parse_bool_env(env_var, default=False):
+    """Parse boolean environment variables properly."""
+    import os
+    value = os.environ.get(env_var, str(default)).lower()
+    return value in ("true", "1", "yes", "y", "t")
 
 def load_enhanced_mental_health_taxonomy():
     """

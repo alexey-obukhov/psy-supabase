@@ -161,7 +161,7 @@ class TestDatabaseManager:
         """Test successfully adding an interaction."""
         # Configure mock
         mock_response = Mock()
-        mock_response.data = 1  # New entry with interaction_id = 1
+        mock_response.data = 1  # interaction_id = 1
         mock_response.error = None
 
         # Set up the RPC method to return our mock response when executed
