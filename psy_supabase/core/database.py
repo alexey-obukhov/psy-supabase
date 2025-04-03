@@ -111,11 +111,11 @@ class DatabaseManager:
         try:
             response = self.supabase.rpc('create_default_schema_and_tables').execute()
             if response.data:
-                logger.info(f"Default schema and tables created successfully.")
+                logger.info("Default schema and tables created successfully.")
                 return True
             return False
         except Exception as e:
-            logger.error(f"Error creating default schema: {e}")
+            logger.error("Error creating default schema: %s", e)
             logger.error(traceback.format_exc())
             return False
 
@@ -135,7 +135,7 @@ class DatabaseManager:
                 return []
 
             # Log for debugging
-            logger.debug(f"Retrieving conversation history for session: {session_id}")
+            logger.debug("Retrieving conversation history for session: %s", session_id)
 
             response = self.supabase.rpc(
                 'get_conversation_history',
@@ -168,11 +168,11 @@ class DatabaseManager:
                     }
                     result.append(transformed_item)
 
-            logger.debug(f"Found {len(result)} interactions for session {session_id}")
+            logger.debug("Found %d interactions for session %s", len(result), session_id)
             return result
 
         except Exception as e:
-            logger.error(f"Error retrieving conversation history: {e}")
+            logger.error("Error retrieving conversation history: %s", e)
             logger.error(traceback.format_exc())
             return []
 
@@ -209,7 +209,7 @@ class DatabaseManager:
                 metadata['session_id'] = session_id
 
             # Log the exact data being inserted for debugging
-            logger.debug(f"Adding interaction with data: {question[:30]}..., session_id: {session_id}")
+            logger.debug("Adding interaction with data: %s..., session_id: %s", question[:30], session_id)
 
             # Bypass RPC completely - use direct table insertion
             insert_data = {
@@ -244,22 +244,22 @@ class DatabaseManager:
                 interaction_id = response.data
 
             if interaction_id is None:
-                logger.error(f"Failed to extract interaction ID from response: {response.data}")
+                logger.error("Failed to extract interaction ID from response: %s", response.data)
                 return {'success': False, 'error': 'Failed to extract interaction ID'}
 
-            logger.debug(f"Interaction added with ID {interaction_id}")
+            logger.debug("Interaction added with ID %d", interaction_id)
 
             # Generate and store embedding if content is valid
             if question:
                 question_embedding = get_embedding_provider().generate_embedding(question)
                 embedding_result = self.add_embedding_to_interaction(interaction_id, question_embedding)
                 if not embedding_result:
-                    logger.error(f"Failed to add embedding for interaction {interaction_id}")
+                    logger.error("Failed to add embedding for interaction %d", interaction_id)
                     return {'success': False, 'error': 'Failed to add embedding for interaction'}
                 return {'success': True}
 
         except Exception as e:
-            logger.error(f"Error adding interaction: {e}")
+            logger.error("Error adding interaction: %s", e)
             logger.error(traceback.format_exc())
             return {'success': False, 'error': str(e)}
 
@@ -296,10 +296,10 @@ class DatabaseManager:
                 logger.error("Error adding interaction via RPC")
                 return False
 
-            logger.info(f"Interaction added successfully with ID: {response.data}")
+            logger.info("Interaction added successfully with ID: %s", response.data)
             return True
         except Exception as e:
-            logger.error(f"Exception adding interaction: {str(e)}")
+            logger.error("Exception adding interaction: %s", str(e))
             logger.error(traceback.format_exc())
             return False
 
@@ -314,7 +314,7 @@ class DatabaseManager:
 
             # If schema exists, no need to create it
             if schema_check.data:
-                logger.debug(f"Schema '{self.schema_name}' already exists, skipping creation")
+                logger.debug("Schema '%s' already exists, skipping creation", self.schema_name)
                 return True
 
             # Continue with schema creation for new users
@@ -322,7 +322,7 @@ class DatabaseManager:
 
             # Check schema creation response
             if response.data is None:
-                logger.error(f"Schema creation failed for user {self.user_id} - no data in response")
+                logger.error("Schema creation failed for user %s - no data in response", self.user_id)
                 return False
             elif response.data is False:
                 error_message = response.error if response.error else "Schema creation failed"
@@ -333,33 +333,33 @@ class DatabaseManager:
             try:
                 p_response = self.supabase.rpc('optimize_vector_queries', {'p_schema_name': self.schema_name}).execute()
                 if p_response.data is None or p_response.data is False:
-                    logger.warning(f"Vector optimization failed for schema {self.schema_name}")
+                    logger.warning("Vector optimization failed for schema %s", self.schema_name)
                     # Try the alternate function name
                     try:
                         p_response = self.supabase.rpc('optimize_vector_indexes', {'p_schema_name': self.schema_name}).execute()
                         if p_response.data:
-                            logger.info(f"Vector indexes optimized for schema {self.schema_name}")
+                            logger.info("Vector indexes optimized for schema %s", self.schema_name)
                     except Exception as e2:
                         # Just log this, don't fail the whole operation
-                        logger.debug(f"Alternate vector optimization also failed: {str(e2)}")
+                        logger.debug("Alternate vector optimization also failed: %s", str(e2))
                 else:
-                    logger.info(f"Vector statistics optimized for schema {self.schema_name}")
+                    logger.info("Vector statistics optimized for schema %s", self.schema_name)
             except Exception as e:
                 # Just log and continue - this is enhancement, not critical
-                logger.debug(f"Vector optimization attempt failed: {str(e)}")
+                logger.debug("Vector optimization attempt failed: %s", str(e))
 
-            logger.info(f"Schema '{self.schema_name}' and tables created successfully.")
+            logger.info("Schema '%s' and tables created successfully.", self.schema_name)
 
             # Verify the schema structure after creation
             if self.verify_schema_structure():
-                logger.info(f"Schema structure verification successful for {self.schema_name}")
+                logger.info("Schema structure verification successful for %s", self.schema_name)
             else:
-                logger.warning(f"Schema structure verification failed for {self.schema_name}")
+                logger.warning("Schema structure verification failed for %s", self.schema_name)
 
             return True
 
         except Exception as e:
-            logger.error(f"Error creating schema for user {self.user_id}: {e}")
+            logger.error("Error creating schema for user %s: %s", self.user_id, e)
             logger.error(traceback.format_exc())
             return False
 
@@ -374,7 +374,7 @@ class DatabaseManager:
 
             # If schema exists, no need to create it
             if schema_check.data:
-                logger.debug(f"Schema '{self.schema_name}' already exists, skipping creation")
+                logger.debug("Schema '%s' already exists, skipping creation", self.schema_name)
                 return True
 
             # Continue with schema creation for new users
@@ -382,7 +382,7 @@ class DatabaseManager:
 
             # Check schema creation response
             if response.data is None:
-                logger.error(f"Schema creation failed for user {self.user_id} - no data in response")
+                logger.error("Schema creation failed for user %s - no data in response", self.user_id)
                 return False
             elif response.data is False:
                 error_message = response.error if response.error else "Schema creation failed"
@@ -392,55 +392,55 @@ class DatabaseManager:
             # Now optimize vector queries
             p_response = self.supabase.rpc('optimize_vector_queries', {'p_schema_name': self.schema_name}).execute()
             if p_response.data is None or p_response.data is False:
-                logger.warning(f"Vector optimization failed for schema {self.schema_name}")
+                logger.warning("Vector optimization failed for schema %s", self.schema_name)
                 # Continue anyway since basic schema creation worked
             else:
-                logger.info(f"Vector statistics optimized for schema {self.schema_name}")
+                logger.info("Vector statistics optimized for schema %s", self.schema_name)
 
-            logger.info(f"Schema '{self.schema_name}' and tables created successfully.")
+            logger.info("Schema '%s' and tables created successfully.", self.schema_name)
 
             # Verify the schema structure after creation
             if self.verify_schema_structure():
-                logger.info(f"Schema structure verification successful for {self.schema_name}")
+                logger.info("Schema structure verification successful for %s", self.schema_name)
             else:
-                logger.warning(f"Schema structure verification failed for {self.schema_name}")
+                logger.warning("Schema structure verification failed for %s", self.schema_name)
 
             return True
 
         except Exception as e:
-            logger.error(f"Error creating schema for user {self.user_id}: {e}")
+            logger.error("Error creating schema for user %s: %s", self.user_id, e)
             logger.error(traceback.format_exc())
             return False
 
     def get_interaction_history(self, user_id: str):
         """ Get interaction history from the user's schema """
-        logger.info(f"Retrieving interaction history for user: {user_id} with schema {self.schema_name}")
+        logger.info("Retrieving interaction history for user: %s with schema %s", user_id, self.schema_name)
 
         # Call SQL function to retrieve interaction history
         sql_query = f"SELECT * FROM get_interaction_history('{self.schema_name}')"
         response = self.supabase.rpc('sql', {'command': sql_query}).execute()
 
         if response.data is None:
-            logger.error(f"Error retrieving interaction history for user {user_id}")
+            logger.error("Error retrieving interaction history for user %s", user_id)
             return None
 
         history = response.model_dump_json()
-        logger.info(f"Retrieved interaction history for user {user_id}: {history}")
+        logger.info("Retrieved interaction history for user %s: %s", user_id, history)
         return history
 
     def ensure_user_schema_view(self, user_id: str):
         """ Ensure the view for the user schema exists in the public schema """
-        logger.info(f"Ensuring view exists for user: {user_id} with schema {self.schema_name}")
+        logger.info("Ensuring view exists for user: %s with schema %s", user_id, self.schema_name)
 
         # Call SQL function to ensure the view exists
         sql_query = f"SELECT ensure_user_schema_view('{self.schema_name}')"
         response = self.supabase.rpc('sql', {'command': sql_query}).execute()
 
         if response.data is None:
-            logger.error(f"Error confirming view for user {user_id}")
+            logger.error("Error confirming view for user %s", user_id)
             return False
 
-        logger.info(f"View for user {user_id} confirmed.")
+        logger.info("View for user %s confirmed.", user_id)
         return True
 
     def _sanitize_schema_name(self, user_id: str) -> str:
@@ -484,13 +484,13 @@ class DatabaseManager:
 
                     processed_results.append(doc)
 
-                logger.info(f"Retrieved {len(processed_results)} documents from knowledge base")
+                logger.info("Retrieved %d documents from knowledge base", len(processed_results))
                 return processed_results
             else:
                 logger.warning("No documents found in knowledge base")
                 return []
         except Exception as e:
-            logger.error(f"Error retrieving documents and embeddings: {e}")
+            logger.error("Error retrieving documents and embeddings: %s", e)
             traceback.print_exc()
             return []
 
@@ -519,7 +519,7 @@ class DatabaseManager:
             # Return the most recent interactions up to the limit
             return topic_interactions[-limit:] if topic_interactions else []
         except Exception as e:
-            logger.error(f"Error getting topic interactions: {e}")
+            logger.error("Error getting topic interactions: %s", e)
             return []
 
     def get_high_quality_interactions(self, topic_filter=None, min_effectiveness=0.7, limit=100):
@@ -547,11 +547,11 @@ class DatabaseManager:
             if response.data:
                 return response.data
             else:
-                logger.warning(f"No high-quality interactions found for topic: {topic_filter}")
+                logger.warning("No high-quality interactions found for topic: %s", topic_filter)
                 return []
 
         except Exception as e:
-            logger.error(f"Error retrieving high-quality interactions: {e}")
+            logger.error("Error retrieving high-quality interactions: %s", e)
             return []
 
     def add_document_to_knowledge_base(self, content, embedding):
@@ -568,8 +568,8 @@ class DatabaseManager:
             vector_str = str(embedding).replace(' ', '')
 
             # Log what we're doing
-            logger.debug(f"Adding document to knowledge base in schema: {self.schema_name}")
-            logger.debug(f"Document content (truncated): {content[:100]}...")
+            logger.debug("Adding document to knowledge base in schema: %s", self.schema_name)
+            logger.debug("Document content (truncated): %s...", content[:100])
 
             # Insert using the table API
             response = self.supabase.table(f"{self.schema_name}.knowledge_base").insert({
@@ -581,10 +581,10 @@ class DatabaseManager:
                 logger.error("Error adding document to knowledge base")
                 return False
 
-            logger.info(f"Successfully added document to knowledge base: {response.data}")
+            logger.info("Successfully added document to knowledge base: %s", response.data)
             return True
         except Exception as e:
-            logger.error(f"Error adding document to knowledge base: {str(e)}")
+            logger.error("Error adding document to knowledge base: %s", str(e))
             logger.error(traceback.format_exc())
             return False
 
@@ -615,7 +615,7 @@ class DatabaseManager:
             searches, use find_similar_documents_via_rpc instead.
         """
         try:
-            logger.info(f"Finding similar documents in schema: {self.schema_name}")
+            logger.info("Finding similar documents in schema: %s", self.schema_name)
 
             # Check if we have either query_text or embedding
             if embedding is None and query_text is None:
@@ -640,7 +640,7 @@ class DatabaseManager:
             return documents
 
         except Exception as e:
-            logger.error(f"Error finding similar documents: {e}")
+            logger.error("Error finding similar documents: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             return []
@@ -762,7 +762,7 @@ class DatabaseManager:
                 LIMIT {limit};
                 """
 
-            logger.info(f"Finding similar documents in schema: {schema_name}")
+            logger.info("Finding similar documents in schema: %s", schema_name)
             response = self.supabase.rpc('sql', {'command': query}).execute()
 
             # Process the response to ensure proper formatting
@@ -778,14 +778,14 @@ class DatabaseManager:
                                 doc['metadata'] = {}
                         results.append(doc)
 
-                logger.info(f"Found {len(results)} similar documents")
+                logger.info("Found %d similar documents", len(results))
                 return results
             else:
                 logger.warning("No similar documents found")
                 return []
 
         except Exception as e:
-            logger.error(f"Error finding similar documents via RPC: {e}")
+            logger.error("Error finding similar documents via RPC: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             return []
@@ -816,7 +816,7 @@ class DatabaseManager:
 
             # If check_response.data is 't' or True, index already exists
             if check_response.data == 't' or check_response.data is True:
-                logger.debug(f"Vector index already exists for {self.schema_name}")
+                logger.debug("Vector index already exists for %s", self.schema_name)
                 return True
 
             # Call the function with the current schema name
@@ -825,14 +825,14 @@ class DatabaseManager:
             }).execute()
 
             if response.data:
-                logger.info(f"Successfully added vector index to knowledge_base table for {self.schema_name}")
+                logger.info("Successfully added vector index to knowledge_base table for %s", self.schema_name)
                 return True
             else:
                 # Change warning to info since index creation is often asynchronous
-                logger.info(f"Vector index creation initiated for {self.schema_name} (this process runs in background)")
+                logger.info("Vector index creation initiated for %s (this process runs in background)", self.schema_name)
                 return True  # Return true since the operation was initiated
         except Exception as e:
-            logger.error(f"Exception adding vector index: {str(e)}")
+            logger.error("Exception adding vector index: %s", str(e))
             logger.error(traceback.format_exc())
             return False
 
@@ -863,7 +863,7 @@ class DatabaseManager:
 
             return True
         except Exception as e:
-            logger.error(f"Error creating psychological connection: {e}")
+            logger.error("Error creating psychological connection: %s", e)
             return False
 
     def extract_psychological_themes(self, session_id: str, min_occurrences: int = 3):
@@ -920,7 +920,7 @@ class DatabaseManager:
             # Return themes that occur at least min_occurrences times
             return {theme: count for theme, count in themes.items() if count >= min_occurrences}
         except Exception as e:
-            logger.error(f"Error extracting psychological themes: {e}")
+            logger.error("Error extracting psychological themes: %s", e)
             return {}
 
     def start_therapy_session(self, session_id: str, session_metadata: Optional[dict] = None):
@@ -948,7 +948,7 @@ class DatabaseManager:
 
             return self.add_interaction(data_point, session_id)
         except Exception as e:
-            logger.error(f"Error starting therapy session: {e}")
+            logger.error("Error starting therapy session: %s", e)
             return False
 
     def mark_therapeutic_insight(self,
@@ -966,7 +966,7 @@ class DatabaseManager:
 
             return response.data is not None
         except Exception as e:
-            logger.error(f"Error marking therapeutic insight: {e}")
+            logger.error("Error marking therapeutic insight: %s", e)
             return False
 
     def get_psychological_connections(self, concept_id: int, relationship_type: Optional[str] = None, session_id: Optional[str] = None):
@@ -1018,7 +1018,7 @@ class DatabaseManager:
 
             return connections
         except Exception as e:
-            logger.error(f"Error retrieving psychological connections: {e}")
+            logger.error("Error retrieving psychological connections: %s", e)
             return []
 
     def get_session_summary(self, session_id: str):
@@ -1101,7 +1101,7 @@ class DatabaseManager:
             return summary
 
         except Exception as e:
-            logger.error(f"Error generating session summary: {e}")
+            logger.error("Error generating session summary: %s", e)
             return {
                 'session_id': session_id,
                 'error': f"Failed to generate summary: {str(e)}"
@@ -1187,7 +1187,7 @@ class DatabaseManager:
             return unique_results
 
         except Exception as e:
-            logger.error(f"Error finding related memories: {e}")
+            logger.error("Error finding related memories: %s", e)
             logger.error(traceback.format_exc())
             return []
 
@@ -1227,7 +1227,7 @@ class DatabaseManager:
 
             return results
         except Exception as e:
-            logger.error(f"Error finding similar memories: {e}")
+            logger.error("Error finding similar memories: %s", e)
             return []
 
     def analyze_theme_clusters(self, session_id: str, min_similarity: float = 0.7, max_clusters: int = 5):
@@ -1257,7 +1257,7 @@ class DatabaseManager:
 
             return response.data
         except Exception as e:
-            logger.error(f"Error analysing theme clusters: {e}")
+            logger.error("Error analysing theme clusters: %s", e)
             return []
 
     def analyze_emotional_vector_trajectory(self, session_id: str):
@@ -1313,7 +1313,7 @@ class DatabaseManager:
 
             return response.data
         except Exception as e:
-            logger.error(f"Error finding concept connections: {e}")
+            logger.error("Error finding concept connections: %s", e)
             return []
 
     def find_cross_session_patterns(self, session_ids: List[str]):
@@ -1339,7 +1339,7 @@ class DatabaseManager:
 
             return response.data
         except Exception as e:
-            logger.error(f"Error finding cross-session patterns: {e}")
+            logger.error("Error finding cross-session patterns: %s", e)
             return []
 
     def ensure_vector_indexes(self, session_id: Optional[str] = None):
@@ -1360,7 +1360,7 @@ class DatabaseManager:
 
             return response.data is not None
         except Exception as e:
-            logger.error(f"Error ensuring vector indexes: {e}")
+            logger.error("Error ensuring vector indexes: %s", e)
             return False
 
     def add_embedding_to_interaction(self, interaction_id: int, embedding: List[float], session_id: Optional[str] = None):
@@ -1391,7 +1391,7 @@ class DatabaseManager:
 
             return response.data is not None
         except Exception as e:
-            logger.error(f"Error adding embedding to interaction: {e}")
+            logger.error("Error adding embedding to interaction: %s", e)
             return False
 
     def add_embedding_to_interactions(self, session_id: Optional[str] = None):
@@ -1413,7 +1413,7 @@ class DatabaseManager:
 
             return response.data is not None
         except Exception as e:
-            logger.error(f"Error adding embedding column: {e}")
+            logger.error("Error adding embedding column: %s", e)
             return False
 
     def get_interactions_without_embeddings(self, session_id: Optional[str] = None, limit: int = 50):
@@ -1440,7 +1440,7 @@ class DatabaseManager:
 
             return response.data
         except Exception as e:
-            logger.error(f"Error getting interactions without embeddings: {e}")
+            logger.error("Error getting interactions without embeddings: %s", e)
             return []
 
     def enrich_interactions_with_embeddings(self, session_id: Optional[str] = None, model_name: str = "microsoft/phi-1_5"):
@@ -1479,12 +1479,12 @@ class DatabaseManager:
                         if self.add_embedding_to_interaction(interaction_id, embedding, self.schema_name):
                             enriched_count += 1
                 except Exception as e:
-                    logger.error(f"Error enriching interaction {interaction.get('interaction_id')}: {e}")
+                    logger.error("Error enriching interaction %d: %s", interaction.get('interaction_id'), e)
                     continue
 
             return enriched_count
         except Exception as e:
-            logger.error(f"Error enriching interactions: {e}")
+            logger.error("Error enriching interactions: %s", e)
             return 0
 
     def update_table_statistics(self, session_id: Optional[str] = None):
@@ -1506,7 +1506,7 @@ class DatabaseManager:
 
             return response.data is not None
         except Exception as e:
-            logger.error(f"Error updating table statistics: {e}")
+            logger.error("Error updating table statistics: %s", e)
             return False
 
     def optimize_vector_operations(self, session_id: Optional[str] = None):
@@ -1543,7 +1543,7 @@ class DatabaseManager:
                 'statistics_updated': stats_updated
             }
         except Exception as e:
-            logger.error(f"Error optimizing vector operations: {e}")
+            logger.error("Error optimizing vector operations: %s", e)
             return {
                 'column_added': False,
                 'indexes_created': False,
@@ -1587,15 +1587,15 @@ class DatabaseManager:
             success_count = 0
             for i, content in enumerate(knowledge_entries):
                 try:
-                    logger.debug(f"Generating embedding for entry {i+1}")
+                    logger.debug("Generating embedding for entry %d", i+1)
                     # Generate embedding
                     embedding = embedding_provider.generate_embedding(content)
 
                     if embedding is None:
-                        logger.error(f"Embedding generation returned None for entry {i+1}")
+                        logger.error("Embedding generation returned None for entry %d", i+1)
                         continue
 
-                    logger.debug(f"Successfully generated embedding with length: {len(embedding)}")
+                    logger.debug("Successfully generated embedding with length: %d", len(embedding))
 
                     # Format for PostgreSQL vector - IMPORTANT: Use square brackets format!
                     try:
@@ -1604,10 +1604,10 @@ class DatabaseManager:
                         else:
                             vector_str = f"[{','.join(str(x) for x in embedding.tolist())}]"
 
-                        logger.debug(f"Formatted vector string (first 20 chars): {vector_str[:20]}...")
+                        logger.debug("Formatted vector string (first 20 chars): %s...", vector_str[:20])
                     except Exception as format_e:
-                        logger.error(f"Error formatting vector string: {format_e}")
-                        logger.error(f"Embedding type: {type(embedding)}")
+                        logger.error("Error formatting vector string: %s", format_e)
+                        logger.error("Embedding type: %s", type(embedding))
                         continue
 
                     # Direct SQL approach to avoid possible table API issues
@@ -1626,16 +1626,16 @@ class DatabaseManager:
 
                         if insert_response.data:
                             success_count += 1
-                            logger.info(f"Added knowledge base entry {i+1}: {success_count}")
+                            logger.info("Added knowledge base entry %d: %d", i+1, success_count)
                         else:
-                            logger.warning(f"No data returned when inserting entry {i+1}")
+                            logger.warning("No data returned when inserting entry %d", i+1)
                     except Exception as insert_e:
-                        logger.error(f"SQL insert error for entry {i+1}: {insert_e}")
+                        logger.error("SQL insert error for entry %d: %s", i+1, insert_e)
                         logger.error(traceback.format_exc())
 
                         # Try the direct table API as a fallback
                         try:
-                            logger.info(f"Trying direct table API as fallback for entry {i+1}")
+                            logger.info("Trying direct table API as fallback for entry %d", i+1)
                             insert_result = self.supabase.table(f"{self.schema_name}.knowledge_base").insert({
                                 "content": content,
                                 "embedding": vector_str
@@ -1643,19 +1643,19 @@ class DatabaseManager:
 
                             if insert_result.data:
                                 success_count += 1
-                                logger.info(f"Added knowledge base entry via fallback: {success_count}")
+                                logger.info("Added knowledge base entry via fallback: %d", success_count)
                         except Exception as fallback_e:
-                            logger.error(f"Fallback insert also failed: {fallback_e}")
+                            logger.error("Fallback insert also failed: %s", fallback_e)
                             logger.error(traceback.format_exc())
 
                 except Exception as e:
-                    logger.error(f"Complete error processing entry {i+1}: {e}")
+                    logger.error("Complete error processing entry %d: %s", i+1, e)
                     logger.error(traceback.format_exc())
                     continue
 
             # Make sure we have at least one success
             if success_count > 0:
-                logger.info(f"Successfully initialized knowledge base with {success_count} entries")
+                logger.info("Successfully initialized knowledge base with %d entries", success_count)
 
                 # Create vector index for better performance
                 self.ensure_vector_indexes(self.schema_name)
@@ -1664,7 +1664,7 @@ class DatabaseManager:
                 logger.error("Failed to add any knowledge base entries")
                 return False
         except Exception as e:
-            logger.error(f"Error initializing knowledge base: {e}")
+            logger.error("Error initializing knowledge base: %s", e)
             logger.error(traceback.format_exc())
             return False
 
@@ -1717,9 +1717,9 @@ class DatabaseManager:
             response = self.supabase.rpc('sql', {'command': query}).execute()
 
             # Debug the response type
-            logger.debug(f"Response data type: {type(response.data)}")
+            logger.debug("Response data type: %s", type(response.data))
             if response.data:
-                logger.debug(f"First element type: {type(response.data[0])}")
+                logger.debug("First element type: %s", type(response.data[0]))
 
             if response.data and len(response.data) > 0:
                 # PostgreSQL might be returning rows as strings, not dictionaries
@@ -1734,10 +1734,10 @@ class DatabaseManager:
                         try:
                             # Remove brackets and split by commas
                             embedding_list = [float(val) for val in embedding_str.strip('[]').split(',')]
-                            logger.info(f"Found similar question with embedding (length: {len(embedding_list)})")
+                            logger.info("Found similar question with embedding (length: %d)", len(embedding_list))
                             return embedding_list
                         except Exception as e:
-                            logger.error(f"Error converting embedding string to list: {e}")
+                            logger.error("Error converting embedding string to list: %s", e)
                             return None
 
                 # Case 2: If response.data[0] is a string (CSV-like format)
@@ -1753,17 +1753,17 @@ class DatabaseManager:
                             embedding_str = embedding_str.strip('{}[]').replace('{', '').replace('}', '')
                             embedding_list = [float(val) for val in embedding_str.split(',')]
 
-                            logger.info(f"Found similar question with embedding from string format (length: {len(embedding_list)})")
+                            logger.info("Found similar question with embedding from string format (length: %d)", len(embedding_list))
                             return embedding_list
                     except Exception as e:
-                        logger.error(f"Error parsing string result: {e}")
+                        logger.error("Error parsing string result: %s", e)
                         return None
 
             # No similar question found
             return None
 
         except Exception as e:
-            logger.error(f"Error finding similar question embedding: {e}")
+            logger.error("Error finding similar question embedding: %s", e)
             logger.error(traceback.format_exc())
             return None
 
@@ -1832,7 +1832,7 @@ class DatabaseManager:
 
             return results
         except Exception as e:
-            logger.error(f"Error finding similar interactions by embedding: {e}")
+            logger.error("Error finding similar interactions by embedding: %s", e)
             logger.error(traceback.format_exc())
             return []
 
@@ -1889,7 +1889,7 @@ class DatabaseManager:
 
             return emotional_responses
         except Exception as e:
-            logger.error(f"Error analysing emotional response to interaction: {e}")
+            logger.error("Error analysing emotional response to interaction: %s", e)
             return []
 
     def get_therapeutic_insights_for_interaction(self, interaction_id: int, session_id: str) -> List[Dict]:
@@ -1951,7 +1951,7 @@ class DatabaseManager:
 
             return insights
         except Exception as e:
-            logger.error(f"Error getting therapeutic insights: {e}")
+            logger.error("Error getting therapeutic insights: %s", e)
             return []
 
     def identify_potential_pain_points(self,
@@ -1978,12 +1978,12 @@ class DatabaseManager:
             history = self.get_conversation_history(session_id)
 
             if not history:
-                logger.debug(f"No conversation history found for session {session_id}")
+                logger.debug("No conversation history found for session %s", session_id)
                 return {}
 
             # Skip if less than 3 interactions (not enough history to identify patterns)
             if len(history) < 3:
-                logger.debug(f"Not enough history to identify pain points ({len(history)} interactions)")
+                logger.debug("Not enough history to identify pain points (%d interactions)", len(history))
                 return {}
 
             # Get embeddings for past questions using optimized pgvector search
@@ -2086,7 +2086,7 @@ class DatabaseManager:
                     recurring_terms = repetition_pattern.get('recurring_terms', [])
                     if recurring_terms and len(recurring_terms) > 0:
                         primary_theme = recurring_terms[0]  # Use the first recurring term
-                        logger.info(f"Extracted primary theme '{primary_theme}' from repetition pattern")
+                        logger.info("Extracted primary theme '%s' from repetition pattern", primary_theme)
 
                 # If we couldn't get a theme from repetition pattern, extract from the question text
                 if primary_theme == 'unknown':
@@ -2105,7 +2105,7 @@ class DatabaseManager:
                     for theme, keywords in theme_keywords.items():
                         if any(keyword in question_text.lower() for keyword in keywords):
                             primary_theme = theme
-                            logger.info(f"Extracted primary theme '{primary_theme}' from keywords")
+                            logger.info("Extracted primary theme '%s' from keywords", primary_theme)
                             break
 
                     # If still unknown, check the original question text too
@@ -2113,7 +2113,7 @@ class DatabaseManager:
                         for theme, keywords in theme_keywords.items():
                             if any(keyword in most_similar['text'].lower() for keyword in keywords):
                                 primary_theme = theme
-                                logger.info(f"Extracted primary theme '{primary_theme}' from original question")
+                                logger.info("Extracted primary theme '%s' from original question", primary_theme)
                                 break
 
                 return {
@@ -2135,7 +2135,7 @@ class DatabaseManager:
             return {}
 
         except Exception as e:
-            logger.error(f"Error identifying potential pain points: {e}")
+            logger.error("Error identifying potential pain points: %s", e)
             logger.error(traceback.format_exc())
             return {}
 
@@ -2178,14 +2178,14 @@ class DatabaseManager:
                 else:
                     count = 1
 
-                logger.info(f"Migrated {count} embeddings to interaction_embeddings table")
+                logger.info("Migrated %d embeddings to interaction_embeddings table", count)
                 return count
             else:
                 logger.info("No embeddings to migrate")
                 return 0
 
         except Exception as e:
-            logger.error(f"Error migrating embeddings to interaction_embeddings table: {e}")
+            logger.error("Error migrating embeddings to interaction_embeddings table: %s", e)
             logger.error(traceback.format_exc())
             return 0
 
@@ -2214,7 +2214,7 @@ class DatabaseManager:
 
             return embedding
         except Exception as e:
-            logger.error(f"Error creating embedding: {e}")
+            logger.error("Error creating embedding: %s", e)
             logger.error(traceback.format_exc())
             return None
 
@@ -2228,7 +2228,7 @@ class DatabaseManager:
         """Save an interaction to the database with proper metadata handling."""
         try:
             # Ensure schema exists
-            logger.info(f"Ensuring schema exists for user: {self.user_id}")
+            logger.info("Ensuring schema exists for user: %s", self.user_id)
             self.create_user_schema_sync()
 
             # Prepare metadata
@@ -2238,7 +2238,7 @@ class DatabaseManager:
             # CRITICAL FIX: Always add session_id to metadata explicitly
             if session_id is not None:
                 metadata['session_id'] = session_id
-                logger.info(f"Adding session_id to metadata: {session_id}")
+                logger.info("Adding session_id to metadata: %s", session_id)
 
             # Clean the text data
             clean_context = self._clean_text_for_db(context)
@@ -2251,7 +2251,7 @@ class DatabaseManager:
             else:
                 metadata_str = str(metadata)
 
-            logger.info(f"Calling add_interaction RPC with schema: {self.schema_name}, session_id: {session_id}")
+            logger.info("Calling add_interaction RPC with schema: %s, session_id: %s", self.schema_name, session_id)
 
             # Add the interaction using our updated RPC function
             response = self.supabase.rpc('add_interaction', {
@@ -2264,7 +2264,7 @@ class DatabaseManager:
             }).execute()
 
             # Check response
-            logger.info(f"RPC response: {response.data}")
+            logger.info("RPC response: %s", response.data)
 
             if response.data is None:
                 logger.error("Error saving interaction via RPC - null response")
@@ -2288,19 +2288,19 @@ class DatabaseManager:
                     fallback_response = self.supabase.rpc('sql', {'command': query}).execute()
                     if fallback_response.data:
                         interaction_id = fallback_response.data
-                        logger.info(f"Fallback successful, interaction ID: {interaction_id}")
+                        logger.info("Fallback successful, interaction ID: %d", interaction_id)
                     else:
                         logger.error("Fallback failed")
                         return False
                 except Exception as fallback_error:
-                    logger.error(f"Error in SQL fallback: {fallback_error}")
+                    logger.error("Error in SQL fallback: %s", fallback_error)
                     return False
             else:
                 try:
                     interaction_id = int(response.data)
-                    logger.info(f"Interaction saved successfully with ID: {interaction_id}")
+                    logger.info("Interaction saved successfully with ID: %d", interaction_id)
                 except (ValueError, TypeError):
-                    logger.error(f"Could not parse interaction ID from response: {response.data}")
+                    logger.error("Could not parse interaction ID from response: %s", response.data)
                     return False
 
             # Generate embedding for the question if needed
@@ -2314,7 +2314,7 @@ class DatabaseManager:
                     embedding_str = format_embedding_for_db(question_embedding)
 
                     # Store in interaction_embeddings table
-                    logger.info(f"Storing embedding for interaction {interaction_id}")
+                    logger.info("Storing embedding for interaction %d", interaction_id)
 
                     embed_response = self.supabase.rpc('add_embedding_to_interaction', {
                         'p_schema_name': self.schema_name,
@@ -2323,16 +2323,16 @@ class DatabaseManager:
                     }).execute()
 
                     if embed_response.data is True:
-                        logger.info(f"Embedding stored successfully for interaction {interaction_id}")
+                        logger.info("Embedding stored successfully for interaction %d", interaction_id)
                     else:
-                        logger.warning(f"Embedding storage function returned: {embed_response.data}")
+                        logger.warning("Embedding storage function returned: %s", embed_response.data)
                 else:
-                    logger.warning(f"No embedding generated for question")
+                    logger.warning("No embedding generated for question")
 
             return True
 
         except Exception as e:
-            logger.error(f"Error saving interaction: {e}")
+            logger.error("Error saving interaction: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             return False
@@ -2462,7 +2462,7 @@ class DatabaseManager:
             }
 
         except Exception as e:
-            logger.error(f"Error detecting pain points: {e}")
+            logger.error("Error detecting pain points: %s", e)
             return {'pain_points': [], 'severity': 'none', 'first_detected_at': None}
 
     def _text_similarity(self, text1: str, text2: str) -> float:
@@ -2592,7 +2592,7 @@ class DatabaseManager:
             }
 
         except Exception as e:
-            logger.error(f"Error getting therapeutic approach: {e}")
+            logger.error("Error getting therapeutic approach: %s", e)
             return {
                 'name': 'Supportive Listening',
                 'primary_technique': 'Person-Centered',
@@ -2722,7 +2722,7 @@ class DatabaseManager:
             return results
 
         except Exception as e:
-            logger.error(f"Error analysing pain points over time: {e}")
+            logger.error("Error analysing pain points over time: %s", e)
             return []
 
     @typechecked
@@ -2778,7 +2778,7 @@ class DatabaseManager:
             response = self.supabase.rpc('sql', {'command': query}).execute()
 
             if not response.data:
-                logger.warning(f"No similar documents found with threshold {threshold}")
+                logger.warning("No similar documents found with threshold %f", threshold)
                 return []
 
             # Format the results
@@ -2806,7 +2806,7 @@ class DatabaseManager:
             return results
 
         except Exception as e:
-            logger.error(f"Error finding similar documents by embedding: {e}")
+            logger.error("Error finding similar documents by embedding: %s", e)
             return []
 
     def get_emotional_signals(self, session_id):
@@ -2929,7 +2929,7 @@ class DatabaseManager:
             }
 
         except Exception as e:
-            logger.error(f"Error analysing emotional signals: {e}")
+            logger.error("Error analysing emotional signals: %s", e)
             return {"error": str(e), "signals": [], "primary_emotion": "neutral"}
 
     def verify_schema_structure(self) -> bool:
@@ -2942,13 +2942,13 @@ class DatabaseManager:
 
             # Check if all required tables exist and have correct column counts
             if not response.data:
-                logger.error(f"No tables found in schema: {self.schema_name}")
+                logger.error("No tables found in schema: %s", self.schema_name)
                 return False
 
             all_valid = True
             for table in response.data:
                 if not table.get('table_exists'):  # Changed from 'exists' to 'table_exists'
-                    logger.error(f"Missing table: {table.get('table_name')}")
+                    logger.error("Missing table: %s", table.get('table_name'))
                     all_valid = False
                 elif table.get('columns_found') != table.get('columns_expected'):
                     logger.error(f"Table {table.get('table_name')} has {table.get('columns_found')} " +
@@ -2958,7 +2958,7 @@ class DatabaseManager:
             return all_valid
 
         except Exception as e:
-            logger.error(f"Error verifying schema structure: {e}")
+            logger.error("Error verifying schema structure: %s", e)
             return False
 
     def ensure_schema_exists(self) -> bool:

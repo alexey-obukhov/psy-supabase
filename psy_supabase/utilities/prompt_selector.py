@@ -138,7 +138,7 @@ class PromptSelector:
             ]
             return " ".join(cleaned_tokens).strip()
         except Exception as e:
-            logger.error(f"Error in tokenize_and_lemmatize: {e}")
+            logger.error("Error in tokenize_and_lemmatize: %s", e)
             return text
 
     def extract_entities(self, question: str) -> List[str]:
@@ -285,7 +285,7 @@ class PromptSelector:
                 "emotion_intensity": emotion_intensity
             }
         except Exception as e:
-            logger.error(f"Error selecting prompt template: {e}")
+            logger.error("Error selecting prompt template: %s", e)
             return "basic_answer", {"detected_topic": "general", "confidence": 0.5}
 
     def _determine_topic(self, category_info: Dict[str, str], question: str) -> str:
@@ -473,7 +473,7 @@ class PromptSelector:
                 analysis["metrics"]["template_adherence"] = "medium"
 
         except Exception as e:
-            logger.error(f"Error analysing response effectiveness: {e}")
+            logger.error("Error analysing response effectiveness: %s", e)
             analysis["metrics"]["error"] = str(e)
 
         return analysis
@@ -595,7 +595,7 @@ class PromptSelector:
             return analysis
 
         except Exception as e:
-            logger.error(f"Error analysing question: {e}")
+            logger.error("Error analysing question: %s", e)
             logger.error(traceback.format_exc())
             return {
                 "topic": "general",

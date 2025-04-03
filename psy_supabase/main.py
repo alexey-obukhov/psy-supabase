@@ -142,7 +142,7 @@ def ensure_spacy_model():
             subprocess.check_call([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
             logger.info("Successfully downloaded spaCy model 'en_core_web_sm'")
         except Exception as e:
-            logger.error(f"Failed to download spaCy model: {e}")
+            logger.error("Failed to download spaCy model: %s", e)
             logger.error("Please install it manually with: python -m spacy download en_core_web_sm")
             # Don't raise an exception, application might still work without the model
 
@@ -156,7 +156,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_KEY")
 intelligent_processing_enabled = parse_bool_env("INTELLIGENT_PROCESS_ENABLED", True)
-logger.info(f"Intelligent processing enabled: {intelligent_processing_enabled}")
+logger.info("Intelligent processing enabled: %s", intelligent_processing_enabled)
 
 # Validate environment variables at module level
 if not supabase_url or not supabase_key:
@@ -174,12 +174,12 @@ app = Flask(__name__)
 def initialize_app():
     """Set up the application before the first request."""
     logger.info("Setting up application...")
-    logger.info(f"Welcome to the Therapy AI Assistant! Using model: {MODEL_NAME} on {DEVICE}")
+    logger.info("Welcome to the Therapy AI Assistant! Using model: %s on %s", MODEL_NAME, DEVICE)
 
     # Initialize the model manager but don't load the model yet
     # This just sets up the instance which will lazy-load when needed
     get_model_manager(MODEL_NAME, DEVICE)
-    logger.info(f"Model manager initialized for {MODEL_NAME}")
+    logger.info("Model manager initialized for %s", MODEL_NAME)
 
 # Call initialize directly
 initialize_app()
@@ -280,7 +280,7 @@ def chat():
         question = data['question']
 
         # Log the incoming request
-        logger.info(f"Received chat request from user {user_id}: {question[:50]}...")
+        logger.info("Received chat request from user %s: %s...", user_id, question[:50])
 
         # Check if knowledge base is empty and initialize if needed
         # This should be done before expensive model operations
@@ -296,7 +296,7 @@ def chat():
             table_exists = g.db_manager.supabase.rpc('sql', {'command': check_query}).execute()
 
             if table_exists.data and table_exists.data[0] == '0':
-                logger.info(f"Knowledge base table doesn't exist for {user_id}, creating it...")
+                logger.info("Knowledge base table doesn't exist for %s, creating it...", user_id)
                 g.db_manager.create_user_schema_sync()
 
             # Now check if the table has data
@@ -305,15 +305,15 @@ def chat():
             try:
                 count_result = g.db_manager.supabase.rpc('sql', {'command': count_query}).execute()
                 if count_result.data and count_result.data[0] == '0':
-                    logger.info(f"Knowledge base for {user_id} is empty, initializing...")
+                    logger.info("Knowledge base for %s is empty, initializing...", user_id)
                     g.db_manager.initialize_knowledge_base(user_id)
             except Exception as count_e:
                 # If this fails, the table might not exist despite our earlier check
-                logger.error(f"Error checking knowledge base count: {count_e}")
+                logger.error("Error checking knowledge base count: %s", count_e)
                 g.db_manager.initialize_knowledge_base(user_id)
 
         except Exception as kb_e:
-            logger.error(f"Error checking or initializing knowledge base: {kb_e}")
+            logger.error("Error checking or initializing knowledge base: %s", kb_e)
             # Continue with chat process even if this fails
 
         # Get the model manager instance and then get the generator
@@ -334,7 +334,7 @@ def chat():
 
             # Validate response before returning
             if not response or len(response.strip()) < 10:
-                logger.error(f"Invalid response generated: {response}")
+                logger.error("Invalid response generated: %s", response)
                 if "anxiety" in question.lower() or "worry" in question.lower() or "stress" in question.lower():
                     response = (
                         "I notice you mentioned anxiety or stress. This is a common concern. "
@@ -360,7 +360,7 @@ def chat():
 
         return jsonify({"response": response})
     except Exception as e:
-        logger.error(f"Error in chat endpoint: {e}")
+        logger.error("Error in chat endpoint: %s", e)
         logger.error(traceback.format_exc())
         return jsonify({"response": "I apologise, but I encountered an error. Could you try expressing your concern in a different way?"}), 500
 
@@ -424,7 +424,7 @@ def optimize_vectors():
         batch_size = min(10, total_interactions)  # Process in smaller batches
         enriched_count = 0
 
-        logger.info(f"Starting vector optimization: {total_interactions} interactions to process")
+        logger.info("Starting vector optimization: %d interactions to process", total_interactions)
 
         try:
             # Process in batches to avoid memory issues
@@ -446,7 +446,7 @@ def optimize_vectors():
                             if g.db_manager.add_embedding_to_interaction(interaction_id, embedding):
                                 enriched_count += 1
                     except Exception as e:
-                        logger.error(f"Error enriching interaction: {e}")
+                        logger.error("Error enriching interaction: %s", e)
                         continue
 
                 # After each batch, clean up memory
@@ -454,7 +454,7 @@ def optimize_vectors():
                     cleanup_memory()
 
                 # Log progress
-                logger.info(f"Processed {min(i + batch_size, total_interactions)}/{total_interactions} interactions")
+                logger.info("Processed %d/%d interactions", min(i + batch_size, total_interactions), total_interactions)
         finally:
             # Ensure memory is cleaned up after the operation
             if DEVICE == "cuda":
@@ -470,7 +470,7 @@ def optimize_vectors():
             )
         })
     except Exception as e:
-        logger.error(f"Error in optimize_vectors endpoint: {e}")
+        logger.error("Error in optimize_vectors endpoint: %s", e)
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
 @app.route('/free_memory', methods=['POST'])
@@ -483,7 +483,7 @@ def free_memory():
         cleanup_memory()
         return jsonify({'message': 'GPU memory freed successfully'})
     except Exception as e:
-        logger.error(f"Error freeing memory: {e}")
+        logger.error("Error freeing memory: %s", e)
         return jsonify({'error': f'Failed to free memory: {str(e)}'}), 500
 
 if __name__ == '__main__':

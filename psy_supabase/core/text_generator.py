@@ -185,7 +185,7 @@ class TextGenerator:
         # Initialize Detoxify once
         self.detoxify = Detoxify("original-small")
 
-        logger.info(f"TextGenerator initialized with model: {model_name} on device: {device}")
+        logger.info("TextGenerator initialized with model: %s on device: %s", model_name, device)
 
     def _load_model(self):
         """
@@ -204,7 +204,7 @@ class TextGenerator:
             Exception: If model loading fails due to memory constraints or invalid model
         """
         try:
-            logger.info(f"Loading model: {self.model_name}")
+            logger.info("Loading model: %s", self.model_name)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
             # Set the pad token if not defined
@@ -241,9 +241,9 @@ class TextGenerator:
 
             self.model.eval()  # Set to evaluation mode
 
-            logger.info(f"Model loaded successfully: {self.model_name}")
+            logger.info("Model loaded successfully: %s", self.model_name)
         except Exception as e:
-            logger.error(f"Error loading model: {e}")
+            logger.error("Error loading model: %s", e)
             logger.error(traceback.format_exc())
             raise
 
@@ -270,7 +270,7 @@ class TextGenerator:
         The method helps prevent out-of-memory errors by releasing GPU resources
         when the model is not actively generating text.
         """
-        logger.info(f"Unloading language model: {self.model_name}")
+        logger.info("Unloading language model: %s", self.model_name)
         if self.model is not None:
             del self.model
             self.model = None
@@ -323,11 +323,11 @@ class TextGenerator:
             # Check token count and limit if necessary
             token_count = len(self.tokenizer.encode(prompt))
             max_context_tokens = 2048  # model's context window size
-            logger.info(f"Prompt token count: {token_count} (limit: {max_context_tokens})")
+            logger.info("Prompt token count: %d (limit: %d)", token_count, max_context_tokens)
 
             if token_count > max_context_tokens:
                 # If too long, truncate the prompt to fit within token limit
-                logger.warning(f"Prompt exceeds token limit ({token_count} > {max_context_tokens})")
+                logger.warning("Prompt exceeds token limit (%d > %d)", token_count, max_context_tokens)
 
                 # Truncate by re-encoding with truncation
                 truncated_tokens = self.tokenizer.encode(
@@ -336,13 +336,13 @@ class TextGenerator:
                     max_length=max_context_tokens - 50  # Leave room for generation
                 )
                 prompt = self.tokenizer.decode(truncated_tokens)
-                logger.info(f"Prompt truncated to {len(truncated_tokens)} tokens")
+                logger.info("Prompt truncated to %d tokens", len(truncated_tokens))
 
                 # Log first and last part of truncated prompt for debugging
                 prompt_start = prompt[:100]
                 prompt_end = prompt[-100:]
-                logger.debug(f"Truncated prompt starts with: {prompt_start}...")
-                logger.debug(f"Truncated prompt ends with: ...{prompt_end}")
+                logger.debug("Truncated prompt starts with: %s...", prompt_start)
+                logger.debug("Truncated prompt ends with: ...%s", prompt_end)
 
             # Check for phi-1.5 templating pattern in prompt
             if "<|im_start|>assistant" in prompt and prompt.endswith("<|im_start|>assistant\n"):
@@ -393,12 +393,12 @@ class TextGenerator:
                 # Extract only the generated response, not including the prompt
                 response = output_text[len(prompt):]
 
-                logger.info(f"Generated text of length {len(response)}")
-                logger.debug(f"Generated text: {response}")
+                logger.info("Generated text of length %d", len(response))
+                logger.debug("Generated text: %s", response)
                 return response
 
         except Exception as e:
-            logger.error(f"Error generating text: {e}")
+            logger.error("Error generating text: %s", e)
             logger.error(traceback.format_exc())
             return ""
 
@@ -451,10 +451,10 @@ class TextGenerator:
         """
 
 
-        logger.debug(f"Cleaning therapeutic response of length {len(response)}")
+        logger.debug("Cleaning therapeutic response of length %d", len(response))
 
         # DEBUGGING: Log the raw response for inspection
-        logger.info(f"[DEBUG] Raw response before cleaning: {response[:200]}...")
+        logger.info("[DEBUG] Raw response before cleaning: %s...", response[:200])
 
         # STEP 1: Extract the "Answer:" or "A:" section
         answer_match = re.search(r"(?i)(?:^ *|\n)(answer\s*\d*:|a\s*\d*:|ans\s*:)\s*(.*?)(?=\n\n|$)", response, flags=re.DOTALL)
@@ -488,9 +488,9 @@ class TextGenerator:
         # Check for educational patterns with logging
         for pattern in educational_patterns:
             if re.search(pattern, response.lower(), re.IGNORECASE):
-                logger.warning(f"Educational pattern detected: {pattern}")
+                logger.warning("Educational pattern detected: %s", pattern)
                 # DEBUGGING: Log which pattern triggered the fallback
-                logger.info(f"[DEBUG] Educational pattern fallback triggered: {pattern}")
+                logger.info("[DEBUG] Educational pattern fallback triggered: %s", pattern)
                 return self._get_supportive_fallback()
 
         # STAGE 3: CONTENT TYPE CLASSIFICATION
@@ -504,9 +504,9 @@ class TextGenerator:
 
         for marker in instruction_markers:
             if marker in response.lower():
-                logger.warning(f"Instruction leakage detected: {marker}")
+                logger.warning("Instruction leakage detected: %s", marker)
                 # DEBUGGING: Log which instruction marker triggered the fallback
-                logger.info(f"[DEBUG] Instruction marker fallback triggered: {marker}")
+                logger.info("[DEBUG] Instruction marker fallback triggered: %s", marker)
                 return self._get_supportive_fallback()
 
         # STAGE 4: SPECIAL CHARACTER & FORMATTING HANDLING
@@ -514,7 +514,7 @@ class TextGenerator:
         if response.strip() and any(response.strip().startswith(char) for char in "_+-=[]{};:',.<>/?\"\\"):
             logger.warning("Response starts with special character - using supportive fallback")
             # DEBUGGING: Log the special character fallback
-            logger.info(f"[DEBUG] Special character fallback triggered. Response starts with: {response.strip()[0]}")
+            logger.info("[DEBUG] Special character fallback triggered. Response starts with: %s", response.strip()[0])
             return self._get_supportive_fallback()
 
         # STAGE 5: EXTRACT DIRECT THERAPIST RESPONSES
@@ -530,7 +530,7 @@ class TextGenerator:
             if match:
                 extracted = match.group(1).strip()
                 if len(extracted) > 50:  # Ensure it's substantial
-                    logger.info(f"Extracted direct therapeutic response ({len(extracted)} chars)")
+                    logger.info("Extracted direct therapeutic response (%d chars)", len(extracted))
                     response = extracted
 
         # STAGE 6: STRUCTURAL CLEANING
@@ -563,11 +563,11 @@ class TextGenerator:
 
             # Check if any supportive terms are present
             found_terms = [term for term in supportive_terms if term in response.lower()]
-            logger.info(f"[DEBUG] Supportive terms found: {found_terms}")
+            logger.info("[DEBUG] Supportive terms found: %s", found_terms)
 
             return self._get_supportive_fallback()
 
-        logger.info(f"Cleaned response passed all quality checks, final length: {len(response)}")
+        logger.info("Cleaned response passed all quality checks, final length: %d", len(response))
         return response
 
     def _get_targeted_fallback_response(self, original_text: str) -> str:
@@ -637,11 +637,11 @@ class TextGenerator:
             # Use the pre-initialized Detoxify instance
             results = self.detoxify.predict(text)
             toxic_score = results["toxicity"]
-            logger.info(f"Toxicity score: {toxic_score} - Text: {text[:50]}...")
+            logger.info("Toxicity score: %f - Text: %s...", toxic_score, text[:50])
             return bool(toxic_score > 0.8)
 
         except Exception as e:
-            logger.error(f"Error during toxicity check: {e}\n{traceback.format_exc()}")
+            logger.error("Error during toxicity check: %s\n%s", e, traceback.format_exc())
             # Don't block the response on toxicity check failure
             return False
 
@@ -662,7 +662,7 @@ class TextGenerator:
             embeddings = hidden_states.mean(dim=1)
             return embeddings
         except Exception as e:
-            logger.error(f"Error during embedding generation: {e}")
+            logger.error("Error during embedding generation: %s", e)
             return None
 
     def _final_response_validation(self, response: str) -> str:
@@ -693,12 +693,12 @@ class TextGenerator:
         # Check for inappropriate patterns
         for pattern in code_patterns + instruction_patterns:
             if re.search(pattern, response):
-                logger.error(f"Invalid response detected with pattern: {pattern}")
+                logger.error("Invalid response detected with pattern: %s", pattern)
                 return self._get_emergency_fallback()
 
         # Check for extremely short responses
         if len(response.split()) < 10:
-            logger.error(f"Response too short: {response}")
+            logger.error("Response too short: %s", response)
             return self._get_emergency_fallback()
 
         return response
@@ -811,7 +811,7 @@ class TextGenerator:
         """
         # Input validation
         if not user_question or len(user_question) > 2000:
-            logger.warning(f"Invalid question length: {len(user_question) if user_question else 0}")
+            logger.warning("Invalid question length: %d", len(user_question) if user_question else 0)
             return "I'm sorry, but your question is too long. Could you please rephrase it more concisely?"
 
         try:
@@ -870,7 +870,7 @@ class TextGenerator:
             # Check if we should use dynamic retrieval
             use_dynamic_retrieval = context.get('use_dynamic_retrieval', False)
             if use_dynamic_retrieval and 'dynamic_retriever' in context:
-                logger.info(f"Using dynamic RAG retrieval with template: {template_name}")
+                logger.info("Using dynamic RAG retrieval with template: %s", template_name)
 
                 # Get the retriever object
                 retriever: DynamicRAGRetriever = context['dynamic_retriever']
@@ -915,7 +915,7 @@ class TextGenerator:
 
                 # Limit to top 3 topics
                 extracted_topics = extracted_topics[:3]
-                logger.info(f"Extracted topics for RAG retrieval: {extracted_topics}")
+                logger.info("Extracted topics for RAG retrieval: %s", extracted_topics)
 
                 # Add extracted topics to context
                 context['extracted_topics'] = extracted_topics
@@ -929,7 +929,7 @@ class TextGenerator:
                     if approach_type and hasattr(self, 'map_approach_to_template'):
                         therapeutic_approach = map_approach_to_template(approach_type)
                         context['therapeutic_approach'] = therapeutic_approach
-                        logger.info(f"Using therapeutic approach '{therapeutic_approach}' from pain point")
+                        logger.info("Using therapeutic approach '%s' from pain point", therapeutic_approach)
 
                 # Define dynamic retrieval functions
                 def query_knowledge(topic_query):
@@ -943,11 +943,11 @@ class TextGenerator:
                             else:
                                 return "\nPlease specify a concrete psychological concept to search for.\n"
 
-                        logger.info(f"Dynamic knowledge retrieval for: {topic_query}")
+                        logger.info("Dynamic knowledge retrieval for: %s", topic_query)
                         result = retriever.get_knowledge_by_query(topic_query, limit=2)
                         return f"\nRelevant knowledge about '{topic_query}':\n{result if result else 'No specific information found.'}\n"
                     except Exception as e:
-                        logger.error(f"Error in query_knowledge: {e}")
+                        logger.error("Error in query_knowledge: %s", e)
                         return f"\nAttempted to retrieve knowledge about '{topic_query}', but encountered an error.\n"
 
                 def query_history(topic_query):
@@ -961,11 +961,11 @@ class TextGenerator:
                             else:
                                 return "\nPlease specify a concrete conversation topic to search for.\n"
 
-                        logger.info(f"Dynamic history retrieval for: {topic_query}")
+                        logger.info("Dynamic history retrieval for: %s", topic_query)
                         result = retriever.get_past_interactions(topic_query)
                         return f"\nRelevant conversation history about '{topic_query}':\n{result if result else 'No past conversations on this topic.'}\n"
                     except Exception as e:
-                        logger.error(f"Error in query_history: {e}")
+                        logger.error("Error in query_history: %s", e)
                         return f"\nAttempted to retrieve conversation history about '{topic_query}', but encountered an error.\n"
 
                 def get_pain_point():
@@ -976,7 +976,7 @@ class TextGenerator:
                             return f"\nDetected recurring theme: {result.get('pain_point')}\n"
                         return "\nNo specific recurring themes detected.\n"
                     except Exception as e:
-                        logger.error(f"Error in get_pain_point: {e}")
+                        logger.error("Error in get_pain_point: %s", e)
                         return "\nAttempted to retrieve pain points, but encountered an error.\n"
 
                 # Add the functions to the template context
@@ -996,11 +996,11 @@ class TextGenerator:
                         if kb_info and len(kb_info) > 20:
                             pre_retrieved_info[first_topic] = kb_info
                     except Exception as e:
-                        logger.warning(f"Error pre-retrieving knowledge: {e}")
+                        logger.warning("Error pre-retrieving knowledge: %s", e)
 
                     # Add the pre-retrieved info to the context
                     context['pre_retrieved_info'] = pre_retrieved_info
-                    logger.info(f"Added pre-retrieved info for topics: {list(pre_retrieved_info.keys())}")
+                    logger.info("Added pre-retrieved info for topics: %s", list(pre_retrieved_info.keys()))
 
             # Add conversation history if provided
             if conversation_history:
@@ -1021,7 +1021,7 @@ class TextGenerator:
 
                     # Check if template is valid
                     if not hasattr(template, 'render'):
-                        logger.warning(f"Invalid template object: {type(template)}. Using fallback.")
+                        logger.warning("Invalid template object: %s. Using fallback.", type(template))
                         # Create a simple fallback template string
                         fallback_template_str = (
                             "You are a therapeutic assistant. "
@@ -1035,10 +1035,10 @@ class TextGenerator:
 
                     # DEFENSIVE: Ensure prompt is a string
                     if not isinstance(prompt, str):
-                        logger.warning(f"Template rendered non-string object: {type(prompt)}. Converting to string.")
+                        logger.warning("Template rendered non-string object: %s. Converting to string.", type(prompt))
                         prompt = f"Template rendering produced non-string. USER'S QUESTION: {user_question}"
             except Exception as template_error:
-                logger.error(f"Error rendering template: {str(template_error)}")
+                logger.error("Error rendering template: %s", str(template_error))
                 # Create a simple fallback prompt
                 prompt = f"Failed to render template. Please respond to: {user_question}"
 
@@ -1046,15 +1046,15 @@ class TextGenerator:
             try:
                 token_count = len(self.tokenizer.encode(prompt))
                 max_context_tokens = 2048  # Model's context window size
-                logger.info(f"Prompt token count: {token_count} (limit: {max_context_tokens})")
+                logger.info("Prompt token count: %d (limit: %d)", token_count, max_context_tokens)
             except Exception as token_error:
-                logger.error(f"Error counting tokens: {str(token_error)}")
+                logger.error("Error counting tokens: %s", str(token_error))
                 token_count = 0  # Default
                 max_context_tokens = 2048
 
             # DEFENSIVE: Prompt truncation
             if token_count > max_context_tokens:
-                logger.warning(f"Prompt exceeds token limit ({token_count} > {max_context_tokens})")
+                logger.warning("Prompt exceeds token limit (%d > %d)", token_count, max_context_tokens)
                 try:
                     # Try to split the prompt
                     prompt_parts = prompt.split("\n\n")
@@ -1109,9 +1109,9 @@ class TextGenerator:
                     # Combine the essential parts back into a prompt
                     try:
                         prompt = "\n\n".join(essential_parts)
-                        logger.info(f"Truncated prompt length: {len(prompt)} chars")
+                        logger.info("Truncated prompt length: %d chars", len(prompt))
                     except Exception as join_error:
-                        logger.error(f"Error joining prompt parts: {str(join_error)}")
+                        logger.error("Error joining prompt parts: %s", str(join_error))
                         prompt = str(prompt)[:1500] + "... [truncated]"
                 else:
                     logger.warning("Invalid prompt_parts, using simplified truncation")
@@ -1154,11 +1154,11 @@ class TextGenerator:
 
             # DEFENSIVE: Text generation with comprehensive error handling
             try:
-                logger.info(f"Generating text with prompt of length {len(prompt) if isinstance(prompt, str) else 'unknown'}")
+                logger.info("Generating text with prompt of length '%s'", len(prompt) if isinstance(prompt, str) else 'unknown')
 
                 # Safety check for prompt type before passing to generate_text
                 if not isinstance(prompt, str):
-                    logger.warning(f"Non-string prompt detected (type: {type(prompt)}). Converting to string.")
+                    logger.warning("Non-string prompt detected (type: %s). Converting to string.", type(prompt))
                     prompt = f"USER QUESTION: {user_question}"
 
                 # Generate the text
@@ -1166,30 +1166,30 @@ class TextGenerator:
 
                 # Verify response is valid
                 if not response or not isinstance(response, str):
-                    logger.error(f"Invalid response generated: {type(response)}")
+                    logger.error("Invalid response generated: %s", type(response))
                     return self._get_fallback_response()
 
-                logger.debug(f"RESPONSE DEBUG: '{response[:50]}...' (length: {len(response)})")
+                logger.debug("RESPONSE DEBUG: '%s...' (length: %d)", response[:50], len(response))
 
                 # Clean the therapeutic response if needed
                 if hasattr(self, '_clean_therapeutic_response'):
                     try:
                         response = self._clean_therapeutic_response(response)
                     except Exception as clean_error:
-                        logger.error(f"Error cleaning response: {str(clean_error)}")
+                        logger.error("Error cleaning response: %s", str(clean_error))
 
                 # Final validation
                 response = self._final_validation(response, user_question)
 
-                logger.info(f"Successfully generated response of length {len(response)}")
+                logger.info("Successfully generated response of length %d", len(response))
                 return response
 
             except Exception as e:
-                logger.error(f"Error generating therapeutic response: {str(e)}")
+                logger.error("Error generating therapeutic response: %s", str(e))
                 return "I apologise, but I'm having trouble processing your question."
 
         except Exception as outer_e:
-            logger.error(f"Error in generate_therapeutic_response: {str(outer_e)}")
+            logger.error("Error in generate_therapeutic_response: %s", str(outer_e))
             return "I apologise, but I'm having trouble understanding your question."
 
     def _get_breakup_recovery_steps(self) -> str:
@@ -1304,7 +1304,7 @@ class TextGenerator:
         """
         try:
             # DEBUGGING - log raw response to understand what's being generated
-            logger.debug(f"Raw response before cleaning: {response[:100]}...")
+            logger.debug("Raw response before cleaning: %s...", response[:100])
 
             # STEP 1: CHECK FOR EDUCATIONAL/LECTURE CONTENT LEAKAGE
             educational_markers = [
@@ -1373,11 +1373,11 @@ class TextGenerator:
                 return response.strip()
 
             # If response is too short, use targeted fallback
-            logger.warning(f"Response too short after cleaning: {len(response)} chars")
+            logger.warning("Response too short after cleaning: %d chars", len(response))
             return self._get_targeted_fallback_response(question if question else "")
 
         except Exception as e:
-            logger.error(f"Error cleaning response: {e}")
+            logger.error("Error cleaning response: %s", e)
             return self._get_fallback_response()
 
     def _load_template(self, template_name: str) -> Template:
@@ -1395,7 +1395,7 @@ class TextGenerator:
 
                 return Template(template_content)
         except Exception as e:
-            logger.error(f"Error loading template {template_name}: {str(e)}")
+            logger.error("Error loading template %s: %s", template_name, str(e))
 
         # Try fallback template
         try:
@@ -1404,7 +1404,7 @@ class TextGenerator:
                 with open(fallback_path, mode='r', encoding='utf-8') as jinja2_fallback_template:
                     return Template(jinja2_fallback_template.read())
         except Exception as e:
-            logger.error(f"Error loading fallback template: {str(e)}")
+            logger.error("Error loading fallback template: %s", str(e))
 
         # Emergency hardcoded template
         return Template("You are a therapeutic assistant. Please respond to: {{user_question}}")
@@ -1443,7 +1443,7 @@ class TextGenerator:
 
             logger.info("Model unloaded successfully")
         except Exception as e:
-            logger.error(f"Error unloading model: {e}")
+            logger.error("Error unloading model: %s", e)
 
     def _prepare_prompt_for_generation(self, user_input, template_name, context: Optional[dict] = None):
         """Prepare prompt with special handling for unusual inputs."""
@@ -1519,7 +1519,7 @@ class TextGenerator:
             Exception: If dynamic retrieval fails or model generation errors occur
         """
         try:
-            logger.info(f"Starting dynamic RAG generation with template: {template_name}")
+            logger.info("Starting dynamic RAG generation with template: %s", template_name)
 
             # First check if we have dynamic retrieval capability
             if not context.get('use_dynamic_retrieval') or 'dynamic_retriever' not in context:
@@ -1539,8 +1539,8 @@ class TextGenerator:
             category_info = self.prompt_selector.generate_category_info(user_question)
             category_names = list(category_info.keys()) if category_info else []
 
-            logger.info(f"PromptSelector analysis: Topic={detected_topic}, Emotion={emotion}")
-            logger.info(f"Detected categories: {category_names}")
+            logger.info("PromptSelector analysis: Topic=%s, Emotion=%s", detected_topic, emotion)
+            logger.info("Detected categories: %s", category_names)
 
             # Extract specific psychological topics for dynamic retrieval
             extracted_topics = []
@@ -1577,7 +1577,7 @@ class TextGenerator:
 
             # Limit to top 3 topics
             extracted_topics = extracted_topics[:3]
-            logger.info(f"Extracted topics for RAG retrieval: {extracted_topics}")
+            logger.info("Extracted topics for RAG retrieval: %s", extracted_topics)
 
             # Extract therapeutic approach from pain points if available
             therapeutic_approach = None
@@ -1588,7 +1588,7 @@ class TextGenerator:
                 # Map the approach_type to a therapeutic template name using the utility function
                 if approach_type:
                     therapeutic_approach = map_approach_to_template(approach_type)
-                    logger.info(f"Using therapeutic approach '{therapeutic_approach}' from pain point approach type '{approach_type}'")
+                    logger.info("Using therapeutic approach '%s' from pain point approach type '%s'", therapeutic_approach, approach_type)
 
             # Add psychological context to the template context
             template_context = context.copy()
@@ -1606,9 +1606,9 @@ class TextGenerator:
             # Load the template
             try:
                 template = self._load_template(template_name)
-                logger.info(f"Template '{template_name}' loaded successfully")
+                logger.info("Template '%s' loaded successfully", template_name)
             except Exception as template_error:
-                logger.error(f"Error loading template '{template_name}': {template_error}")
+                logger.error("Error loading template '%s': %s", template_name, template_error)
                 # Fall back to a basic template
                 template = jinja2.Template("You are a therapeutic AI assistant. USER QUESTION: {{ user_question }}")
 
@@ -1624,11 +1624,11 @@ class TextGenerator:
                         else:
                             return "\nPlease specify a concrete psychological concept to search for.\n"
 
-                    logger.info(f"Dynamic knowledge retrieval for: {topic_query}")
+                    logger.info("Dynamic knowledge retrieval for: %s", topic_query)
                     result = retriever.get_knowledge_by_query(topic_query, limit=2)
                     return f"\nRelevant knowledge about '{topic_query}':\n{result if result else 'No specific information found.'}\n"
                 except Exception as e:
-                    logger.error(f"Error in query_knowledge: {e}")
+                    logger.error("Error in query_knowledge: %s", e)
                     return f"\nAttempted to retrieve knowledge about '{topic_query}', but encountered an error.\n"
 
             def query_history(topic_query):
@@ -1642,11 +1642,11 @@ class TextGenerator:
                         else:
                             return "\nPlease specify a concrete conversation topic to search for.\n"
 
-                    logger.info(f"Dynamic history retrieval for: {topic_query}")
+                    logger.info("Dynamic history retrieval for: %s", topic_query)
                     result = retriever.get_past_interactions(topic_query)
                     return f"\nRelevant conversation history about '{topic_query}':\n{result if result else 'No past conversations on this topic.'}\n"
                 except Exception as e:
-                    logger.error(f"Error in query_history: {e}")
+                    logger.error("Error in query_history: %s", e)
                     return f"\nAttempted to retrieve conversation history about '{topic_query}', but encountered an error.\n"
 
             def get_pain_point():
@@ -1657,7 +1657,7 @@ class TextGenerator:
                         return f"\nDetected recurring theme: {result.get('pain_point')}\n"
                     return "\nNo specific recurring themes detected.\n"
                 except Exception as e:
-                    logger.error(f"Error in get_pain_point: {e}")
+                    logger.error("Error in get_pain_point: %s", e)
                     return "\nAttempted to retrieve pain points, but encountered an error.\n"
 
             # Add the functions to the template context
@@ -1682,27 +1682,27 @@ class TextGenerator:
                         if kb_info and len(kb_info) > 20:
                             pre_retrieved_info[first_topic] = kb_info
                     except Exception as e:
-                        logger.warning(f"Error pre-retrieving knowledge: {e}")
+                        logger.warning("Error pre-retrieving knowledge: %s", e)
 
                 # Add the pre-retrieved info to the context
                 template_context['pre_retrieved_info'] = pre_retrieved_info
-                logger.info(f"Added pre-retrieved info for topics: {list(pre_retrieved_info.keys())}")
+                logger.info("Added pre-retrieved info for topics: %s", list(pre_retrieved_info.keys()))
 
             # Render the template
             try:
                 logger.info("Rendering template with context")
-                logger.debug(f"Template context keys: {list(template_context.keys())}")
+                logger.debug("Template context keys: %s", list(template_context.keys()))
                 prompt = template.render(**template_context)
 
                 # Add token count check after rendering
                 token_count = len(self.tokenizer.encode(prompt))
                 max_context_tokens = 2048  # Set model's context window size
 
-                logger.info(f"Template rendered successfully, length: {len(prompt)} chars ({token_count} tokens)")
+                logger.info("Template rendered successfully, length: %d chars (%d tokens)", len(prompt), token_count)
 
                 # Check if prompt exceeds token limit
                 if token_count > max_context_tokens:
-                    logger.warning(f"Prompt exceeds token limit ({token_count} > {max_context_tokens})")
+                    logger.warning("Prompt exceeds token limit (%d > %d)", token_count, max_context_tokens)
                     # Truncate the prompt but preserve important parts
                     prompt_parts = prompt.split("\n\n")
                     essential_parts = []
@@ -1733,10 +1733,10 @@ class TextGenerator:
 
                     # Combine the essential parts back into a prompt
                     prompt = "\n\n".join(essential_parts)
-                    logger.info(f"Truncated prompt length: {len(prompt)} chars")
+                    logger.info("Truncated prompt length: %d chars", len(prompt))
 
             except Exception as render_error:
-                logger.error(f"Error rendering template: {render_error}")
+                logger.error("Error rendering template: %s", render_error)
                 # Fall back to a basic prompt
                 prompt = f"You are a therapeutic AI assistant. The user asks: {user_question}"
 
@@ -1752,23 +1752,23 @@ class TextGenerator:
                         f"I understand that talking about {topic} can be challenging. "
                         "Could you tell me more about what you're experiencing?"
                     )
-                logger.info(f"Generated response of length {len(response)}")
-                logger.debug(f"First 100 chars of response: {response[:100]}")
+                logger.info("Generated response of length %d", len(response))
+                logger.debug("First 100 chars of response: %s", response[:100])
             except Exception as gen_error:
-                logger.error(f"Error generating text: {gen_error}")
+                logger.error("Error generating text: %s", gen_error)
                 return "I apologise, but I'm having trouble generating a response right now."
 
             # Clean the response
             try:
                 cleaned_response = self._clean_therapeutic_response(response)
-                logger.info(f"Cleaned response, final length: {len(cleaned_response)}")
+                logger.info("Cleaned response, final length: %d", len(cleaned_response))
                 return cleaned_response
             except Exception as clean_error:
-                logger.error(f"Error cleaning response: {clean_error}")
+                logger.error("Error cleaning response: %s", clean_error)
                 return response  # Return uncleaned response if cleaning fails
 
         except Exception as e:
-            logger.error(f"Error in dynamic RAG generation: {e}")
+            logger.error("Error in dynamic RAG generation: %s", e)
             logger.error(traceback.format_exc())
             return "I apologise, but I encountered an error while processing your question. Could you please try again?"
 
@@ -1814,7 +1814,7 @@ class TextGenerator:
             logger.info(f"Question analysed - Topic: {topic} ({confidence:.2f}), Emotion: {emotion} ({confidence:.2f}) for question {user_question}")
 
         except Exception as e:
-            logger.error(f"Error in emotion analysis: {str(e)}")
+            logger.error("Error in emotion analysis: %s", str(e))
 
     def get_test_response(self, prompt: str, **kwargs) -> str:
         """Return a predictable response for tests."""

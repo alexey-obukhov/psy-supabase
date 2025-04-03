@@ -77,7 +77,7 @@ def tokenize_and_lemmatize(text: str,
 
     try:
         if logger:
-            logger.debug(f"Tokenizing text (first 50 chars): '{text[:50]}...'")
+            logger.debug("Tokenizing text (first 50 chars): '%s...'", text[:50])
 
         doc = nlp(text)
         cleaned_tokens = [
@@ -87,13 +87,13 @@ def tokenize_and_lemmatize(text: str,
         cleaned_text = " ".join(cleaned_tokens)
 
         if logger:
-            logger.debug(f"Lemmatized text (first 50 chars): '{cleaned_text[:50]}...'")
+            logger.debug("Lemmatized text (first 50 chars): '%s...'", cleaned_text[:50])
 
         return cleaned_text.strip()
 
     except Exception as e:
         if logger:
-            logger.error(f"Error in tokenize_and_lemmatize: {str(e)}\n{traceback.format_exc()}")
+            logger.error("Error in tokenize_and_lemmatize: %s\n%s", str(e), traceback.format_exc())
         return text
 
 def cleanup_memory():
@@ -117,7 +117,7 @@ def cleanup_memory():
         gc.collect()
         logger.info("Memory cleanup completed")
     except Exception as e:
-        logger.error(f"Error during memory cleanup: {e}")
+        logger.error("Error during memory cleanup: %s", e)
 
 def parse_bool_env(env_var, default=False):
     """Parse boolean environment variables properly."""

@@ -115,7 +115,7 @@ class ModelManager:
         # Preload toxicity model
         self.load_toxicity_model()
 
-        self.logger.info(f"ModelManager initialized with model: {model_name}, device: {device}, quantize: {quantize}")
+        self.logger.info("ModelManager initialized with model: %s, device: %s, quantize: %s", model_name, device, quantize)
 
     def get_local_model_path(self):
         """Get the local path for the model"""
@@ -147,11 +147,11 @@ class ModelManager:
             # Check if model exists locally
             if self.is_model_downloaded():
                 # Use local model
-                self.logger.info(f"Loading model from local path: {local_path}")
+                self.logger.info("Loading model from local path: %s", local_path)
                 self.generator = TextGenerator(local_path, self.preferred_device, quantize=self.quantize)
             else:
                 # We need to download the model regardless of quantization
-                self.logger.info(f"Model not found locally. Downloading {self.model_name} to {local_path}")
+                self.logger.info("Model not found locally. Downloading %s to %s", self.model_name, local_path)
 
                 # Create directory
                 os.makedirs(local_path, exist_ok=True)
@@ -159,26 +159,26 @@ class ModelManager:
                 # Download and save tokenizer
                 tokenizer = AutoTokenizer.from_pretrained(self.model_name)
                 tokenizer.save_pretrained(local_path)
-                self.logger.info(f"Tokenizer saved to {local_path}")
+                self.logger.info("Tokenizer saved to %s", local_path)
 
                 try:
                     # Download and save full model (without quantization)
-                    self.logger.info(f"Downloading full model weights to {local_path}")
+                    self.logger.info("Downloading full model weights to %s", local_path)
                     model = AutoModelForCausalLM.from_pretrained(self.model_name)
                     model.save_pretrained(local_path)
-                    self.logger.info(f"Full model saved to {local_path}")
+                    self.logger.info("Full model saved to %s", local_path)
 
                     # Now create the generator, using quantization if requested
                     self.generator = TextGenerator(local_path, self.preferred_device, quantize=self.quantize)
                 except Exception as e:
-                    self.logger.error(f"Error downloading full model: {e}")
+                    self.logger.error("Error downloading full model: %s", e)
                     # If full model download fails, try direct initialization
                     self.generator = TextGenerator(self.model_name, self.preferred_device, quantize=self.quantize)
 
             self.current_device = self.preferred_device
         else:
             # Make sure model is fully on the right device
-            self.logger.info(f"Moving existing model to {self.preferred_device}")
+            self.logger.info("Moving existing model to %s", self.preferred_device)
             if hasattr(self.generator, 'model'):
                 # Only try to move model if not using device_map='auto'
                 if not (self.quantize and hasattr(self.generator, 'using_device_map') and self.generator.using_device_map):
@@ -195,7 +195,7 @@ class ModelManager:
             self.toxicity_model, self.toxicity_tokenizer = common_load_toxicity_model(self.logger)
             return self.toxicity_model, self.toxicity_tokenizer
         except Exception as e:
-            self.logger.error(f"Error loading toxicity model: {e}")
+            self.logger.error("Error loading toxicity model: %s", e)
             raise
 
     def free_memory(self):
@@ -268,7 +268,7 @@ class ModelManager:
             raise ValueError("Model doesn't support embedding generation")
 
         except Exception as e:
-            self.logger.error(f"Error generating embedding with main model: {e}")
+            self.logger.error("Error generating embedding with main model: %s", e)
             self.logger.error(traceback.format_exc())
 
             # Try with sentence transformer as fallback
@@ -303,7 +303,7 @@ class ModelManager:
             return embedding.tolist()
 
         except Exception as e:
-            self.logger.error(f"Error generating embedding with sentence transformer: {e}")
+            self.logger.error("Error generating embedding with sentence transformer: %s", e)
             self.logger.error(traceback.format_exc())
             return None
 
@@ -337,17 +337,17 @@ class ModelManager:
                     # Check if model exists locally
                     if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
                         # Use local model
-                        self.logger.info(f"Loading SentenceTransformer from local path: {local_path}")
+                        self.logger.info("Loading SentenceTransformer from local path: %s", local_path)
                         self.sentence_transformer = SentenceTransformer(local_path)
                     else:
                         # Download model and save locally
-                        self.logger.info(f"Downloading SentenceTransformer to {local_path}")
+                        self.logger.info("Downloading SentenceTransformer to %s", local_path)
                         os.makedirs(local_path, exist_ok=True)
 
                         # Download and save model
                         self.sentence_transformer = SentenceTransformer("sentence-transformers/" + st_model_name)
                         self.sentence_transformer.save(local_path)
-                        self.logger.info(f"SentenceTransformer saved to {local_path}")
+                        self.logger.info("SentenceTransformer saved to %s", local_path)
 
                     # Move to the right device
                     if self.preferred_device == "cuda" and torch.cuda.is_available():
@@ -373,7 +373,7 @@ class ModelManager:
                 return results
 
             except Exception as e:
-                self.logger.error(f"Error in batch embedding: {e}")
+                self.logger.error("Error in batch embedding: %s", e)
                 self.logger.error(traceback.format_exc())
 
         # For smaller batches or if sentence-transformers failed, use the main model
@@ -458,7 +458,7 @@ class EmbeddingProviderAdapter:
             return embedding
 
         except Exception as e:
-            self.logger.error(f"Error generating embedding: {e}")
+            self.logger.error("Error generating embedding: %s", e)
             return [0.0] * self.get_embedding_dimension()
 
     def _initialize_provider(self):
@@ -472,12 +472,12 @@ class EmbeddingProviderAdapter:
             try:
                 # Use the existing model manager directly - no circular import needed
                 self._provider = get_model_manager(self.model_name)
-                self.logger.info(f"Initialized local embedding provider with model: {self.model_name}")
+                self.logger.info("Initialized local embedding provider with model: %s", self.model_name)
             except Exception as e:
-                self.logger.error(f"Failed to initialize embedding provider: {e}")
+                self.logger.error("Failed to initialize embedding provider: %s", e)
         else:
             # For other provider types
-            self.logger.warning(f"Provider type {self.provider_type} initialization not implemented")
+            self.logger.warning("Provider type %s initialization not implemented", self.provider_type)
             self._provider = None
 
     def batch_generate_embeddings(self, texts: List[str]) -> List[List[float]]:
@@ -500,7 +500,7 @@ class EmbeddingProviderAdapter:
             # Use the batch function
             return model_manager.batch_generate_embeddings(texts) or [[0.0] * self.get_embedding_dimension() for _ in texts]
         except Exception as e:
-            self.logger.error(f"Error in batch embedding: {e}")
+            self.logger.error("Error in batch embedding: %s", e)
             return [[0.0] * self.get_embedding_dimension() for _ in texts]
 
 

@@ -337,7 +337,7 @@ class RAGProcessor:
             return response
 
         except Exception as e:
-            logger.error(f"Error generating response: {e}")
+            logger.error("Error generating response: %s", e)
             logger.error(traceback.format_exc())
             return "I'm sorry, I encountered an error while generating a response. Could you please try again?"
 
@@ -405,7 +405,7 @@ class RAGProcessor:
 
                 training_examples.append(example)
             except Exception as e:
-                logger.error(f"Error formatting training example: {e}")
+                logger.error("Error formatting training example: %s", e)
                 continue
 
         return training_examples
@@ -556,7 +556,7 @@ class RAGProcessor:
                 knowledge_context = "\n\n".join(final_docs)
 
                 # Log what we're including
-                logger.info(f"Using {len(final_docs)} documents ({total_length} chars) for knowledge context")
+                logger.info("Using %d documents (%d chars) for knowledge context", len(final_docs), total_length)
 
             # OPTIMIZATION: Get conversation history with limited exchanges
             conversation_context = ""
@@ -581,9 +581,9 @@ class RAGProcessor:
 
                     # Log the conversation context
                     if conversation_context:
-                        logger.debug(f"Added conversation context ({len(conversation_context)} chars)")
+                        logger.debug("Added conversation context (%d chars)", len(conversation_context))
             except Exception as e:
-                logger.error(f"Error retrieving conversation history: {e}")
+                logger.error("Error retrieving conversation history: %s", e)
                 # Continue with empty conversation context
 
             # Create enhanced context dictionary with consistent size limits
@@ -598,13 +598,13 @@ class RAGProcessor:
             }
 
             # Log context sizes
-            logger.info(f"Knowledge context: {len(knowledge_context)} chars from vector similarity search")
-            logger.info(f"Conversation context: {len(conversation_context)} chars")
-            logger.info(f"Total prompt context: {len(knowledge_context) + len(conversation_context)} chars")
+            logger.info("Knowledge context: %d chars from vector similarity search", len(knowledge_context))
+            logger.info("Conversation context: %d chars", len(conversation_context))
+            logger.info("Total prompt context: %d chars", len(knowledge_context) + len(conversation_context))
 
             return enhanced_context
         except Exception as e:
-            logger.error(f"Error enhancing context: {e}")
+            logger.error("Error enhancing context: %s", e)
             logger.error(traceback.format_exc())
             return {
                 'knowledge_context': "",
@@ -843,7 +843,7 @@ class RAGProcessor:
                         knowledge_context += content[:remaining_chars] + "..."
                         break
 
-                logger.info(f"Knowledge context: {len(knowledge_context)} chars from vector similarity search")
+                logger.info("Knowledge context: %d chars from vector similarity search", len(knowledge_context))
 
             # 5. Get minimal conversation context
             conversation_context = ""
@@ -859,11 +859,11 @@ class RAGProcessor:
                     if q and a:
                         conversation_context += f"User: {q}\nAssistant: {a}\n\n"
 
-                logger.info(f"Conversation context: {len(conversation_context)} chars")
+                logger.info("Conversation context: %d chars", len(conversation_context))
 
             # 6. Ensure overall context stays within limits
-            total_context_chars = len(knowledge_context) + len(conversation_context)
-            logger.info(f"Total prompt context: {total_context_chars} chars")
+            total_context_length = len(knowledge_context) + len(conversation_context)
+            logger.info("Total prompt context: %d chars", total_context_length)
 
             return {
                 "knowledge_context": knowledge_context,
@@ -871,7 +871,7 @@ class RAGProcessor:
             }
 
         except Exception as e:
-            logger.error(f"Error getting contextual data: {e}")
+            logger.error("Error getting contextual data: %s", e)
             logger.error(traceback.format_exc())
             return {"knowledge_context": "", "conversation_context": ""}
 
@@ -918,7 +918,7 @@ class RAGProcessor:
             return embedding_list
 
         except Exception as e:
-            logger.error(f"Error processing query: {e}")
+            logger.error("Error processing query: %s", e)
             logger.error(traceback.format_exc())
             # Return a zero embedding as fallback (will likely not match anything)
             return [0.0] * self.embedding_dimension
@@ -1016,13 +1016,13 @@ class RAGProcessor:
                                             "source": "vector_similarity"
                                         })
                 except Exception as inner_e:
-                    logger.warning(f"Error finding hot topics: {inner_e}")
+                    logger.warning("Error finding hot topics: %s", inner_e)
                     # Continue without hot topics
 
             return hot_topics
 
         except Exception as e:
-            logger.error(f"Error identifying hot topics: {e}")
+            logger.error("Error identifying hot topics: %s", e)
             return []
 
     @typechecked
@@ -1079,7 +1079,7 @@ class RAGProcessor:
             return formatted_history
 
         except Exception as e:
-            logger.error(f"Error getting conversation history: {e}")
+            logger.error("Error getting conversation history: %s", e)
             logger.error(traceback.format_exc())
             return []
 
@@ -1140,7 +1140,7 @@ class RAGProcessor:
             return result
 
         except Exception as e:
-            logger.error(f"Error in pain point detection: {e}")
+            logger.error("Error in pain point detection: %s", e)
             logger.error(traceback.format_exc())
             return default_response
 
@@ -1190,7 +1190,7 @@ class RAGProcessor:
             return relevant_documents
 
         except Exception as e:
-            logger.error(f"Error retrieving documents with pgvector: {e}")
+            logger.error("Error retrieving documents with pgvector: %s", e)
             return []
 
     def _log_pain_point_detection(self, user_question, pain_point, template_used):
@@ -1221,4 +1221,4 @@ class RAGProcessor:
                 f"(count: {pain_point.get('count', 0)}, severity: {pain_point.get('severity', 'unknown')})"
             )
         except Exception as e:
-            logger.error(f"Error logging pain point detection: {e}")
+            logger.error("Error logging pain point detection: %s", e)

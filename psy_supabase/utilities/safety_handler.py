@@ -102,7 +102,7 @@ class SafetyHandler:
         for category, data in self.categories.items():
             for pattern in data['patterns']:
                 if re.search(pattern, user_input):
-                    logger.warning(f"Detected {category} content: '{user_input}'")
+                    logger.warning("Detected %s content: '%s'", category, user_input)
 
                     # Get appropriate response
                     response = data['response']()

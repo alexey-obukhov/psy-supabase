@@ -63,12 +63,12 @@ class ResponseGenerator:
         # Check for high ratio of special characters
         special_char_count = len(re.sub(r'[a-zA-Z0-9\s]', '', user_question))
         if len(user_question) > 0 and special_char_count / len(user_question) > 0.5:
-            logger.info(f"Detected high ratio of special characters in input ({special_char_count}/{len(user_question)})")
+            logger.info("Detected high ratio of special characters in input (%d/%d)", special_char_count, len(user_question))
             return False
 
         # Check for excessively long inputs
         if len(user_question) > 1000:
-            logger.info(f"Processing very long input ({len(user_question)} chars)")
+            logger.info("Processing very long input (%d chars)", len(user_question))
             return False
 
         return True
@@ -98,7 +98,7 @@ class ResponseGenerator:
             is_toxic = self.text_generator.is_toxic(user_question)
 
         if is_toxic:
-            logger.warning(f"Toxic user input detected: {user_question[:50]}...")
+            logger.warning("Toxic user input detected: %s...", user_question[:50])
             response = "I cannot respond to this type of content. Please use respectful and appropriate language."
 
             # Save interaction for toxic content
@@ -136,8 +136,8 @@ class ResponseGenerator:
         category_info = self.prompt_selector.generate_category_info(user_question)
 
         # Log the analysis results
-        logger.info(f"Question analysis: Topic={detected_topic}, Emotion={emotion}")
-        logger.info(f"Categories: {list(category_info.keys())}")
+        logger.info("Question analysis: Topic=%s, Emotion=%s", detected_topic, emotion)
+        logger.info("Categories: %s", list(category_info.keys()))
 
         # Extract psychological topics for dynamic retrieval
         extracted_topics = []
@@ -177,7 +177,7 @@ class ResponseGenerator:
 
         # Limit to top 3 topics
         extracted_topics = extracted_topics[:3]
-        logger.info(f"Extracted topics for RAG retrieval: {extracted_topics}")
+        logger.info("Extracted topics for RAG retrieval: %s", extracted_topics)
 
         # Return structured context information
         return {
@@ -244,7 +244,7 @@ class ResponseGenerator:
             return response
 
         except Exception as gen_error:
-            logger.error(f"Error generating response with dynamic retrieval: {gen_error}")
+            logger.error("Error generating response with dynamic retrieval: %s", gen_error)
             return "I apologise, but I'm experiencing a technical issue. Please try again with a different question."
 
     def determine_final_context(self, user_question: str, topics_context: Dict,
@@ -272,16 +272,16 @@ class ResponseGenerator:
         # Now determine the best context using our priority rules
         if detected_topic and detected_topic != "general":
             context = detected_topic.replace(" ", "_").lower()
-            logger.info(f"Using detected_topic as context: {context}")
+            logger.info("Using detected_topic as context: %s", context)
         elif extracted_topics and extracted_topics[0] != "therapeutic_dialogue":
             context = extracted_topics[0]
-            logger.info(f"Using extracted_topic as context: {context}")
+            logger.info("Using extracted_topic as context: %s", context)
         elif approach_type and approach_type != "default_approach" and approach_type != "none":
             context = map_approach_to_template(approach_type)
-            logger.info(f"Using approach_type mapped to therapeutic method: {context}")
+            logger.info("Using approach_type mapped to therapeutic method: %s", context)
         elif pain_point and 'topic' in pain_point and pain_point['topic']:
             context = pain_point['topic']
-            logger.info(f"Using pain_point topic as context: {context}")
+            logger.info("Using pain_point topic as context: %s", context)
         else:
             logger.info("No specific topic found, using default context: therapeutic_dialogue")
             context = "therapeutic_dialogue"
@@ -303,7 +303,7 @@ class ResponseGenerator:
                        metadata: Dict, session_id: str) -> None:
         """Save the interaction to the database with error handling."""
         # Use the determined context when saving
-        logger.info(f"About to save_interaction with context: {context}, session_id: {session_id}")
+        logger.info("About to save_interaction with context: %s, session_id: %d", context, session_id)
         try:
             self.db_manager.save_interaction(
                 context=context,
@@ -314,7 +314,7 @@ class ResponseGenerator:
             )
             logger.info("save_interaction completed successfully")
         except Exception as e:
-            logger.error(f"Error in save_interaction: {e}")
+            logger.error("Error in save_interaction: %s", e)
             logger.error(traceback.format_exc())
 
     def debug_context_determination(self, user_question: str, detected_topic: str,
@@ -322,8 +322,8 @@ class ResponseGenerator:
                                   pain_point: Dict) -> None:
         """Debug function to log context determination process."""
         logger.debug("DEBUG CONTEXT DETERMINATION:")
-        logger.debug(f"- User question: {user_question[:50]}...")
-        logger.debug(f"- Detected topic: {detected_topic}")
-        logger.debug(f"- Extracted topics: {extracted_topics}")
-        logger.debug(f"- Approach type: {approach_type}")
-        logger.debug(f"- Pain point: {str(pain_point)[:100]}...")
+        logger.debug("- User question: %s...", user_question[:50])
+        logger.debug("- Detected topic: %s", detected_topic)
+        logger.debug("- Extracted topics: %s", extracted_topics)
+        logger.debug("- Approach type: %s", approach_type)
+        logger.debug("- Pain point: %s...", str(pain_point)[:100])

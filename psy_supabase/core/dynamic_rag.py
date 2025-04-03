@@ -120,10 +120,10 @@ class DynamicRAGRetriever:
                 self.associative_memory.add_memory(content, topics, metadata)
 
             self.memory_initialized = True
-            logger.info(f"Initialized associative memory with {len(docs)} documents")
+            logger.info("Initialized associative memory with %d documents", len(docs))
 
         except Exception as e:
-            logger.error(f"Error initializing associative memory: {e}")
+            logger.error("Error initializing associative memory: %s", e)
 
     def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
         """Extract simple keywords from text for topic generation."""
@@ -199,7 +199,7 @@ class DynamicRAGRetriever:
             return combined_results
 
         except Exception as e:
-            logger.error(f"Error in get_knowledge_by_query: {e}")
+            logger.error("Error in get_knowledge_by_query: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             return f"Error retrieving knowledge: {str(e)}"
@@ -228,7 +228,7 @@ class DynamicRAGRetriever:
             return history[:limit] if limit > 0 else history
 
         except Exception as e:
-            logger.error(f"Error getting past interactions: {e}")
+            logger.error("Error getting past interactions: %s", e)
             return []
 
     def get_past_interactions_by_topic(self, topic: str, session_id: str = None, limit: int = 5) -> List[Dict[str, Any]]:
@@ -247,7 +247,7 @@ class DynamicRAGRetriever:
             # Generate embedding for the topic query
             topic_embedding = self.db_manager.create_embedding(topic)
             if not topic_embedding:
-                logger.warning(f"Could not create embedding for topic: {topic}")
+                logger.warning("Could not create embedding for topic: %s", topic)
                 return []
 
             # Find similar interactions using the embedding
@@ -259,7 +259,7 @@ class DynamicRAGRetriever:
 
             return results
         except Exception as e:
-            logger.error(f"Error getting past interactions by topic: {e}")
+            logger.error("Error getting past interactions by topic: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             return []
@@ -281,7 +281,7 @@ class DynamicRAGRetriever:
 
             return result
         except Exception as e:
-            logger.error(f"Error in combined retrieval workflow: {e}")
+            logger.error("Error in combined retrieval workflow: %s", e)
             return f"Error: {str(e)}"
 
     def get_pain_point(self) -> Dict[str, Any]:
@@ -372,7 +372,7 @@ class DynamicRAGRetriever:
             }
 
         except Exception as e:
-            logger.error(f"Error analysing emotion: {e}")
+            logger.error("Error analysing emotion: %s", e)
             return {'sentiment': 0, 'emotions': {}, 'dominant_emotion': None, 'confidence': 0.0}
 
     def reset_cache(self):

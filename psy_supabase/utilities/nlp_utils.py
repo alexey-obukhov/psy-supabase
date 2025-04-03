@@ -60,17 +60,17 @@ class SpacyModelManager:
         if model_name not in self._models:
             try:
                 self._models[model_name] = spacy.load(model_name)
-                logger.info(f"Loaded spaCy model '{model_name}'")
+                logger.info("Loaded spaCy model '%s'", model_name)
             except OSError:
-                logger.warning(f"Model '{model_name}' not found. Attempting to download...")
+                logger.warning("Model '%s' not found. Attempting to download...", model_name)
                 try:
                     from spacy.cli import download
                     download(model_name)
                     self._models[model_name] = spacy.load(model_name)
-                    logger.info(f"Successfully downloaded and loaded model '{model_name}'")
+                    logger.info("Successfully downloaded and loaded model '%s'", model_name)
                 except Exception as e:
-                    logger.error(f"Failed to download spaCy model: {e}")
-                    logger.error(f"Please run: python -m spacy download {model_name}")
+                    logger.error("Failed to download spaCy model: %s", e)
+                    logger.error("Please run: python -m spacy download %s", model_name)
                     return None
         return self._models[model_name]
 
@@ -86,13 +86,13 @@ def download_nltk_resources():
     for resource in resources:
         try:
             nltk.data.find(f'tokenizers/{resource}')
-            logger.debug(f"NLTK resource '{resource}' already downloaded")
+            logger.debug("NLTK resource '%s' already downloaded", resource)
         except LookupError:
-            logger.info(f"Downloading NLTK resource: {resource}")
+            logger.info("Downloading NLTK resource: %s", resource)
             try:
                 nltk.download(resource, quiet=True)
             except Exception as e:
-                logger.error(f"Failed to download NLTK resource '{resource}': {e}")
+                logger.error("Failed to download NLTK resource '%s': %s", resource, e)
                 return False
 
     return True
@@ -107,7 +107,7 @@ def is_text2emotion_ready():
         test = te.get_emotion("This is a test")
         return isinstance(test, dict)
     except Exception as e:
-        logger.error(f"text2emotion error: {e}")
+        logger.error("text2emotion error: %s", e)
         return False
 
 def analyze_emotion(text: str) -> Dict[str, float]:
@@ -126,7 +126,7 @@ def analyze_emotion(text: str) -> Dict[str, float]:
     try:
         return te.get_emotion(text)
     except Exception as e:
-        logger.error(f"Error analysing emotion: {e}")
+        logger.error("Error analysing emotion: %s", e)
         return {}
 
 # Convenience functions

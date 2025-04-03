@@ -130,7 +130,7 @@ def map_approach_to_template(approach_type: str) -> str:
     }
 
     logger = ColoredLogger(__name__)
-    logger.debug(f"Mapping approach type '{approach_type}' to template.")
+    logger.debug("Mapping approach type '%s' to template.", approach_type)
 
     # Try direct match first
     if approach_type in approach_to_template:

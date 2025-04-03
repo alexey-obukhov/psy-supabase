@@ -27,9 +27,9 @@ class AssociativeMemory:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.model = AutoModel.from_pretrained(model_name)
             self.dimension = self.model.config.hidden_size
-            logger.info(f"AssociativeMemory initialized with model: {model_name}")
+            logger.info("AssociativeMemory initialized with model: %s", model_name)
         except Exception as e:
-            logger.error(f"Error loading embedding model: {e}")
+            logger.error("Error loading embedding model: %s", e)
             # Fall back to a simple word-based similarity
             self.tokenizer = None
             self.model = None
@@ -86,7 +86,7 @@ class AssociativeMemory:
             return memory_index
 
         except Exception as e:
-            logger.error(f"Error adding memory: {e}")
+            logger.error("Error adding memory: %s", e)
             return -1
 
     def query(self, query_text: str, top_k: int = 5, threshold: float = 0.6) -> List[str]:
@@ -104,7 +104,7 @@ class AssociativeMemory:
         try:
             # Check cache first
             if query_text in self.cache:
-                logger.info(f"Cache hit for query: {query_text[:50]}...")
+                logger.info("Cache hit for query: %s...", query_text[:50])
                 return self.cache[query_text]
 
             if not self.memories:
@@ -259,7 +259,7 @@ class AssociativeMemory:
             return formatted_results
 
         except Exception as e:
-            logger.error(f"Error querying associative memory: {e}")
+            logger.error("Error querying associative memory: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             return ["Error retrieving memories."]
@@ -292,7 +292,7 @@ class AssociativeMemory:
                 embeddings = outputs.last_hidden_state.mean(dim=1).cpu().numpy()
                 return embeddings[0]
             except Exception as e:
-                logger.error(f"Error generating embedding with model: {e}")
+                logger.error("Error generating embedding with model: %s", e)
                 # Fall back to simple embedding
                 return self._simple_embedding(text)
         else:
@@ -327,10 +327,10 @@ class AssociativeMemory:
             # Update the mapping
             self.memory_index_map = {i: i for i in range(len(self.memories))}
 
-            logger.info(f"Updated associative memory index with {len(self.memories)} memories")
+            logger.info("Updated associative memory index with %d memories", len(self.memories))
 
         except Exception as e:
-            logger.error(f"Error updating FAISS index: {e}")
+            logger.error("Error updating FAISS index: %s", e)
             self.index = None
 
     def _keyword_search(self, query: str, top_k: int) -> List[Dict]:

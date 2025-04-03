@@ -19,7 +19,7 @@ def ensure_dir_exists(directory_path):
     """Create directory if it doesn't exist."""
     if not os.path.exists(directory_path):
         os.makedirs(directory_path, exist_ok=True)
-        logger.info(f"Created directory: {directory_path}")
+        logger.info("Created directory: %s", directory_path)
     return directory_path
 
 def get_models_dir():
