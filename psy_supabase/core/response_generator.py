@@ -303,7 +303,7 @@ class ResponseGenerator:
                        metadata: Dict, session_id: str) -> None:
         """Save the interaction to the database with error handling."""
         # Use the determined context when saving
-        logger.info("About to save_interaction with context: %s, session_id: %d", context, session_id)
+        logger.info("About to save_interaction with context: %s, session_id: %s", context, session_id)
         try:
             self.db_manager.save_interaction(
                 context=context,
