@@ -19,7 +19,6 @@ import sys
 from typing import Dict, List, Any, Optional
 import json
 import time
-import torch
 from dotenv import load_dotenv
 from school_logging.log import ColoredLogger
 from psy_supabase.utilities.utils import cleanup_memory
@@ -63,7 +62,7 @@ class PainPointDemo:
         # Create a unique test user ID
         import uuid
         self.user_id = f"demo_user_{uuid.uuid4().hex[:8]}"
-        logger.info(f"Using demo user ID: {self.user_id}")
+        logger.info("Using demo user ID: %s", self.user_id)
         self.session_id = f"demo_session"
 
         # Define mock responses for all methods to use
@@ -134,7 +133,7 @@ class PainPointDemo:
                     schema_exists = ''.join(schema_response.data).lower() == 'true'
 
             if not schema_exists:
-                logger.error(f"Schema {self.db_manager.schema_name} does not exist!")
+                logger.error("Schema %s does not exist!", self.db_manager.schema_name)
                 raise RuntimeError(f"Schema {self.db_manager.schema_name} not found")
 
             # Check if interactions table exists
@@ -156,7 +155,7 @@ class PainPointDemo:
                     table_exists = ''.join(table_response.data).lower() == 'true'
 
             if not table_exists:
-                logger.error(f"Table interactions does not exist in schema {self.db_manager.schema_name}!")
+                logger.error("Table interactions does not exist in schema %s!", self.db_manager.schema_name)
 
                 # Try creating the tables again
                 logger.info("Attempting to create tables again...")
@@ -183,7 +182,7 @@ class PainPointDemo:
                 logger.info("Tables created manually")
 
         except Exception as e:
-            logger.error(f"Error verifying schema: {e}")
+            logger.error("Error verifying schema: %s", e)
             import traceback
             logger.error(traceback.format_exc())
 
@@ -206,7 +205,7 @@ class PainPointDemo:
                     approach_desc = f"Therapeutic approaches for {conversation['name']}: {', '.join(approaches)}"
                     self.associative_memory.add_memory(approach_desc, approaches + themes)
 
-        logger.info(f"Initialized memory with {len(self.associative_memory.memories)} entries")
+        logger.info("Initialized memory with %d entries", len(self.associative_memory.memories))
 
     def add_conversations_to_database(self, conversation):
         """Add conversations from TEST_CONVERSATIONS to the database."""
@@ -214,14 +213,14 @@ class PainPointDemo:
         session_id = conversation.get("session_id")
         questions = conversation["questions"]
 
-        logger.info(f"\n=== Adding conversation to database: {name} ===")
-        logger.info(f"Session ID: {session_id}")
+        logger.info("\n=== Adding conversation to database: %s ===", name)
+        logger.info("Session ID: %s", session_id)
 
         # Process each question in the conversation
         added_count = 0
         for i, question in enumerate(questions):
             question_num = i + 1
-            logger.debug(f"Adding Q{question_num}: {question[:50]}...")
+            logger.debug("Adding Q%s: %s...", question_num, question[:50])
 
             # Generate a simple mock response
             answer = self.mock_responses[i % len(self.mock_responses)]
@@ -263,9 +262,9 @@ class PainPointDemo:
                     added_count += 1
 
             except Exception as e:
-                logger.error(f"Error adding interaction: {e}")
+                logger.error("Error adding interaction: %s", e)
 
-        logger.info(f"Added {added_count} interactions for session {session_id}")
+        logger.info("Added %d interactions for session %s", added_count, session_id)
         return added_count
 
     def run_conversation(self, conversation: Dict[str, Any]) -> Dict[str, Any]:
@@ -282,8 +281,8 @@ class PainPointDemo:
         session_id = conversation["session_id"]
         questions = conversation["questions"]
 
-        logger.info(f"\n=== Running conversation: {name} ===")
-        logger.info(f"Session ID: {session_id}")
+        logger.info("\n=== Running conversation: %s ===", name)
+        logger.info("Session ID: %s", session_id)
 
         # First, add all conversations to the database
         added_count = self.add_conversations_to_database(conversation)
@@ -322,7 +321,7 @@ class PainPointDemo:
             #response = self.db_manager.get_conversation_history(session_id)
             if response.data:
                 found_count = len(response.data)
-                logger.info(f"Found {found_count} interactions in the database for session {session_id}")
+                logger.info("Found %d interactions in the database for session %s", found_count, session_id)
 
                 # Process each question to detect pain points
                 all_questions = []
@@ -366,7 +365,7 @@ class PainPointDemo:
                 results["error"] = "No interactions found in database"
 
         except Exception as e:
-            logger.error(f"Error processing conversation: {e}")
+            logger.error("Error processing conversation: %s", e)
             import traceback
             logger.error(traceback.format_exc())
             results["error"] = str(e)
@@ -422,22 +421,22 @@ class PainPointDemo:
             results: Results dictionary from run_conversation()
         """
         if "error" in results:
-            logger.error(f"Error in results: {results['error']}")
+            logger.error("Error in results: %s", results['error'])
             return
 
-        logger.info(f"\n=== Results for {results['name']} ===")
+        logger.info("\n=== Results for %s ===", results['name'])
 
         # Basic statistics
         total_questions = len(results.get("exchanges", []))
         pain_points = results.get("pain_points_detected", 0)
         detection_rate = (pain_points / total_questions) * 100 if total_questions > 0 else 0
 
-        logger.info(f"Questions processed: {total_questions}")
-        logger.info(f"Pain points detected: {pain_points}")
+        logger.info("Questions processed: %d", total_questions)
+        logger.info("Pain points detected: %s", pain_points)
         logger.info(f"Detection rate: {detection_rate:.2f}%")
 
         if results.get("first_detection_at"):
-            logger.info(f"First detected at question #{results['first_detection_at']}")
+            logger.info("First detected at question #%s", results['first_detection_at'])
 
         # Compare with expected themes
         expected_themes = set(results.get("expected_themes", []))
@@ -453,13 +452,13 @@ class PainPointDemo:
 
             match_rate = (len(matches) / len(norm_expected)) * 100 if norm_expected else 0
             logger.info(f"\nTheme detection rate: {match_rate:.2f}%")
-            logger.info(f"Expected themes: {', '.join(expected_themes)}")
-            logger.info(f"Detected themes: {', '.join(detected_themes)}")
+            logger.info("Expected themes: %s", ', '.join(expected_themes))
+            logger.info("Detected themes: %s", ', '.join(detected_themes))
 
             if matches:
-                logger.info(f"Matched themes: {', '.join(matches)}")
+                logger.info("Matched themes: %s", ', '.join(matches))
             if misses:
-                logger.info(f"Missed themes: {', '.join(misses)}")
+                logger.info("Missed themes: %s", ', '.join(misses))
 
     def run_all_conversations(self) -> List[Dict[str, Any]]:
         """
@@ -489,9 +488,9 @@ class PainPointDemo:
             DROP SCHEMA IF EXISTS "{self.db_manager.schema_name}" CASCADE;
             """
             self.db_manager.supabase.rpc('sql', {'command': drop_query}).execute()
-            logger.info(f"Dropped schema {self.db_manager.schema_name}")
+            logger.info("Dropped schema %s", self.db_manager.schema_name)
         except Exception as e:
-            logger.error(f"Error dropping schema: {e}")
+            logger.error("Error dropping schema: %s", e)
 
 def main() -> None:
     """Main function to demonstrate pain point detection."""
@@ -518,9 +517,9 @@ def main() -> None:
 
             json.dump(json_results, f, indent=2)
 
-        logger.info(f"Results saved to pain_point_detection_results.json")
+        logger.info("Results saved to pain_point_detection_results.json")
     except Exception as e:
-        logger.error(f"Error in demonstration: {e}")
+        logger.error("Error in demonstration: %s", e)
         import traceback
         logger.error(traceback.format_exc())
     finally:
