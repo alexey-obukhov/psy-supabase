@@ -10,7 +10,7 @@ sys.path.append(str(project_root))
 from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 
 
-class TestDynamicRAGEdgeCases(DynamicRAGRetriever):
+class TestDynamicRAGEdgeCases(unittest.TestCase):
     """Test edge cases for DynamicRAGRetriever."""
 
     def setUp(self):
@@ -28,7 +28,6 @@ class TestDynamicRAGEdgeCases(DynamicRAGRetriever):
         """Test that database errors are handled gracefully."""
         # Setup mock to raise an exception
         self.mock_db.create_embedding.return_value = [0.1] * 384
-        # Mock the correct method that's actually being called
         self.mock_db.find_similar_interactions_by_embedding.side_effect = Exception("Database connection failure")
 
         # Temporarily disable logging during this test
