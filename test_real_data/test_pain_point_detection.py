@@ -512,7 +512,7 @@ class PainPointDetectionTester:
                 # 5. Manual information based on expected schema
                 logger.info("Expected schema:")
                 if table_name == 'interactions':
-                    logger.info("  - interactionid: ID column (primary key)")
+                    logger.info("  - interaction_id: ID column (primary key)")
                     logger.info("  - question: Text content of user question")
                     logger.info("  - answer: Text content of AI response")
                     logger.info("  - context: Contextual information")
@@ -521,7 +521,7 @@ class PainPointDetectionTester:
                     logger.info("  - created_at: Timestamp")
                 elif table_name == 'interaction_embeddings':
                     logger.info("  - id: ID column (primary key)")
-                    logger.info("  - interaction_id: Foreign key to interactions.interactionid")
+                    logger.info("  - interaction_id: Foreign key to interactions.interaction_id")
                     logger.info("  - embedding: Vector embedding")
                     logger.info("  - created_at: Timestamp")
 

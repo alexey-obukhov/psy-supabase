@@ -157,24 +157,29 @@ class TestDynamicRAG(unittest.TestCase):
                          "New query should trigger fresh embedding creation")
 
     def test_format_of_associated_results_dynamic_rag(self):
-        """Test that associated results are properly formatted."""
-        # Setup mock for initial query and related topics
+        """Test the format of associated results from dynamic RAG."""
+        # Setup mock responses for similar interactions
         self.mock_db.find_similar_interactions_by_embedding.return_value = [
             {
-                "interaction_id": 1,
-                "question": "How does anxiety affect sleep?",
-                "answer": "Anxiety can cause insomnia and disrupt sleep patterns.",
-                "similarity": 0.9,
-                "metadata": {"topics": ["anxiety", "sleep"]}
+                'interaction_id': '1',
+                'question': 'How does anxiety affect sleep?',
+                'answer': 'Anxiety can cause insomnia and disrupt sleep patterns.',
+                'similarity': 0.85
             }
         ]
 
-        result = self.retriever.get_knowledge_by_query("anxiety and sleep", associative_memory=True)
+        result = self.retriever.get_knowledge_by_query("test query about anxiety")
 
-        # Check formatting
-        self.assertIn("Q: How does anxiety affect sleep?", result)
-        self.assertIn("A: Anxiety can cause insomnia", result)
-        self.assertIn("[Similarity: 0.90]", result)
+        # After refactoring, we only include answer content without Q&A format
+        self.assertIn('Anxiety can cause insomnia and disrupt sleep patterns.', result)
+
+        expected_answer = "Anxiety can cause insomnia and disrupt sleep patterns."
+        self.assertEqual(expected_answer, result)
+
+        # Check that the last raw results are stored correctly
+        self.assertEqual(1, len(self.retriever._last_raw_results))
+        self.assertEqual("How does anxiety affect sleep?", self.retriever._last_raw_results[0]["question"])
+        self.assertEqual("Anxiety can cause insomnia and disrupt sleep patterns.", self.retriever._last_raw_results[0]["answer"])
 
 
 # === PYTEST-STYLE TESTS FOR ASSOCIATIVE MEMORY CLASS ===

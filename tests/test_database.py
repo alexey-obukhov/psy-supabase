@@ -20,6 +20,13 @@ import pytest
 import json
 from unittest.mock import Mock, patch, ANY
 
+# Import the new module instead of using DatabaseManager methods directly
+from psy_supabase.utilities.vector_utils import (
+    optimize_vector_operations,
+    ensure_vector_indexes,
+    update_table_statistics
+)
+
 # Test data constants
 from tests.conftest import TEST_USER_ID, TEST_SCHEMA, TEST_SESSION_ID, TEST_URL, TEST_KEY, SAMPLE_SIMILAR_DOCUMENTS
 
@@ -86,7 +93,7 @@ class TestDatabaseManager:
         # Verify the right functions were called
         assert 'get_schema_exists' in function_calls
         assert 'create_user_schema_and_tables' in function_calls
-        assert 'optimize_vector_queries' in function_calls
+        assert 'verify_schema_structure' in function_calls
 
     def test_create_user_schema_error(self, db_manager):
         """Test handling of errors when creating a schema."""
@@ -1106,6 +1113,7 @@ class TestDatabaseManager:
         assert len(result) == 2
         assert result[0]['id'] == 1
         assert result[0]['similarity'] == 0.95
+        assert result[1]['id'] == 2
         assert result[1]['content'] == 'Document 2'
 
         # Verify SQL was called with vector query
@@ -1118,7 +1126,8 @@ class TestDatabaseManager:
         sql = db_manager.supabase.rpc.call_args[0][1]['command']
 
         # Verify embedding was in the SQL
-        assert str(embedding).replace(' ', '') in sql
+        embedding_str = str(embedding)
+        assert embedding_str in sql
 
         # Check for the individual components instead of the exact string format
         assert 'ORDER BY' in sql
@@ -1155,3 +1164,58 @@ class TestDatabaseManager:
                 # Verify vector index creation was attempted
                 assert db_manager.supabase.rpc.call_args_list[-1][0][0] == 'sql' or \
                     db_manager.supabase.rpc.call_args_list[-1][0][0] == 'ensure_vector_indexes'
+
+    def test_optimize_vector_operations(self, db_manager):
+        """Test optimization of vector operations."""
+        # Mock response for the optimize_vectors function
+        mock_response = {
+            'column_added': True,
+            'indexes_created': True,
+            'interactions_enriched': 5,
+            'statistics_updated': True
+        }
+
+        # Patch the imported optimize_vectors in database.py
+        # Note: The module imports it as optimize_vectors, not optimize_vector_operations
+        with patch('psy_supabase.core.database.optimize_vectors',
+                   return_value=mock_response) as mock_optimize:
+
+            # Call the method through database manager
+            result = db_manager.optimize_vector_operations()
+
+            # Verify the imported function was called with correct parameters
+            mock_optimize.assert_called_once_with(db_manager, db_manager.schema_name)
+
+            # Verify the result was passed through correctly
+            assert result == mock_response
+            assert result['interactions_enriched'] == 5
+
+    def test_ensure_vector_indexes(self, db_manager):
+        """Test ensuring vector indexes exist."""
+        # Patch the imported ensure_vector_indexes in database.py
+        with patch('psy_supabase.core.database.ensure_vector_indexes',
+                   return_value=True) as mock_ensure:
+
+            # Call the method through database manager
+            result = db_manager.ensure_vector_indexes()
+
+            # Verify the imported function was called with correct parameters
+            mock_ensure.assert_called_once_with(db_manager, db_manager.schema_name)
+
+            # Verify the result was passed through
+            assert result is True
+
+    def test_update_table_statistics(self, db_manager):
+        """Test updating table statistics."""
+        # Patch the imported update_table_statistics in database.py
+        with patch('psy_supabase.core.database.update_table_statistics',
+                   return_value=True) as mock_update:
+
+            # Call the method through database manager
+            result = db_manager.update_table_statistics()
+
+            # Verify the imported function was called with correct parameters
+            mock_update.assert_called_once_with(db_manager, db_manager.schema_name)
+
+            # Verify the result was passed through
+            assert result is True

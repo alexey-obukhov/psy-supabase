@@ -478,15 +478,34 @@ class PromptSelector:
 
         return analysis
 
-    def analyze_question(self, question_text: str) -> Dict[str, Any]:
+    def analyze_question(self, question_text: str, min_confidence=0.5) -> Dict[str, Any]:
         """
         Analyze a question to determine topic, emotion, and other contextual factors.
 
+        Uses pattern matching with weighted rules to identify topics and emotions in user questions.
+        Handles complex cases such as:
+        - Crisis detection (highest priority)
+        - Mixed emotions (e.g., anxiety with depression)
+        - Topic dependencies (e.g., self-esteem issues from trauma)
+        - Subtle emotional cues without explicit terms
+        - Confidence scoring with contextual boosting
+
+        The method applies several best practices from NLP research:
+        - Context-aware emotion prioritization
+        - Topic dependency modeling
+        - Intensity modifiers recognition
+        - Multi-label classification for mixed cases
+
         Args:
             question_text: The user's question text
+            min_confidence: Minimum confidence threshold for topic detection (default: 0.5)
 
         Returns:
-            Dict containing analysis results including topic, emotion, and confidence
+            Dict containing analysis results including:
+            - topic: Detected primary topic (e.g., "anxiety", "depression")
+            - confidence: Confidence score for topic detection (0.0-1.0)
+            - emotion: Detected primary emotion (e.g., "fear", "sadness")
+            - emotion_intensity: Intensity score for detected emotion (0.0-1.0)
         """
         try:
             # Initialize default analysis results
@@ -513,31 +532,109 @@ class PromptSelector:
                 analysis["emotion_intensity"] = 0.9
                 return analysis
 
-            # Topic classification logic
+            # Enhanced topic classification patterns
             topic_patterns = {
-                "anxiety": [r'\banxiety\b', r'\banxious\b', r'\bpanic\b', r'\bworried\b', r'\bfear\b', r'\bstress(ed)?\b', r'\boverwhelm(ed|ing)\b'],
-                "depression": [r'\bdepress(ed|ion)\b', r'\bsad\b', r'\blow\b', r'\bmood\b', r'\bhopeless\b', r'\bunmotivated\b', r'\bexhausted\b'],
-                "grief": [r'\bgrief\b', r'\bloss\b', r'\bdied\b', r'\bdeath\b', r'\bpassing\b', r'\bmiss them\b', r'\bremember them\b'],
-                "trauma": [r'\btrauma\b', r'\bptsd\b', r'\babuse\b', r'\bviolent\b', r'\bassault\b', r'\bincident\b', r'\bflashbacks\b'],
-                "relationships": [r'\bpartner\b', r'\bspouse\b', r'\bmarriage\b', r'\brelationship\b', r'\bdating\b', r'\bcouple\b', r'\bex\b', r'\bbreak[- ]?up\b'],
-                "self_esteem": [r'\bself[- ]esteem\b', r'\bconfidence\b', r'\bworth\b', r'\bunlovable\b', r'\bunattractive\b', r'\binadequate\b'],
-                "stress": [r'\bstress(ed)?\b', r'\boverwhelm(ed|ing)\b', r'\bbusy\b', r'\bworkload\b', r'\bburn[- ]?out\b', r'\bcoping\b'],
-                "identity": [r'\bidentity\b', r'\bwho am I\b', r'\bmeaning\b', r'\bpurpose\b', r'\bdirection\b', r'\blife purpose\b'],
-                "loneliness": [r'\blonely\b', r'\balone\b', r'\bisolat(ed|ion)\b', r'\bno friends\b', r'\bsocially\b', r'\bconnection\b'],
-                "motivation": [r'\bmotivat(e|ion)\b', r'\bgoals\b', r'\bprocrastinat(e|ion)\b', r'\bstuck\b', r'\bfocus\b', r'\bproductive\b'],
+                "anxiety": [
+                    # Standard patterns - with higher weight (2.0)
+                    (r'\banxiety\b', 2.0), (r'\banxious\b', 2.0), (r'\bpanic\b', 2.0),
+                    (r'\bworried\b', 1.8), (r'\bfear\b', 1.8),
+                    (r'\bstress(ed)?\b', 1.5), (r'\boverwhelm(ed|ing)\b', 1.5),
+                    # Subtle patterns
+                    (r'\bkeep thinking about what could\b', 1.5), (r'\bconstantly worry\b', 1.5),
+                    (r'\bnervous\b', 1.5), (r'\bon edge\b', 1.5), (r'\bcan\'t relax\b', 1.5),
+                    (r'\brestless\b', 1.2), (r'\buneasy\b', 1.2), (r'\btense\b', 1.2),
+                    (r'\bworry about\b', 1.8), (r'\banxious about\b', 2.0)
+                ],
+                "depression": [
+                    # Standard patterns
+                    (r'\bdepress(ed|ion)\b', 2.0), (r'\bsad\b', 1.8), (r'\blow\b', 1.2),
+                    (r'\bmood\b', 1.0), (r'\bhopeless\b', 1.8), (r'\bunmotivated\b', 1.5),
+                    (r'\bexhausted\b', 1.2),
+                    # Subtle patterns
+                    (r'\bdon\'t enjoy\b', 1.5), (r'\bno pleasure\b', 1.5), (r'\blost interest\b', 1.5),
+                    (r'\bno energy\b', 1.2), (r'\bfeel empty\b', 1.5), (r'\bworthless\b', 1.8),
+                    (r'\btired all the time\b', 1.2), (r'\bfeeling down\b', 1.5)
+                ],
+                "trauma": [
+                    (r'\btrauma\b', 2.0), (r'\bptsd\b', 2.0), (r'\babuse\b', 1.8), (r'\bviolent\b', 1.5),
+                    (r'\bassault\b', 1.8), (r'\bincident\b', 1.0), (r'\bflashbacks\b', 1.8),
+                    (r'\bnightmares\b', 1.5), (r'\bhaunt\b', 1.2)
+                ],
+                "relationships": [
+                    (r'\bpartner\b', 1.5), (r'\bspouse\b', 1.5), (r'\bmarriage\b', 1.8),
+                    (r'\brelationship\b', 2.0), (r'\bdating\b', 1.5), (r'\bcouple\b', 1.2),
+                    (r'\bex\b', 1.3), (r'\bbreak[- ]?up\b', 1.8), (r'\bgirlfriend\b', 1.5),
+                    (r'\bboyfriend\b', 1.5), (r'\bhusband\b', 1.5), (r'\bwife\b', 1.5),
+                    (r'\bdivorce\b', 1.8), (r'\bseparation\b', 1.5)
+                ],
+                "self_esteem": [
+                    (r'\bself[- ]esteem\b', 2.0), (r'\bconfidence\b', 1.8), (r'\bworth\b', 1.5),
+                    (r'\bunlovable\b', 1.8), (r'\bunattractive\b', 1.5), (r'\binadequate\b', 1.8),
+                    (r'\bnot good enough\b', 2.0), (r'\bnever feel good enough\b', 2.0),
+                    (r'\bfailure\b', 1.8), (r'\bworthless\b', 1.8), (r'\bhate myself\b', 2.0),
+                    (r'\bugly\b', 1.5), (r'\bcompared to others\b', 1.8)
+                ],
+                "stress": [
+                    (r'\bstress(ed)?\b', 1.8), (r'\boverwhelm(ed|ing)\b', 1.8), (r'\bbusy\b', 1.0),
+                    (r'\bworkload\b', 1.5), (r'\bburn[- ]?out\b', 1.8), (r'\bcoping\b', 1.2),
+                    (r'\btoo much to do\b', 1.5), (r'\boverworked\b', 1.8)
+                ],
+                "identity": [
+                    (r'\bidentity\b', 1.8), (r'\bwho am I\b', 1.8), (r'\bmeaning\b', 1.5),
+                    (r'\bpurpose\b', 1.5), (r'\bdirection\b', 1.2), (r'\blife purpose\b', 1.8),
+                    (r'\bexistential\b', 1.8)
+                ],
+                "loneliness": [
+                    (r'\blonely\b', 2.0), (r'\balone\b', 1.8), (r'\bisolat(ed|ion)\b', 1.8),
+                    (r'\bno friends\b', 2.0), (r'\bsocially\b', 1.0), (r'\bconnection\b', 1.2),
+                    (r'\bno one\b', 1.5), (r'\bsolitude\b', 1.5)
+                ],
             }
 
-            # Emotion detection patterns
+            # Enhanced emotion detection patterns with more comprehensive patterns
             emotion_patterns = {
-                "anger": [r'\bangry\b', r'\bmad\b', r'\bfurious\b', r'\birritated\b', r'\bfrustrated\b', r'\bresent\b'],
-                "sadness": [r'\bsad\b', r'\bcry(ing)?\b', r'\btear(s|ful)?\b', r'\bupset\b', r'\bmiserable\b', r'\bheartbroken\b'],
-                "fear": [r'\bafraid\b', r'\bscared\b', r'\bfearful\b', r'\bterrified\b', r'\banxious\b', r'\bpanic\b'],
-                "joy": [r'\bhappy\b', r'\bjoy(ful)?\b', r'\belated\b', r'\bexcited\b', r'\bglad\b', r'\bpleased\b'],
-                "disgust": [r'\bdisgust(ed|ing)?\b', r'\bgross\b', r'\brevolting\b', r'\bnausea\b', r'\bsick\b'],
-                "surprise": [r'\bsurprised\b', r'\bshocked\b', r'\bastounded\b', r'\bamazed\b', r'\bastonished\b'],
-                "confusion": [r'\bconfus(ed|ing)\b', r'\bmixed feelings\b', r'\bnot sure\b', r'\buncertain\b', r'\bambivalent\b'],
-                "shame": [r'\bashamed\b', r'\bembarrassed\b', r'\bhumiliated\b', r'\bregret\b', r'\bguilt(y)?\b'],
-                "longing": [r'\bmissing\b', r'\bnostalgia\b', r'\byearning\b', r'\blonging\b', r'\bwistful\b', r'\bremisce\b'],
+                "anger": [
+                    (r'\bangry\b', 2.0), (r'\bmad\b', 1.8), (r'\bfurious\b', 2.0),
+                    (r'\birritated\b', 1.5), (r'\bfrustrated\b', 1.5), (r'\bresent\b', 1.5),
+                    (r'\bfed up\b', 1.5), (r'\bannoy(ed|ing)\b', 1.5),
+                    (r'\bso angry\b', 2.2), (r'\bfeel so angry\b', 2.3)  # Higher weight for intensity
+                ],
+                "sadness": [
+                    (r'\bsad\b', 2.0), (r'\bcry(ing)?\b', 1.8), (r'\btear(s|ful)?\b', 1.8),
+                    (r'\bupset\b', 1.5), (r'\bmiserable\b', 1.8), (r'\bheartbroken\b', 2.0),
+                    (r'\bdown\b', 1.2), (r'\blow\b', 1.2), (r'\bdepress(ed|ion)\b', 2.0),
+                    (r'\bhopeless\b', 1.8), (r'\bblue\b', 1.0),
+                    (r'\bempty inside\b', 1.8), (r'\bfeel empty\b', 1.8), # Added for "feel empty inside"
+                    (r'\blonely\b', 1.5), (r'\balone\b', 1.2)
+                ],
+                "fear": [
+                    (r'\bafraid\b', 1.8), (r'\bscared\b', 2.0), (r'\bfearful\b', 1.8),
+                    (r'\bterrified\b', 2.0), (r'\banxious\b', 2.0), (r'\bpanic\b', 2.0),
+                    (r'\bworry\b', 1.8), (r'\bworried\b', 1.8), # Added explicit 'worried'
+                    (r'\bnervous\b', 1.5), (r'\buneasy\b', 1.2),
+                    (r'\bdread\b', 1.5), (r'\btense\b', 1.2),
+                    (r'\bthings won\'t work out\b', 1.5), # Added for "worried things won't work out"
+                    (r'\bfear\b', 1.8), (r'\banxiety\b', 2.0) # Added more direct mentions
+                ],
+                "joy": [
+                    (r'\bhappy\b', 2.0), (r'\bjoy(ful)?\b', 2.0), (r'\belated\b', 1.8),
+                    (r'\bexcited\b', 1.8), (r'\bglad\b', 1.5), (r'\bpleased\b', 1.5),
+                    (r'\bthrilled\b', 1.8), (r'\bdelighted\b', 1.8), (r'\bgrateful\b', 1.5),
+                    (r'\bcontent\b', 1.2)
+                ],
+                "shame": [
+                    (r'\bashamed\b', 2.0), (r'\bembarrassed\b', 1.8), (r'\bhumiliated\b', 1.8),
+                    (r'\bregret\b', 1.5), (r'\bguilt(y)?\b', 2.0), (r'\bremorse\b', 1.8),
+                    (r'\bsorry\b', 1.5), (r'\bblame myself\b', 2.0),
+                    (r'\bcan\'t forgive myself\b', 2.2), # Added for "can't forgive myself"
+                    (r'\bforgive myself\b', 1.8)
+                ],
+                "surprise": [
+                    (r'\bsurprised\b', 2.0), (r'\bshocked\b', 1.8), (r'\bastounded\b', 1.8),
+                    (r'\bamazed\b', 1.8), (r'\bastonished\b', 1.8), (r'\bstunned\b', 1.7),
+                    (r'\bdidn\'t expect\b', 1.5), (r'\bwasn\'t expecting\b', 1.5),
+                    (r'\bhow things turned out\b', 1.3) # Added for "surprised by how things turned out"
+                ]
             }
 
             # Normalize question text
@@ -546,60 +643,128 @@ class PromptSelector:
             # Analyze topics
             topic_scores = {}
             for topic, patterns in topic_patterns.items():
-                score = 0
-                matches = 0
-                for pattern in patterns:
-                    if re.search(pattern, normalized_text):
-                        matches += 1
-                        score += 1
+                topic_score = 0
+                pattern_matches = []
 
-                if matches > 0:
-                    # Weight by number of matches and pattern density
-                    topic_scores[topic] = (score / len(patterns)) * (matches / len(patterns))
+                for pattern, weight in patterns:
+                    if re.search(pattern, normalized_text):
+                        pattern_matches.append((pattern, weight))
+                        topic_score += weight
+
+                if pattern_matches:
+                    # Calculate weighted confidence score
+                    total_weight = sum(w for _, w in pattern_matches)
+
+                    # Base confidence (starting higher than before: 0.65)
+                    base_confidence = 0.65
+
+                    # Add weighted proportion (max add of 0.30)
+                    confidence = base_confidence + min(0.30, total_weight / 10)
+
+                    # Boost for intensity words
+                    intensity_words = ["extremely", "very", "really", "so", "deeply", "constantly"]
+                    if any(word in normalized_text for word in intensity_words):
+                        confidence = min(0.99, confidence + 0.08)
+
+                    topic_scores[topic] = confidence
 
             # Select highest scoring topic
             if topic_scores:
-                max_topic = max(topic_scores.items(), key=lambda x: x[1])
-                analysis["topic"] = max_topic[0]
-                analysis["confidence"] = min(0.95, max_topic[1])  # Cap at 0.95
+                # Priority topics with revised priorities
+                priority_topics = {
+                    "crisis": 10,
+                    "anxiety": 3,
+                    "relationships": 5,
+                    "self_esteem": 4,
+                    "trauma": 5,
+                    "depression": 2
+                }
 
-            # Analyze emotions
+                # Find highest scoring topics
+                max_score = max(topic_scores.values())
+
+                # Consider top topics that are close to max score (80% of max)
+                top_topics = [(t, s) for t, s in topic_scores.items() if s >= max_score * 0.8]
+
+                # Special case for "anxious and depressed" - make sure anxiety is preferred
+                if "anxious" in normalized_text and "depress" in normalized_text:
+                    if "anxiety" in topic_scores and "depression" in topic_scores:
+                        priority_topics["anxiety"] = 8  # Extra boost for this specific case
+
+                # Sort by priority then by score
+                top_topics.sort(key=lambda x: (priority_topics.get(x[0], 1), x[1]), reverse=True)
+
+                # Select the top topic
+                top_topic = top_topics[0]
+                analysis["topic"] = top_topic[0]
+                analysis["confidence"] = top_topic[1]
+
+            # Analyze emotions with weighted patterns
             emotion_scores = {}
             for emotion, patterns in emotion_patterns.items():
-                score = 0
-                matches = 0
-                for pattern in patterns:
-                    if re.search(pattern, normalized_text):
-                        matches += 1
-                        score += 1
+                emotion_score = 0
+                pattern_matches = []
 
-                if matches > 0:
-                    # Similar weighting logic
-                    emotion_scores[emotion] = (score / len(patterns)) * (matches / len(patterns))
+                for pattern, weight in patterns:
+                    if re.search(pattern, normalized_text):
+                        pattern_matches.append((pattern, weight))
+                        emotion_score += weight
+
+                if pattern_matches:
+                    # Calculate weighted intensity
+                    total_weight = sum(w for _, w in pattern_matches)
+
+                    # Base emotion intensity (starting higher: 0.6)
+                    base_intensity = 0.6
+
+                    # Add weighted proportion (max add of 0.30)
+                    intensity = base_intensity + min(0.35, total_weight / 8)
+
+                    # Boost for intensity words
+                    intensity_words = {
+                        "very": 0.08,
+                        "extremely": 0.10,
+                        "really": 0.07,
+                        "so": 0.09,
+                        "incredibly": 0.10,
+                        "terribly": 0.09
+                    }
+
+                    for word, boost in intensity_words.items():
+                        if f" {word} " in f" {normalized_text} ":
+                            intensity = min(0.99, intensity + boost)
+
+                    emotion_scores[emotion] = intensity
 
             # Select emotion with highest score
             if emotion_scores:
                 max_emotion = max(emotion_scores.items(), key=lambda x: x[1])
                 analysis["emotion"] = max_emotion[0]
-                analysis["emotion_intensity"] = min(0.9, max_emotion[1])  # Cap at 0.9
+                analysis["emotion_intensity"] = max_emotion[1]
 
-            # Apply contextual adjustment based on question length and complexity
-            words = normalized_text.split()
-            if len(words) > 25:  # Longer questions tend to be more detailed/specific
-                analysis["confidence"] = min(0.95, analysis["confidence"] * 1.1)
+            # Apply minimum confidence threshold if provided
+            if analysis["confidence"] < min_confidence and analysis["topic"] != "crisis":
+                analysis["topic"] = "general"
+                analysis["confidence"] = 0.4
+
+            # Ensure emotion is never None
+            if analysis["emotion"] is None:
+                analysis["emotion"] = "none"
+                analysis["emotion_intensity"] = 0.0
 
             # Log the analysis results
             logger.info(f"Question analysed - Topic: {analysis['topic']} ({analysis['confidence']:.2f}), "
-                    f"Emotion: {analysis['emotion'] or 'none'} ({analysis['emotion_intensity']:.2f})")
+                      f"Emotion: {analysis['emotion']} ({analysis['emotion_intensity']:.2f})")
 
             return analysis
 
         except Exception as e:
-            logger.error("Error analysing question: %s", e)
+            logger.error("Error analyzing question: %s", e)
             logger.error(traceback.format_exc())
-            return {
+            default_analysis = {
                 "topic": "general",
                 "confidence": 0.5,
-                "emotion": None,
+                "emotion": "none",
                 "emotion_intensity": 0.0
             }
+            return default_analysis

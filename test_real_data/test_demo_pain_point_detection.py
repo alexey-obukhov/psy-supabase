@@ -63,7 +63,7 @@ class PainPointDemo:
         import uuid
         self.user_id = f"demo_user_{uuid.uuid4().hex[:8]}"
         logger.info("Using demo user ID: %s", self.user_id)
-        self.session_id = f"demo_session"
+        self.session_id = "demo_session"
 
         # Define mock responses for all methods to use
         self.mock_responses = [
@@ -157,30 +157,6 @@ class PainPointDemo:
             if not table_exists:
                 logger.error("Table interactions does not exist in schema %s!", self.db_manager.schema_name)
 
-                # Try creating the tables again
-                logger.info("Attempting to create tables again...")
-                create_tables_query = f"""
-                CREATE TABLE IF NOT EXISTS "{self.db_manager.schema_name}"."interactions" (
-                  interactionid SERIAL PRIMARY KEY,
-                  question TEXT,
-                  answer TEXT,
-                  context TEXT,
-                  metadata JSONB,
-                  session_id TEXT,
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                );
-
-                CREATE TABLE IF NOT EXISTS "{self.db_manager.schema_name}"."interaction_embeddings" (
-                  id SERIAL PRIMARY KEY,
-                  interaction_id INTEGER REFERENCES "{self.db_manager.schema_name}"."interactions"(interactionid),
-                  embedding VECTOR(384),
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                );
-                """
-
-                self.db_manager.supabase.rpc('sql', {'command': create_tables_query}).execute()
-                logger.info("Tables created manually")
-
         except Exception as e:
             logger.error("Error verifying schema: %s", e)
             import traceback
@@ -252,7 +228,7 @@ class PainPointDemo:
                     '{metadata_json}'::jsonb,
                     '{session_id}'
                 )
-                RETURNING interactionid;
+                RETURNING interaction_id;
                 """
 
                 # Execute the SQL
@@ -317,15 +293,15 @@ class PainPointDemo:
             ORDER BY created_at;
             """
 
-            response = self.db_manager.supabase.rpc('sql', {'command': query}).execute()
-            #response = self.db_manager.get_conversation_history(session_id)
-            if response.data:
-                found_count = len(response.data)
+            # response = self.db_manager.supabase.rpc('sql', {'command': query}).execute()
+            conversations_list = self.db_manager.get_conversation_history(session_id)
+            if conversations_list:
+                found_count = len(conversations_list)
                 logger.info("Found %d interactions in the database for session %s", found_count, session_id)
 
                 # Process each question to detect pain points
                 all_questions = []
-                for i, item in enumerate(response.data):
+                for i, item in enumerate(conversations_list):
                     if isinstance(item, dict):
                         question = item.get('question', '')
                         if question:
@@ -483,11 +459,10 @@ class PainPointDemo:
 
         # Drop the test schema using direct SQL since drop_user_schema doesn't exist
         try:
-            pass
             drop_query = f"""
             DROP SCHEMA IF EXISTS "{self.db_manager.schema_name}" CASCADE;
             """
-            self.db_manager.supabase.rpc('sql', {'command': drop_query}).execute()
+            # self.db_manager.supabase.rpc('sql', {'command': drop_query}).execute()
             logger.info("Dropped schema %s", self.db_manager.schema_name)
         except Exception as e:
             logger.error("Error dropping schema: %s", e)

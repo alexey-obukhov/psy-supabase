@@ -3,7 +3,6 @@ def test_mock_exact_responses():
     from unittest.mock import patch, MagicMock
     from psy_supabase.core.text_generator import TextGenerator
 
-    # Fix: Pass required arguments to TextGenerator constructor
     text_gen = MagicMock(spec=TextGenerator)
 
     test_cases = [

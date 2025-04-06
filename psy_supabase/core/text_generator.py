@@ -204,7 +204,28 @@ class TextGenerator:
             Exception: If model loading fails due to memory constraints or invalid model
         """
         try:
+            # Check GPU memory before loading - only if using CUDA
+            if self.device == "cuda" and torch.cuda.is_available():
+                try:
+                    # Get total and free memory
+                    total_memory = torch.cuda.get_device_properties(0).total_memory
+                    total_memory_gb = total_memory / (1024**3)  # Convert to GB
+                    allocated_memory = torch.cuda.memory_allocated(0)
+                    free_memory = total_memory - allocated_memory
+                    free_memory_gb = free_memory / (1024**3)  # Convert to GB
+
+                    # Only fall back to CPU if:
+                    # Free memory is extremely low (less than 1GB)
+                    if free_memory_gb < 1.0:
+                        logger.warning(f"Insufficient GPU memory ({free_memory_gb:.2f}GB free of {total_memory_gb:.2f}GB). Falling back to CPU.")
+                        self.device = "cpu"
+                    else:
+                        logger.info(f"GPU memory check passed: {free_memory_gb:.2f}GB free of {total_memory_gb:.2f}GB total")
+                except Exception as e:
+                    logger.warning(f"Error checking GPU memory: {e}. Continuing with requested device: {self.device}")
+
             logger.info("Loading model: %s", self.model_name)
+
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
             # Set the pad token if not defined
@@ -358,7 +379,6 @@ class TextGenerator:
 
                 # Check if input fits on device
                 try:
-                    # CRITICAL FIX: Modified params for phi-1.5 to avoid templating issues
                     output = self.model.generate(
                         input_ids,
                         max_new_tokens=max_new_tokens,
@@ -476,7 +496,7 @@ class TextGenerator:
             # Numbered learning sections
             r"\d+\.\d+", r"\d+ \d+ \d+ \d+ \d+",
             # Section headers
-            r"what is [a-z\s]+\?", r"understanding [a-z\s]+",
+            r"what is [a-z\s]+\?",
             # Exercise patterns
             r"exercise \d+:", r"exercise:", r"answer:",
             # Q&A formats

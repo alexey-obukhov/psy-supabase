@@ -343,7 +343,6 @@ def setup_text_generator_for_testing(text_generator):
     # Replace the generate_text method
     text_generator.generate_text = flexible_generate_text
 
-    # Fix emotion analysis to handle iteration
     mock_selector = MagicMock()
 
     # Make analyze_question return a dict that can be iterated

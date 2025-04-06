@@ -210,10 +210,6 @@ class PainPointDetectionTester:
         # Ensure vector indexes for proper pgvector functionality
         self.db_manager.ensure_vector_indexes(self.test_session_id)
 
-        result = self.db_manager.supabase.rpc('add_session_id_column', {
-            'p_schema_name': self.db_manager.schema_name
-        }).execute()
-
         logger.info("Test environment setup complete")
 
     @typechecked

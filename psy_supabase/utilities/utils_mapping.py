@@ -1,6 +1,6 @@
 """
 Mapping Utilities
-================
+=================
 
 This module provides centralized mapping functions used across the psy_supabase package.
 It standardizes naming conventions between different parts of the system:

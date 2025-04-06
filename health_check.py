@@ -44,6 +44,14 @@ def main():
 
         logger.info("Testing RAG processor with sample question...")
         test_question = "How can I manage everyday anxiety?"
+
+        # Use the proper method to generate embeddings
+        from psy_supabase.core.model_manager import get_embedding_provider
+        embedding_provider = get_embedding_provider()
+        test_embedding = embedding_provider.generate_embedding(test_question)
+        logger.info(f"Generated test embedding with length {len(test_embedding)}")
+
+        # Then use generate_response with a session ID that clearly identifies it as a session
         response = processor.generate_response(test_question, session_id="health_check")
 
         logger.info(f"Sample response: {response[:100]}...")

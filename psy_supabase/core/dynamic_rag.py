@@ -42,24 +42,32 @@ if TYPE_CHECKING:
 logger = ColoredLogger(__name__)
 
 class DynamicRAGRetriever:
-    """
-    Enhanced RAG retriever with associative memory capabilities.
-    Retrieves knowledge and automatically makes connections between related concepts.
-    """
+    """Dynamic RAG retriever that selects context sources based on query and user history."""
 
-    def __init__(self, db_manager: 'DatabaseManager', session_id: str, allow_dynamic_queries: bool = True):
+    def __init__(self, db_manager, session_id=None, embedding_provider=None,
+                persona=None, query_mode=None, **kwargs):
         """
-        Initialize the dynamic retriever with database connection and session info.
+        Initialize the dynamic RAG retriever.
 
         Args:
-            db_manager: Instance of DatabaseManager for database access
-            session_id: Current user session ID
-            allow_dynamic_queries: Whether to allow dynamic queries (can be disabled for testing)
+            db_manager: Database manager instance
+            session_id: Optional session ID for context filtering
+            embedding_provider: Optional custom embedding provider
+            persona: Optional persona to use for context retrieval
+            query_mode: Optional query mode (e.g., 'semantic', 'hybrid')
+            **kwargs: Additional parameters (to capture unexpected params)
         """
         self.db_manager = db_manager
         self.session_id = session_id
-        self.allow_dynamic_queries = allow_dynamic_queries
-        self.query_cache = {}  # Cache to avoid repeated identical queries
+        self.embedding_provider = embedding_provider  # Use default if None
+        self.persona = persona
+        self.query_mode = query_mode
+
+        # Store other parameters that might be needed later
+        self.options = kwargs
+
+        self.query_cache = {}
+        self._last_raw_results = []
 
         # Initialize associative memory component for enhanced retrieval
         self.associative_memory = AssociativeMemory()
@@ -144,19 +152,19 @@ class DynamicRAGRetriever:
     def get_knowledge_by_query(self, query: str, associative_memory: bool = False,
                               min_similarity: float = 0.1, **kwargs) -> str:
         """
-        Get knowledge relevant to a query.
+        Get knowledge relevant to a query using vector similarity search.
 
         Args:
-            query: The search query
-            associative_memory: Whether to use associative memory for retrieval
-            min_similarity: Minimum similarity threshold
-            **kwargs: Additional arguments like session_id, limit, etc.
+            query: The text query to search for relevant knowledge
+            associative_memory: Whether to use associative memory for enhanced retrieval
+            min_similarity: Minimum similarity threshold for results
+            **kwargs: Additional parameters like session_id and limit
 
         Returns:
-            String with retrieved knowledge
+            String containing relevant knowledge from the database
         """
         try:
-            session_id = kwargs.get('session_id')
+            session_id = kwargs.get('session_id', self.session_id)
             limit = kwargs.get('limit', 5)
 
             # Create cache key
@@ -164,12 +172,12 @@ class DynamicRAGRetriever:
             if cache_key in self.query_cache:
                 return self.query_cache[cache_key]
 
-            # Generate embedding for query
+            # Generate embedding
             query_embedding = self.db_manager.create_embedding(query)
             if not query_embedding:
                 return "Failed to generate embedding for query"
 
-            # Find similar interactions
+            # Search for similar interactions
             similar = self.db_manager.find_similar_interactions_by_embedding(
                 embedding=query_embedding,
                 session_id=session_id,
@@ -182,16 +190,29 @@ class DynamicRAGRetriever:
 
             # Process results
             result_parts = []
+
+            # Store raw results for testing and internal use
+            self._last_raw_results = []
+
             for interaction in similar:
                 question = interaction.get('question', '')
                 answer = interaction.get('answer', '')
                 similarity = interaction.get('similarity', 0)
 
-                if question and answer:
-                    result_parts.append(f"Q: {question}\nA: {answer}\n[Similarity: {similarity:.2f}]")
+                if answer:
+                    # Just add the answer text (cleaner for user display)
+                    result_parts.append(answer)
 
-            # Combine results
-            combined_results = "\n".join(result_parts)
+                    # Store the full interaction with debug info
+                    self._last_raw_results.append({
+                        'question': question,
+                        'answer': answer,
+                        'similarity': similarity,
+                        'interaction_id': interaction.get('interaction_id', '')
+                    })
+
+            # Combine results for user display
+            combined_results = "\n\n".join(result_parts)
 
             # Cache the result
             self.query_cache[cache_key] = combined_results
@@ -199,8 +220,8 @@ class DynamicRAGRetriever:
             return combined_results
 
         except Exception as e:
-            logger.error("Error in get_knowledge_by_query: %s", e)
             import traceback
+            logger.error("Error in get_knowledge_by_query: %s", e)
             logger.error(traceback.format_exc())
             return f"Error retrieving knowledge: {str(e)}"
 

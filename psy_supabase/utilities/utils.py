@@ -96,6 +96,81 @@ def tokenize_and_lemmatize(text: str,
             logger.error("Error in tokenize_and_lemmatize: %s\n%s", str(e), traceback.format_exc())
         return text
 
+def debug_errors(logger=None):
+    """
+    Decorator to debug errors in methods with detailed information.
+
+    This enhanced decorator captures rich debugging information when exceptions occur,
+    including argument types, values, and detailed stack traces. It's designed to
+    help diagnose complex issues like the "'list' object has no attribute 'get'" error.
+
+    Args:
+        logger: Optional logger instance. If None, will use a default logger.
+
+    Returns:
+        Decorator function that wraps methods for detailed error reporting
+
+    Example:
+        @debug_errors(logger=my_logger)
+        def analyze_emotional_response_to_interaction(self, interaction_data):
+            # Method implementation
+    """
+    # Get a default logger if none provided
+    if logger is None:
+        from school_logging.log import ColoredLogger
+        logger = ColoredLogger("ErrorDebug")
+
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                import inspect
+                import traceback
+
+                # Get more information about the arguments
+                arg_info = []
+                for i, arg in enumerate(args):
+                    if i == 0:  # Skip 'self'
+                        continue
+                    arg_info.append(f"Arg {i}: {type(arg).__name__}")
+                    # Print detailed info for lists and dicts
+                    if isinstance(arg, list):
+                        arg_info.append(f"  List length: {len(arg)}")
+                        if arg:
+                            arg_info.append(f"  First element type: {type(arg[0]).__name__}")
+                            if isinstance(arg[0], dict):
+                                arg_info.append(f"  Keys: {list(arg[0].keys())}")
+                    elif isinstance(arg, dict):
+                        arg_info.append(f"  Dict keys: {list(arg.keys())}")
+
+                # Get source code around the error
+                frame = inspect.currentframe()
+                frames = inspect.getouterframes(frame)
+                error_line = None
+                error_code = None
+
+                for f in frames:
+                    if f.filename == inspect.getfile(func.__code__):
+                        error_line = f.lineno
+                        try:
+                            lines, _ = inspect.getsourcelines(f.frame)
+                            error_code = "".join(lines[:5])  # First 5 lines
+                        except:
+                            error_code = "Could not retrieve source"
+                        break
+
+                # Log detailed error information
+                logger.error(f"Error in {func.__name__} at line {error_line}: {str(e)}")
+                logger.error(f"Arguments: {', '.join(arg_info)}")
+                logger.error(f"Code context: \n{error_code}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+
+                # Re-raise the exception
+                raise
+        return wrapper
+    return decorator
+
 def cleanup_memory():
     """Clean up GPU memory."""
     import torch

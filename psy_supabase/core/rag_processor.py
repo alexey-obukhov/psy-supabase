@@ -148,7 +148,7 @@ class RAGProcessor:
     def generate_response(self,
                           user_question: str,
                           session_id: str = "default_session",
-                          device: Optional[str] = None,
+                          device: Optional[str] = 'cuda',
                           question_id: Optional[int] = None
                           ) -> str:
         """
@@ -1051,7 +1051,7 @@ class RAGProcessor:
             return []
 
     @typechecked
-    def detect_pain_points_from_embedding(self, user_question, embedding, session_id, metadata=None):
+    def detect_pain_points_from_embedding(self, user_question: str, embedding: List[float], session_id: str, metadata: Optional[dict] = None):
         """Detect potential pain points from question embedding with proper error handling."""
         # Default response structure with ALL required keys
         default_response = {
@@ -1066,8 +1066,9 @@ class RAGProcessor:
             # Get pain point from DB
             pain_point = self.db_manager.identify_potential_pain_points(
                 question_text=user_question,
+                question_embedding=embedding,
                 session_id=session_id,
-                question_embedding=embedding
+                pain_threshold=0.85
             )
 
             # If pain_point is None, return default with safe values
@@ -1189,3 +1190,31 @@ class RAGProcessor:
             )
         except Exception as e:
             logger.error("Error logging pain point detection: %s", e)
+
+    def create_dynamic_retriever(self, session_id=None, rag_options=None):
+        """
+        Create a DynamicRAGRetriever with compatible parameters.
+
+        Args:
+            session_id: Session ID for context filtering
+            rag_options: Additional RAG options
+
+        Returns:
+            An instance of DynamicRAGRetriever
+        """
+        options = rag_options or {}
+
+        # Only pass parameters that the class accepts
+        valid_params = {
+            'db_manager': self.db_manager,
+            'session_id': session_id,
+            'persona': options.get('persona'),
+            'query_mode': options.get('query_mode'),
+            'embedding_provider': options.get('embedding_provider')
+        }
+
+        # Filter out None values
+        valid_params = {k: v for k, v in valid_params.items() if v is not None}
+
+        # Create and return the retriever
+        return DynamicRAGRetriever(**valid_params)

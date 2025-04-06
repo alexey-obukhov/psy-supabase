@@ -228,7 +228,7 @@ class TestTextGenerator:
         """Test that conversation history is integrated in responses."""
         from unittest.mock import patch, MagicMock
 
-        # Fix: Create a text_generator instance if it doesn't exist
+        # Create a text_generator instance if it doesn't exist
         if not hasattr(self, 'text_generator') or self.text_generator is None:
             from psy_supabase.core.text_generator import TextGenerator
             self.text_generator = MagicMock(spec=TextGenerator)
@@ -285,7 +285,7 @@ class TestTextGenerator:
         """Test error handling in emotion detection."""
         from unittest.mock import patch, MagicMock
 
-        # Fix: Create a text_generator instance if it doesn't exist
+        # Create a text_generator instance if it doesn't exist
         if not hasattr(self, 'text_generator') or self.text_generator is None:
             from psy_supabase.core.text_generator import TextGenerator
             self.text_generator = MagicMock(spec=TextGenerator)

@@ -94,7 +94,7 @@ def main():
     ('Debug context', 'Debug question?', 'Debug answer',
      '{{"topic": "debug", "session_id": "{test_session_id}"}}',
      '{test_session_id}')
-    RETURNING "interactionID";
+    RETURNING "interaction_id";
     """
 
     try:
@@ -103,8 +103,6 @@ def main():
     except Exception as e:
         logger.info(f"Insert response: {str(e)}")
 
-        # Try with lowercase interactionid
-        insert_query = insert_query.replace('"interactionID"', '"interactionid"')
         try:
             insert_response = db_manager.supabase.rpc('sql', {'command': insert_query}).execute()
             logger.info(f"Insert with lowercase: {insert_response.data}")

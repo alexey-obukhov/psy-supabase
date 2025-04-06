@@ -70,11 +70,13 @@ from typeguard import typechecked
 from datetime import datetime
 
 from school_logging.log import ColoredLogger
-from psy_supabase.utilities.utils import clean_text
+from psy_supabase.utilities.utils import clean_text, debug_errors
 from psy_supabase.utilities.embedding_utils import detect_repetition_pattern
 from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.utilities.embedding_utils import format_embedding_for_db
 from psy_supabase.utilities.utils_mapping import map_theme_to_approach_type, map_approach_name
+from psy_supabase.utilities.vector_utils import optimize_vector_operations as optimize_vectors
+from psy_supabase.utilities.vector_utils import ensure_vector_indexes, update_table_statistics
 
 # Set up logging
 logger = ColoredLogger(__name__)
@@ -120,7 +122,8 @@ class DatabaseManager:
             logger.error(traceback.format_exc())
             return False
 
-    def get_conversation_history(self, session_id: str) -> List[Dict]:
+    @typechecked
+    def get_conversation_history(self, session_id: Optional[str] = None) -> List[Dict]:
         """
         Retrieve conversation history for a specific session.
 
@@ -135,15 +138,20 @@ class DatabaseManager:
                 logger.warning("No session_id provided to get_conversation_history")
                 return []
 
+            if not self.schema_name:
+                logger.error("Schema name is not set")
+                return []
+
             # Log for debugging
             logger.debug("Retrieving conversation history for session: %s", session_id)
 
+            # Check if schema exists
             response = self.supabase.rpc(
                 'get_conversation_history',
                 {'p_schema_name': self.schema_name, 'p_session_id': session_id}
             ).execute()
-            if response.data is None:
-                logger.error("No data returned from get_conversation_history")
+            if bool(response.data) and all(v is None for v in response.data[0].values()):
+                logger.debug("No data returned from get_conversation_history")
                 return []
             # Process the results - handle different response formats
             result = []
@@ -329,25 +337,6 @@ class DatabaseManager:
                 error_message = response.error if response.error else "Schema creation failed"
                 logger.error("Error creating schema for user %s: %s", self.user_id, error_message)
                 return False
-
-            # Now optimize vector queries - try both function names to handle inconsistency
-            try:
-                p_response = self.supabase.rpc('optimize_vector_queries', {'p_schema_name': self.schema_name}).execute()
-                if p_response.data is None or p_response.data is False:
-                    logger.warning("Vector optimization failed for schema %s", self.schema_name)
-                    # Try the alternate function name
-                    try:
-                        p_response = self.supabase.rpc('optimize_vector_indexes', {'p_schema_name': self.schema_name}).execute()
-                        if p_response.data:
-                            logger.info("Vector indexes optimized for schema %s", self.schema_name)
-                    except Exception as e2:
-                        # Just log this, don't fail the whole operation
-                        logger.debug("Alternate vector optimization also failed: %s", str(e2))
-                else:
-                    logger.info("Vector statistics optimized for schema %s", self.schema_name)
-            except Exception as e:
-                # Just log and continue - this is enhancement, not critical
-                logger.debug("Vector optimization attempt failed: %s", str(e))
 
             logger.info("Schema '%s' and tables created successfully.", self.schema_name)
 
@@ -655,7 +644,7 @@ class DatabaseManager:
                     # If session_id column exists, use it
                     query = f"""
                     SELECT
-                        i.interactionID as id,
+                        i.interaction_id as id,
                         i.question as content,
                         i.metadata,
                         1 - (ie.embedding <=> '{vector_str}'::vector) as similarity
@@ -664,7 +653,7 @@ class DatabaseManager:
                     JOIN
                         {schema_name}.interaction_embeddings ie
                     ON
-                        i.interactionID = ie.interaction_id
+                        i.interaction_id = ie.interaction_id
                     WHERE
                         1 - (ie.embedding <=> '{vector_str}'::vector) > {similarity_threshold}
                         AND i.session_id = '{session_id}'
@@ -676,7 +665,7 @@ class DatabaseManager:
                     # Fall back to metadata if no session_id column
                     query = f"""
                     SELECT
-                        i.interactionID as id,
+                        i.interaction_id as id,
                         i.question as content,
                         i.metadata,
                         1 - (ie.embedding <=> '{vector_str}'::vector) as similarity
@@ -685,7 +674,7 @@ class DatabaseManager:
                     JOIN
                         {schema_name}.interaction_embeddings ie
                     ON
-                        i.interactionID = ie.interaction_id
+                        i.interaction_id = ie.interaction_id
                     WHERE
                         1 - (ie.embedding <=> '{vector_str}'::vector) > {similarity_threshold}
                         AND i.metadata->>'session_id' = '{session_id}'
@@ -697,7 +686,7 @@ class DatabaseManager:
                 # If no session_id, search in all interactions
                 query = f"""
                 SELECT
-                    i.interactionID as id,
+                    i.interaction_id as id,
                     i.question as content,
                     i.metadata,
                     1 - (ie.embedding <=> '{vector_str}'::vector) as similarity
@@ -706,7 +695,7 @@ class DatabaseManager:
                 JOIN
                     {schema_name}.interaction_embeddings ie
                 ON
-                    i.interactionID = ie.interaction_id
+                    i.interaction_id = ie.interaction_id
                 WHERE
                     1 - (ie.embedding <=> '{vector_str}'::vector) > {similarity_threshold}
                 ORDER BY
@@ -1253,12 +1242,7 @@ class DatabaseManager:
             Boolean indicating success
         """
         try:
-            # Call the index creation function
-            response = self.supabase.rpc('ensure_vector_indexes', {
-                'p_schema_name': self.schema_name
-            }).execute()
-
-            return response.data is not None
+            return ensure_vector_indexes(self, self.schema_name)
         except Exception as e:
             logger.error("Error ensuring vector indexes: %s", e)
             return False
@@ -1278,9 +1262,14 @@ class DatabaseManager:
         try:
             # Format embedding for PostgreSQL - USING SQUARE BRACKETS for pgvector
             if isinstance(embedding, list):
-                vector_str = f"[{','.join(str(x) for x in embedding)}]"
+                # Use str(embedding) which preserves spaces after commas
+                vector_str = str(embedding)
+            elif hasattr(embedding, 'tolist'):
+                # Convert numpy array to list, then to string
+                vector_str = str(embedding.tolist())
             else:
-                vector_str = f"[{','.join(str(x) for x in embedding.tolist())}]"
+                # Already a string
+                vector_str = embedding
 
             # Call the function to add embedding
             response = self.supabase.rpc('add_embedding_to_interaction', {
@@ -1399,12 +1388,7 @@ class DatabaseManager:
             bool: Success status
         """
         try:
-            # Call the function to update table statistics
-            response = self.supabase.rpc('update_table_statistics', {
-                'p_schema_name': self.schema_name
-            }).execute()
-
-            return response.data is not None
+            return update_table_statistics(self, self.schema_name)
         except Exception as e:
             logger.error("Error updating table statistics: %s", e)
             return False
@@ -1424,24 +1408,8 @@ class DatabaseManager:
             dict: Status report of operations performed
         """
         try:
-            # Ensure embedding column exists
-            column_added = self.add_embedding_to_interactions(self.schema_name)
-
-            # Ensure vector indexes exist
-            indexes_created = self.ensure_vector_indexes(self.schema_name)
-
-            # Enrich interactions with embeddings
-            enriched_count = self.enrich_interactions_with_embeddings(self.schema_name)
-
-            # Update table statistics for query planner
-            stats_updated = self.update_table_statistics(self.schema_name)
-
-            return {
-                'column_added': column_added,
-                'indexes_created': indexes_created,
-                'interactions_enriched': enriched_count,
-                'statistics_updated': stats_updated
-            }
+            # Use the optimized vector utility function
+            return optimize_vectors(self, self.schema_name)
         except Exception as e:
             logger.error("Error optimizing vector operations: %s", e)
             return {
@@ -1591,7 +1559,7 @@ class DatabaseManager:
             query = f"""
             WITH question_interactions AS (
                 SELECT
-                    i.interactionID as interaction_id,
+                    i.interaction_id as interaction_id,
                     i.question,
                     ie.embedding
                 FROM
@@ -1599,7 +1567,7 @@ class DatabaseManager:
                 JOIN
                     {self.schema_name}.interaction_embeddings ie
                 ON
-                    i.interactionID = ie.interaction_id
+                    i.interaction_id = ie.interaction_id
                 WHERE
                     similarity(lower(i.question), '{normalized_question}') > {similarity_threshold}
                 ORDER BY
@@ -1667,8 +1635,14 @@ class DatabaseManager:
             logger.error(traceback.format_exc())
             return None
 
-    def find_similar_interactions_by_embedding(self, embedding: List[float], session_id: str = None,
-                                               limit: int = 5, threshold: float = 0.7) -> List[Dict]:
+    @typechecked
+    def find_similar_interactions_by_embedding(
+            self,
+            embedding: List[float],
+            session_id: Optional[str] = None,
+            limit: int = 5,
+            threshold: float = 0.7
+            ) -> List[Dict]:
         """
         Find interactions with similar embeddings using pgvector.
 
@@ -1682,16 +1656,10 @@ class DatabaseManager:
             List of similar interactions with similarity scores
         """
         try:
-            # Format embedding as PostgreSQL vector format
-            if isinstance(embedding, list):
-                vector_str = str(embedding).replace(' ', '')
-            else:
-                vector_str = str(embedding.tolist()).replace(' ', '')
-
             # Use direct SQL execution
             response = self.supabase.rpc('find_similar_interactions', {
                 'p_schema_name': self.schema_name,
-                'p_embedding': vector_str,
+                'p_embedding': embedding,
                 'p_session_id': session_id,
                 'p_threshold': threshold,
                 'p_limit': limit,
@@ -1736,16 +1704,29 @@ class DatabaseManager:
             logger.error(traceback.format_exc())
             return []
 
+    @debug_errors(logger=logger)
     def analyze_emotional_response_to_interaction(self, interaction_id: int, session_id: str) -> List[Dict]:
         """
-        Analyzes emotional responses to a specific interaction to understand its psychological impact.
+        Analyze emotional response in interactions with robust type handling.
+
+        Safely analyzes emotional content in user interactions, handling various input types
+        including lists, dictionaries, and custom objects. Implements defensive programming
+        techniques to prevent common errors like "'list' object has no attribute 'get'".
+
+        The method:
+        1. Performs type checking on input data
+        2. Handles both single interactions and lists of interactions
+        3. Safely extracts question and answer text using appropriate access methods
+        4. Delegates detailed emotion analysis to the prompt_selector
+        5. Provides graceful fallbacks and detailed error logging
 
         Args:
-            interaction_id: ID of the interaction to analyse
-            session_id: Session identifier
+            interaction_data: Data from the interaction (can be dict, list, or custom object)
 
         Returns:
-            List of emotional responses with metadata
+            Dict with emotional analysis containing:
+            - emotion: Detected emotion (string)
+            - intensity: Emotion intensity score (float 0.0-1.0)
         """
         try:
             # Get conversation history
@@ -1854,6 +1835,7 @@ class DatabaseManager:
             logger.error("Error getting therapeutic insights: %s", e)
             return []
 
+    @typechecked
     def identify_potential_pain_points(self,
                                        question_text: str,
                                        question_embedding: List[float],
@@ -1878,11 +1860,13 @@ class DatabaseManager:
             history = self.get_conversation_history(session_id)
 
             if not history:
-                logger.debug("No conversation history found for session %s", session_id)
-                return {}
+                return {
+                    'session_id': session_id,
+                    'error': 'No conversation history found'
+                }
 
-            # Skip if less than 3 interactions (not enough history to identify patterns)
-            if len(history) < 3:
+            # Skip if less than 2 interactions (not enough history to identify patterns)
+            if len(history) < 2:
                 logger.debug("Not enough history to identify pain points (%d interactions)", len(history))
                 return {}
 
@@ -2056,14 +2040,14 @@ class DatabaseManager:
             query = f"""
             INSERT INTO {self.schema_name}.interaction_embeddings (interaction_id, embedding)
             SELECT
-                i.interactionID,
+                i.interaction_id,
                 i.embedding
             FROM
                 {self.schema_name}.interactions i
             LEFT JOIN
                 {self.schema_name}.interaction_embeddings ie
             ON
-                i.interactionID = ie.interaction_id
+                i.interaction_id = ie.interaction_id
             WHERE
                 i.embedding IS NOT NULL
                 AND ie.interaction_id IS NULL
@@ -2135,7 +2119,7 @@ class DatabaseManager:
             if metadata is None:
                 metadata = {}
 
-            # CRITICAL FIX: Always add session_id to metadata explicitly
+            # Always add session_id to metadata explicitly
             if session_id is not None:
                 metadata['session_id'] = session_id
                 logger.info("Adding session_id to metadata: %s", session_id)
@@ -2181,7 +2165,7 @@ class DatabaseManager:
                     '{metadata_str}'::jsonb,
                     '{session_id}'
                 )
-                RETURNING "interactionID";
+                RETURNING "interaction_id";
                 """
 
                 try:
@@ -2298,20 +2282,43 @@ class DatabaseManager:
                 if not question.strip():
                     continue
 
+                # Get the vector for this question
+                primary_embedding = self.create_embedding(question)
+                if not primary_embedding:
+                    # Skip this question if embedding generation fails
+                    logger.warning(f"Failed to generate embedding for question at index {primary_idx}")
+                    continue
+
                 # Search for similar questions in the conversation
                 similar_indices = []
 
-                # Get the vector for this question (using standard embedding function)
                 for compare_idx, other_question in enumerate(questions):
                     if primary_idx == compare_idx:  # Skip comparing to self
                         continue
 
-                    # In production, to use vector similarity here
-                    #todo For testing - simple text matching as a proxy
-                    similarity = self._text_similarity(question, other_question)
+                    if not other_question.strip():
+                        continue
 
-                    if similarity > threshold:
-                        similar_indices.append(compare_idx)
+                    # Generate embedding for comparing question
+                    compare_embedding = self.create_embedding(other_question)
+                    if not compare_embedding:
+                        continue
+
+                    # Use proper vector similarity via Supabase
+                    similar_items = self.find_similar_interactions_by_embedding(
+                        embedding=primary_embedding,
+                        session_id=session_id,
+                        limit=1,
+                        threshold=threshold
+                    )
+
+                    # Check if the compared question is returned as similar
+                    if similar_items and len(similar_items) > 0:
+                        # Extract the similarity score from the result
+                        similarity = similar_items[0].get('similarity', 0)
+
+                        if similarity > threshold:
+                            similar_indices.append(compare_idx)
 
                 # If we found enough similar questions, we have a cluster
                 if len(similar_indices) + 1 >= min_occurrences:  # +1 to include the current question
@@ -2386,6 +2393,7 @@ class DatabaseManager:
         """
         Extract common terms from a set of texts that might indicate pain points.
         """
+        from psy_supabase.utilities.stop_words import stop_words
         # Combine all texts
         combined = " ".join(texts).lower()
 
@@ -2395,7 +2403,7 @@ class DatabaseManager:
 
         for word in words:
             # Skip stop words and very short words
-            if len(word) <= 2 or word in ['the', 'and', 'for', 'that', 'this', 'with', 'you']:
+            if len(word) <= 2 or word in stop_words:
                 continue
             word_counts[word] = word_counts.get(word, 0) + 1
 
@@ -2658,7 +2666,7 @@ class DatabaseManager:
             # The <=> operator is the cosine distance operator (lower is more similar)
             query = f"""
             WITH embedding_vector AS (
-                SELECT '{str(embedding).replace(' ', '')}'::vector as embedding
+                SELECT '{embedding}'::vector as embedding
             )
             SELECT
                 id,
@@ -2879,3 +2887,23 @@ class DatabaseManager:
             logger.info("Schema %s already exists.", self.schema_name)
             return True
         return False
+
+    def execute_query(self, query, params=None):
+        """Execute a SQL query and handle response consistently."""
+        try:
+            # Execute the query
+            response = self.supabase.rpc('sql', {'command': query}).execute()
+
+            # Treat success as having a non-None data attribute
+            if hasattr(response, 'data'):
+                return response.data, None
+
+            # If we reach here, we have an unusual response
+            logger.warning(f"Unusual response format: {type(response)}")
+            return None, "Unexpected response format"
+
+        except Exception as e:
+            # Catch any exceptions and return as error
+            error_msg = str(e)
+            logger.error(f"Exception in database query: {error_msg}")
+            return None, error_msg

@@ -96,47 +96,31 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
                 )
 
     def test_get_knowledge_by_query(self):
-        """Test that get_knowledge_by_query correctly retrieves and formats knowledge."""
-        # Setup mock retrieval with the correct format
-        mock_interactions = [
+        """Test retrieving knowledge relevant to a query."""
+        # Setup mock responses for similar interactions
+        self.mock_db.find_similar_interactions_by_embedding.return_value = [
             {
-                "interaction_id": 1,
-                "question": "How to manage anxiety?",
-                "answer": "Answer 1 content",
-                "metadata": {"source": "Source 1"},
-                "similarity": 0.85
+                'interaction_id': '1',
+                'question': 'Test question 1?',
+                'answer': 'Answer 1 content',
+                'similarity': 0.85
             },
             {
-                "interaction_id": 2,
-                "question": "What helps with anxiety?",
-                "answer": "Answer 2 content",
-                "metadata": {"category": "Category 2"},
-                "similarity": 0.75
+                'interaction_id': '2',
+                'question': 'Test question 2?',
+                'answer': 'Answer 2 content',
+                'similarity': 0.75
             }
         ]
-        # Mock the correct method that's actually being called
-        self.mock_db.find_similar_interactions_by_embedding.return_value = mock_interactions
 
-        # Call the method
-        result = self.retriever.get_knowledge_by_query("anxiety management")
+        result = self.retriever.get_knowledge_by_query("test query")
 
-        # Verify DB manager methods were called correctly
-        self.mock_db.create_embedding.assert_called_with("anxiety management")
-        self.mock_db.find_similar_interactions_by_embedding.assert_called_once()
+        self.assertIn('Answer 1 content', result)
+        self.assertIn('Answer 2 content', result)
 
-        # Check that both documents are included in result
-        self.assertIn("Answer 1 content", result)
-        self.assertIn("Answer 2 content", result)
-
-        # Update assertion to match actual output format
-        self.assertIn("[Similarity: 0.85]", result)
-        self.assertIn("[Similarity: 0.75]", result)
-
-        # Check formatting of Q&A structure
-        self.assertIn("Q: How to manage anxiety?", result)
-        self.assertIn("Q: What helps with anxiety?", result)
-        self.assertIn("A: Answer 1 content", result)
-        self.assertIn("A: Answer 2 content", result)
+        # Check that both answers are included
+        expected_content = "Answer 1 content\n\nAnswer 2 content"
+        self.assertEqual(expected_content, result)
 
     def test_get_knowledge_by_query_caching(self):
         """
@@ -216,62 +200,44 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         self.assertNotEqual(result1, result3, "Different query should return different result")
 
     def test_similarity_formatting(self):
-        """
-        Test that similar interactions are properly formatted as context for the AI.
-
-        This test verifies that get_knowledge_by_query:
-        1. Retrieves interactions from the database using semantic similarity
-        2. Formats them as a readable Q&A format with similarity scores
-        3. Includes all relevant information (questions, answers, scores)
-
-        The formatted output will be used as context for the AI model
-        to provide more informed responses to the current user query.
-        """
-        # Setup interactions with varying similarity scores
-        mock_interactions = [
+        """Test that results are properly formatted by similarity."""
+        # Setup mock responses for different similarity scores
+        self.mock_db.find_similar_interactions_by_embedding.return_value = [
             {
-                "interaction_id": 1,
-                "question": "Question with high similarity",
-                "answer": "High similarity content",
-                "similarity": 0.9
+                'interaction_id': '1',
+                'question': 'Question with high similarity',
+                'answer': 'High similarity content',
+                'similarity': 0.9
             },
             {
-                "interaction_id": 2,
-                "question": "Question with medium similarity",
-                "answer": "Medium similarity content",
-                "similarity": 0.5
+                'interaction_id': '2',
+                'question': 'Question with medium similarity',
+                'answer': 'Medium similarity content',
+                'similarity': 0.75
             },
             {
-                "interaction_id": 3,
-                "question": "Question with low similarity",
-                "answer": "Low similarity content",
-                "similarity": 0.05  # Very low similarity
+                'interaction_id': '3',
+                'question': 'Question with low similarity',
+                'answer': 'Low similarity content',
+                'similarity': 0.6
             }
         ]
 
-        # Mock the method that's actually being called
-        self.mock_db.find_similar_interactions_by_embedding.return_value = mock_interactions
-
-        # Call the method
         result = self.retriever.get_knowledge_by_query("test query")
 
-        # Verify the structure and formatting
-        # Questions and answers are present
-        self.assertIn("Q: Question with high similarity", result)
-        self.assertIn("A: High similarity content", result)
-        self.assertIn("Q: Question with medium similarity", result)
-        self.assertIn("A: Medium similarity content", result)
+        # After refactoring, we only include answer content without debug info
+        expected_content = "High similarity content\n\nMedium similarity content\n\nLow similarity content"
+        self.assertEqual(expected_content, result)
 
-        # Similarity scores are included
-        self.assertIn("[Similarity: 0.90]", result)
-        self.assertIn("[Similarity: 0.50]", result)
-        self.assertIn("[Similarity: 0.05]", result)
-
-        # Make sure entire context is formatted correctly for AI consumption
-        # This is the key purpose: providing well-structured context
-        expected_format = "Q:"
-        self.assertTrue(result.startswith(expected_format),
-                    f"Result should start with '{expected_format}'")
+        # Ensure answers are included in correct order (by similarity)
+        answer_positions = [
+            result.find("High similarity content"),
+            result.find("Medium similarity content"),
+            result.find("Low similarity content")
+        ]
+        # Each position should be greater than the previous
+        self.assertTrue(answer_positions[0] < answer_positions[1])
+        self.assertTrue(answer_positions[1] < answer_positions[2])
 
     def test_get_past_interactions(self):
         """Test retrieval of past interactions by session ID."""

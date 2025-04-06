@@ -10,8 +10,6 @@ def test_rag_processor_consistent_pattern():
     mock_db = MagicMock()
     mock_text_gen = MagicMock()
 
-    # IMPORTANT FIX: Make generate_text return an actual string
-    # The issue is that generate_text is returning a MagicMock object, not a string
     response_str = "Test response with expected content"
     mock_text_gen.generate_text.return_value = response_str
 

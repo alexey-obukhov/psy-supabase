@@ -45,7 +45,7 @@ import pytest
 import json
 import traceback
 from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from typeguard import TypeCheckError
 from school_logging.log import ColoredLogger
@@ -404,7 +404,6 @@ class TestRAGProcessor:
         question_embedding = [0.1] * 2048
         session_id = TEST_SESSION_ID
 
-        # CRITICAL FIX: Use side_effect instead of return_value to handle any parameter
         def return_anxiety_docs(*args, **kwargs):
             return [
                 {'id': 1, 'content': 'Anxiety management techniques include deep breathing.', 'similarity': 0.9},
@@ -744,46 +743,76 @@ class TestRAGProcessor:
         with pytest.raises(TypeCheckError):
             validated_method(123)  # Passing int instead of str
 
-    def test_dynamic_rag_retriever_integration1(self, rag_processor):
-        """Test integration with DynamicRAGRetriever - First approach."""
-        # IMPORTANT: First set is_toxic to False
-        rag_processor.text_generator.is_toxic.return_value = False
+    @patch('psy_supabase.core.rag_processor.DynamicRAGRetriever')
+    def test_dynamic_rag_retriever_integration(self, mock_retriever_class, rag_processor, mock_text_generator):
+        """Test the integration of DynamicRAGRetriever with RAGProcessor."""
+        # Use the proper fixture-provided objects
+        rag_processor.text_generator = mock_text_generator
 
-        # Create a COMPLETE mock pain point
-        mock_pain_point = {
-            'pain_point_detected': False,
-            'template_used': "dynamic_rag_therapy",
-            'approach_type': "default_approach",
-            'similarity': 0.2,
-            'pain_point': {}  # CRITICAL: Must include this key
-        }
+        # Configure the mocks precisely
+        mock_text_generator.generate_text.return_value = "Response"
+        mock_text_generator.is_toxic.return_value = False
 
-        # Create COMPLETE mock enhanced context
-        mock_enhanced_context = {
-            'knowledge_context': 'Test knowledge context',
-            'conversation_context': 'Test conversation context',
-            'session_id': TEST_SESSION_ID,
-            'has_knowledge': True,
-            'has_conversation': True
-        }
+        # CRITICAL: Mock this specific method that's actually called
+        mock_text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(return_value="Response")
 
-        # Set up ALL necessary mocks
+        # Configure the mock retriever
+        mock_retriever_instance = MagicMock()
+        mock_retriever_instance.get_relevant_context.return_value = "Retrieved context"
+        mock_retriever_class.return_value = mock_retriever_instance
+
+        # Use patch.object for process_query which does exist
         with patch.object(rag_processor, 'process_query', return_value=[0.1] * 2048):
-            with patch.object(rag_processor, 'detect_pain_points_from_embedding',
-                              return_value=mock_pain_point):
-                with patch.object(rag_processor, 'get_recent_conversation_history',
-                                 return_value=[]):
-                    with patch.object(rag_processor, '_enhance_context_with_relevant_documents',
-                                     return_value=mock_enhanced_context):
-                        with patch.object(rag_processor, '_identify_hot_topics',
-                                         return_value=[]):
+            # Set default values for required methods
+            rag_processor.text_generator.check_toxic_content = MagicMock(return_value=None)
 
-                            # CRITICAL: Set the return value AFTER all patches
-                            rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval.return_value = "Response"
+            # Call generate_response
+            response = rag_processor.generate_response(
+                user_question="How can I manage anxiety?",
+                session_id="test_session"
+            )
 
-                            # Call the method and check result
-                            result = rag_processor.generate_response("How do I manage anxiety?", TEST_SESSION_ID)
-                            assert result == "Response"
+            # Verify the response matches what our mock returns
+            assert response == "Response"
+
+    @patch('psy_supabase.core.rag_processor.DynamicRAGRetriever')
+    def test_dynamic_rag_retriever_integration1(self, mock_retriever_class, rag_processor, mock_text_generator):
+        """Test the integration with additional RAG options."""
+        # Use the provided mock text generator
+        rag_processor.text_generator = mock_text_generator
+
+        # Configure the mocks - IMPORTANT: Set the return value for the *method* not just the mock
+        mock_text_generator.generate_text.return_value = "Response"
+        mock_text_generator.is_toxic.return_value = False
+
+        # Set up the specific method that's being called instead of generate_text
+        mock_text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(return_value="Response")
+
+        # Configure the mock retriever
+        mock_retriever_instance = MagicMock()
+        mock_retriever_instance.get_relevant_context.return_value = "Retrieved context with persona"
+        mock_retriever_class.return_value = mock_retriever_instance
+
+        # Use patch.object for process_query which does exist
+        with patch.object(rag_processor, 'process_query', return_value=[0.1] * 2048):
+            # Patch text_generator's check_toxic_content
+            rag_processor.text_generator.check_toxic_content = MagicMock(return_value=None)
+
+            # Handle safety checks if they exist
+            if hasattr(rag_processor, 'ENABLE_CONTENT_FILTER'):
+                rag_processor.ENABLE_CONTENT_FILTER = False
+
+            # Call generate_response
+            response = rag_processor.generate_response(
+                user_question="How can I manage anxiety?",
+                session_id="test_session"
+            )
+
+            # Verify the response matches what we expect
+            assert response == "Response"
+
+            # Verify the retriever was created - that's what we care about
+            mock_retriever_class.assert_called_once()
 
     def test_database_initialization_with_constants(self):
         """Test initialization using test constants."""
@@ -841,6 +870,55 @@ class TestRAGProcessor:
         # Set up return values directly on the processor
         rag_processor.text_generator.is_toxic.return_value = False
         rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval.return_value = "Response"
+
+        # Create complete test data
+        mock_pain_point = {
+            'pain_point_detected': True,
+            'template_used': "dynamic_rag_therapy",
+            'approach_type': "anxiety_exploration",
+            'similarity': 0.85,
+            'pain_point': {'id': 'test_id', 'name': 'Test Pain Point'}
+        }
+
+        mock_enhanced_context = {
+            'knowledge_context': 'Test knowledge context',
+            'conversation_context': 'Test conversation context',
+            'session_id': "test_user_id",
+            'has_knowledge': True,
+            'has_conversation': True
+        }
+
+        # Use decorators instead of deeply nested with blocks
+        with patch.multiple(rag_processor,
+            process_query=Mock(return_value=[0.1] * 2048),
+            detect_pain_points_from_embedding=Mock(return_value=mock_pain_point),
+            get_recent_conversation_history=Mock(return_value=[]),
+            _enhance_context_with_relevant_documents=Mock(return_value=mock_enhanced_context),
+            _identify_hot_topics=Mock(return_value=[])
+        ):
+            # Call generate_response - the method we're testing
+            result = rag_processor.generate_response(
+                "How do I manage anxiety?",
+                "test_user_id"
+            )
+
+            # Assert the expected result
+            assert result == "Response"
+
+    @patch('psy_supabase.core.rag_processor.DynamicRAGRetriever')
+    def test_dynamic_rag_retriever_integration_with_silent_db(self, mock_retriever_class, rag_processor, silent_mock_db_manager):
+        """Test integration with DynamicRAGRetriever using silent DB."""
+        # Replace db_manager with silent version that never produces warnings
+        rag_processor.db_manager = silent_mock_db_manager
+
+        # Set up return values directly on the processor
+        rag_processor.text_generator.is_toxic.return_value = False
+        rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval.return_value = "Response"
+
+        # Configure the mock retriever
+        mock_retriever_instance = MagicMock()
+        mock_retriever_instance.get_relevant_context.return_value = "Retrieved context"
+        mock_retriever_class.return_value = mock_retriever_instance
 
         # Create complete test data
         mock_pain_point = {

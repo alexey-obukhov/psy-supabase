@@ -192,7 +192,6 @@ def clean_text(text: str) -> str:
     if not text:
         return ""
 
-    # Fix common Unicode issues
     import html
     text = html.unescape(text)
     text = re.sub(r"<.*?>", "", text)
