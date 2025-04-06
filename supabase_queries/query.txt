@@ -23,14 +23,13 @@ DROP FUNCTION IF EXISTS find_psychological_patterns(text, integer);
 DROP FUNCTION IF EXISTS add_embedding_to_interaction(text, integer, text);
 DROP FUNCTION IF EXISTS get_interactions_without_embeddings(text, integer);
 DROP FUNCTION IF EXISTS update_table_statistics(text);
-DROP FUNCTION IF EXISTS find_similar_interactions(text, text, int);
+DROP FUNCTION IF EXISTS find_similar_interactions(text, text, text, float, integer);
+DROP FUNCTION IF EXISTS find_similar_interactions(text, vector, text, float, integer);
 DROP FUNCTION IF EXISTS analyze_conversation_themes(text, int);
 DROP FUNCTION IF EXISTS analyze_emotional_trajectory(text, int);
 DROP FUNCTION IF EXISTS initialize_knowledge_base(text, jsonb);
 DROP FUNCTION IF EXISTS analyze_conversation_topics(text, text, int);
 DROP FUNCTION IF EXISTS get_high_quality_interactions(text, text, float, integer);
-DROP FUNCTION IF EXISTS add_session_id_column(text);
-DROP FUNCTION IF EXISTS ensure_session_id_column(text);
 DROP FUNCTION IF EXISTS get_columns_types(text);
 
 
@@ -95,8 +94,63 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to create user schema and tables with vector support
+CREATE OR REPLACE FUNCTION create_vector_indexes(schema_name TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+    success BOOLEAN := TRUE;
+BEGIN
+    -- Create index for interactions.embedding
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS %s_interactions_embedding_idx 
+            ON "%s".interactions 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', schema_name, schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        -- Log the error but continue
+        RAISE NOTICE 'Interactions embedding index creation failed: %', SQLERRM;
+        success := FALSE;
+    END;
+    
+    -- Create index for knowledge_base.embedding
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS %s_knowledge_base_embedding_idx 
+            ON "%s".knowledge_base 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', schema_name, schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        -- Log the error but continue
+        RAISE NOTICE 'Knowledge base index creation failed: %', SQLERRM;
+        success := FALSE;
+    END;
+    
+    -- Create index for interaction_embeddings.embedding
+    BEGIN
+        EXECUTE format('
+            CREATE INDEX IF NOT EXISTS %s_interaction_embeddings_idx 
+            ON "%s".interaction_embeddings 
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100);
+        ', schema_name, schema_name);
+    EXCEPTION WHEN OTHERS THEN
+        -- Log the error but continue
+        RAISE NOTICE 'Interaction embeddings index creation failed: %', SQLERRM;
+        success := FALSE;
+    END;
+    
+    RETURN success;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to create user schema and tables with vector support
 CREATE OR REPLACE FUNCTION create_user_schema_and_tables(schema_name TEXT)
 RETURNS BOOLEAN AS $$
+DECLARE
+    tables_created BOOLEAN := TRUE;
+    indexes_created BOOLEAN := TRUE;
 BEGIN
     -- Ensure the schema exists
     PERFORM ensure_schema_exists(schema_name);
@@ -109,8 +163,9 @@ BEGIN
             question TEXT,
             answer TEXT,
             metadata JSONB,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            embedding vector(2048) -- Embedding directly in interactions table for backward compatibility
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            embedding vector(2048), -- Embedding directly in interactions table for backward compatibility
+            session_id TEXT
         );', schema_name);
 
     -- Create knowledge_base table with native vector type
@@ -127,50 +182,18 @@ BEGIN
             id SERIAL PRIMARY KEY,
             interaction_id INTEGER REFERENCES "%s".interactions(interaction_id),
             embedding vector(2048),
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT unique_interaction UNIQUE(interaction_id)
         );', schema_name, schema_name);
-        
-    -- Simple index creation with error handling for knowledge_base
-    BEGIN
-        EXECUTE format('
-            CREATE INDEX IF NOT EXISTS knowledge_base_embedding_idx 
-            ON "%s".knowledge_base 
-            USING ivfflat (embedding vector_cosine_ops)
-            WITH (lists = 100);
-        ', schema_name);
-    EXCEPTION WHEN OTHERS THEN
-        -- Log the error but continue (index creation is not critical)
-        RAISE NOTICE 'Knowledge base index creation failed: %', SQLERRM;
-    END;
     
-    -- Index for interactions.embedding
-    BEGIN
-        EXECUTE format('
-            CREATE INDEX IF NOT EXISTS interactions_embedding_idx 
-            ON "%s".interactions 
-            USING ivfflat (embedding vector_cosine_ops)
-            WITH (lists = 100);
-        ', schema_name);
-    EXCEPTION WHEN OTHERS THEN
-        -- Log the error but continue
-        RAISE NOTICE 'Interactions embedding index creation failed: %', SQLERRM;
-    END;
+    -- Use the enhanced ensure_vector_indexes function that provides:
+    -- 1. HNSW indexes with fallback to IVFFlat
+    -- 2. Session metadata index
+    -- 3. Table statistics updates
+    -- 4. Robust error handling
+    indexes_created := ensure_vector_indexes(schema_name);
     
-    -- Index for interaction_embeddings.embedding
-    BEGIN
-        EXECUTE format('
-            CREATE INDEX IF NOT EXISTS interaction_embeddings_idx 
-            ON "%s".interaction_embeddings 
-            USING ivfflat (embedding vector_cosine_ops)
-            WITH (lists = 100);
-        ', schema_name);
-    EXCEPTION WHEN OTHERS THEN
-        -- Log the error but continue
-        RAISE NOTICE 'Interaction embeddings index creation failed: %', SQLERRM;
-    END;
-    
-    RETURN TRUE;
+    RETURN tables_created AND indexes_created;
     
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Error creating schema: %', SQLERRM;
@@ -184,50 +207,32 @@ CREATE OR REPLACE FUNCTION get_conversation_history(
     p_session_id TEXT DEFAULT NULL
 )
 RETURNS TABLE (
-    interaction_id INTEGER,  -- Note lowercase column name
+    interaction_id INTEGER,
     context TEXT,
     question TEXT,
     answer TEXT,
     metadata JSONB,
-    created_at TIMESTAMP WITH TIME ZONE
+    created_at TIMESTAMP,
+    session_id TEXT
 ) AS $$
-DECLARE
-    has_session_column BOOLEAN;
 BEGIN
-    -- Check if session_id column exists
-    SELECT EXISTS (
-        SELECT FROM information_schema.columns
-        WHERE table_schema = p_schema_name
-        AND table_name = 'interactions'
-        AND column_name = 'session_id'
-    ) INTO has_session_column;
-
     IF p_session_id IS NOT NULL THEN
-        IF has_session_column THEN
-            -- First try the column-based search
-            RETURN QUERY EXECUTE format('
-                SELECT interaction_id, context, question, answer, metadata, created_at
-                FROM "%s".interactions
-                WHERE session_id = %L
-                ORDER BY created_at;', p_schema_name, p_session_id);
-        ELSE
-            -- Fall back to metadata-based search
-            RETURN QUERY EXECUTE format('
-                SELECT interaction_id, context, question, answer, metadata, created_at
-                FROM "%s".interactions
-                WHERE metadata->>''session_id'' = %L
-                ORDER BY created_at;', p_schema_name, p_session_id);
-        END IF;
+        -- Filter by session_id if provided
+        RETURN QUERY EXECUTE format('
+            SELECT interaction_id, context, question, answer, metadata, created_at, session_id
+            FROM "%s".interactions
+            WHERE session_id = %L
+            ORDER BY created_at;', p_schema_name, p_session_id);
     ELSE
         -- Return all interactions if no session_id provided
         RETURN QUERY EXECUTE format('
-            SELECT interaction_id, context, question, answer, metadata, created_at
+            SELECT interaction_id, context, question, answer, metadata, created_at, session_id
             FROM "%s".interactions
             ORDER BY created_at;', p_schema_name);
     END IF;
 
     -- If no records are found, return an empty result set
-    RETURN QUERY SELECT NULL::INTEGER, NULL::TEXT, NULL::TEXT, NULL::TEXT, NULL::JSONB, NULL::TIMESTAMP WITH TIME ZONE
+    RETURN QUERY SELECT NULL::INTEGER, NULL::TEXT, NULL::TEXT, NULL::TEXT, NULL::JSONB, NULL::TIMESTAMP, NULL::TEXT
     WHERE NOT FOUND;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -260,7 +265,7 @@ RETURNS TABLE (
     question TEXT,
     answer TEXT, 
     metadata JSONB,
-    created_at TIMESTAMP WITH TIME ZONE
+    created_at TIMESTAMP
 ) AS $$
 BEGIN
     IF p_session_id IS NOT NULL THEN
@@ -294,46 +299,24 @@ CREATE OR REPLACE FUNCTION add_interaction(
 RETURNS INTEGER AS $$
 DECLARE
     new_id INTEGER;
-    has_session_column BOOLEAN;
 BEGIN
-    -- First ensure the session_id column exists
-    PERFORM add_session_id_column(p_schema_name);
     
     -- Add session_id to metadata if provided
     IF p_session_id IS NOT NULL THEN
         p_metadata = p_metadata || jsonb_build_object('session_id', p_session_id);
     END IF;
     
-    -- Check if session_id column exists directly rather than relying on the function
-    SELECT EXISTS (
-        SELECT FROM information_schema.columns
-        WHERE table_schema = p_schema_name
-        AND table_name = 'interactions'
-        AND column_name = 'session_id'
-    ) INTO has_session_column;
-    
     -- Insert with session_id if the column exists
-    IF has_session_column AND p_session_id IS NOT NULL THEN
-        BEGIN
-            EXECUTE format('
-                INSERT INTO "%s".interactions
-                (context, question, answer, metadata, session_id)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING "interaction_id";
-            ', p_schema_name)
-            INTO new_id
-            USING p_context, p_question, p_answer, p_metadata, p_session_id;
-        EXCEPTION WHEN OTHERS THEN
-            -- If session_id column insertion failed, try without it
-            EXECUTE format('
-                INSERT INTO "%s".interactions
-                (context, question, answer, metadata)
-                VALUES ($1, $2, $3, $4)
-                RETURNING "interaction_id";
-            ', p_schema_name)
-            INTO new_id
-            USING p_context, p_question, p_answer, p_metadata;
-        END;
+    IF p_session_id IS NOT NULL THEN
+
+        EXECUTE format('
+            INSERT INTO "%s".interactions
+            (context, question, answer, metadata, session_id)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING "interaction_id";
+        ', p_schema_name)
+        INTO new_id
+        USING p_context, p_question, p_answer, p_metadata, p_session_id;
     ELSE
         -- Insert without session_id column
         EXECUTE format('
@@ -384,38 +367,6 @@ BEGIN
 END;
 $$;
 
--- Add session_id column to interactions table if it doesn't exist
-DROP FUNCTION IF EXISTS add_session_id_column(TEXT);
-CREATE OR REPLACE FUNCTION add_session_id_column(
-    p_schema_name TEXT
-) RETURNS BOOLEAN AS $$
-BEGIN
-    -- Check if column exists
-    PERFORM column_name FROM information_schema.columns
-    WHERE table_schema = p_schema_name
-    AND table_name = 'interactions'
-    AND column_name = 'session_id';
-    
-    IF NOT FOUND THEN
-        -- Add column
-        EXECUTE format('
-            ALTER TABLE "%s".interactions 
-            ADD COLUMN session_id TEXT;
-        ', p_schema_name);
-        
-        -- Create index
-        EXECUTE format('
-            CREATE INDEX IF NOT EXISTS idx_%s_interactions_session_id 
-            ON "%s".interactions(session_id);
-        ', p_schema_name, p_schema_name);
-    END IF;
-    
-    RETURN TRUE;
-EXCEPTION WHEN OTHERS THEN
-    RETURN FALSE;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- Function to add vector index to an existing knowledge_base table
 CREATE OR REPLACE FUNCTION add_vector_index_to_knowledge_base(schema_name TEXT)
 RETURNS BOOLEAN AS $$
@@ -449,7 +400,7 @@ BEGIN
             target_id INTEGER NOT NULL,
             relationship_type TEXT NOT NULL,
             strength FLOAT NOT NULL DEFAULT 1.0,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(source_id, target_id)
         );', schema_name);
     
@@ -531,7 +482,7 @@ CREATE OR REPLACE FUNCTION find_psychological_memories(
     p_embedding TEXT,
     p_session_id TEXT,
     p_limit INT DEFAULT 5,
-    p_threshold FLOAT DEFAULT 0.6
+    p_threshold FLOAT DEFAULT 0.7
 )
 RETURNS TABLE (
     interaction_id INTEGER,
@@ -1131,8 +1082,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Find similar interactions based on vector similarity
 CREATE OR REPLACE FUNCTION find_similar_interactions(
     p_schema_name TEXT,
-    p_embedding TEXT,
-    p_limit INT DEFAULT 3
+    p_embedding VECTOR,
+    p_session_id TEXT DEFAULT NULL,
+    p_threshold FLOAT DEFAULT 0.7,
+    p_limit INTEGER DEFAULT 5
 ) RETURNS TABLE (
     interaction_id TEXT,
     question TEXT,
@@ -1145,7 +1098,7 @@ CREATE OR REPLACE FUNCTION find_similar_interactions(
 BEGIN
     RETURN QUERY EXECUTE format('
         SELECT 
-            id::TEXT as interaction_id,
+            interaction_id::TEXT,
             question,
             answer,
             context,
@@ -1437,10 +1390,10 @@ BEGIN
             RETURN;
         END IF;
 
-        -- UPDATED: Check for interactions table with CORRECT column count (7 not 6)
+        -- UPDATED: Check for interactions table with 8 columns
         RETURN QUERY SELECT
             'interactions'::TEXT AS table_name,
-            7 AS columns_expected,  -- FIXED: Changed from 6 to 7
+            8 AS columns_expected,
             COALESCE(COUNT(column_name)::INTEGER, 0) AS columns_found,
             EXISTS (
                 SELECT 1 FROM information_schema.tables t
@@ -1529,7 +1482,8 @@ RETURNS TABLE (
     question TEXT,
     answer TEXT,
     metadata JSONB,
-    created_at TIMESTAMP WITH TIME ZONE
+    created_at TIMESTAMP,
+    session_id TEXT
 ) AS $$
 BEGIN
     -- Build the query dynamically
@@ -1566,7 +1520,7 @@ BEGIN
     -- Check for interactions table
     RETURN QUERY SELECT
         'interactions'::TEXT AS table_name,
-        7 AS columns_expected,  -- CHANGED FROM 6 TO 7 to account for embedding column
+        8 AS columns_expected,
         COALESCE(COUNT(column_name)::INTEGER, 0) AS columns_found,
         EXISTS (
             SELECT 1 FROM information_schema.tables t
@@ -1588,42 +1542,6 @@ BEGIN
     WHERE c.table_schema = p_schema_name AND c.table_name = 'knowledge_base';
 
     -- Add additional checks for other expected tables here
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Function to ensure session_id column exists
-CREATE OR REPLACE FUNCTION ensure_session_id_column(
-    p_schema_name TEXT
-) RETURNS BOOLEAN AS $$
-DECLARE
-    column_exists BOOLEAN;
-BEGIN
-    -- Check if the column already exists
-    SELECT EXISTS (
-        SELECT FROM information_schema.columns
-        WHERE table_schema = p_schema_name
-        AND table_name = 'interactions'
-        AND column_name = 'session_id'
-    ) INTO column_exists;
-    
-    IF NOT column_exists THEN
-        -- Add the column if it doesn't exist
-        EXECUTE format('
-            ALTER TABLE "%s".interactions 
-            ADD COLUMN session_id TEXT;
-            
-            -- Create an index for faster queries
-            CREATE INDEX idx_%s_interactions_session_id 
-            ON "%s".interactions(session_id);
-        ', p_schema_name, p_schema_name, p_schema_name);
-        
-        RETURN TRUE;
-    END IF;
-    
-    RETURN TRUE;
-EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Error adding session_id column: %', SQLERRM;
-    RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
