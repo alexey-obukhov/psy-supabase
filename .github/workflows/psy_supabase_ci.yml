@@ -97,7 +97,7 @@ jobs:
       id: pytest
       run: |
         # Install pytest dependencies
-        pip install pytest pytest-cov exceptiongroup pluggy
+        pip install pytest pytest-cov pytest-html exceptiongroup pluggy
 
         # Create directory for test results
         mkdir -p junit
