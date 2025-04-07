@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PsySupabase Test Reports</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    .card { border: 1px solid #ddd; border-radius: 4px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #333; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+    h2 { margin-top: 0; color: #2c3e50; }
+    .badge { display: inline-block; margin-right: 10px; margin-bottom: 10px; }
+    .timestamp { color: #777; font-size: 0.9em; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <h1>PsySupabase Test Reports</h1>
+
+  <div class="card">
+    <h2>Code Quality Badges</h2>
+    <div class="badge"><img src="../badges/pylint-py3.8.svg" alt="Pylint Score Python 3.8"></div>
+    <div class="badge"><img src="../badges/coverage-py3.8.svg" alt="Coverage Python 3.8"></div>
+    <div class="badge"><img src="../badges/pylint-py3.10.svg" alt="Pylint Score Python 3.10"></div>
+    <div class="badge"><img src="../badges/coverage-py3.10.svg" alt="Coverage Python 3.10"></div>
+  </div>
+
+  <div class="card">
+    <h2>Test Reports</h2>
+    <p><a href="pytest_report_3.8.html">Python 3.8 Test Results</a></p>
+    <p><a href="pytest_report_3.10.html">Python 3.10 Test Results</a></p>
+  </div>
+
+  <div class="card">
+    <h2>PyLint Reports</h2>
+    <p><a href="pylint_report_3.8.html">Python 3.8 PyLint Report</a></p>
+    <p><a href="pylint_report_3.10.html">Python 3.10 PyLint Report</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Coverage Report</h2>
+    <p><a href="../htmlcov/index.html">HTML Coverage Report</a></p>
+  </div>
+
+  <p class="timestamp">Generated: $(date -u "+%Y-%m-%d %H:%M:%S UTC")</p>
+</body>
+</html>
