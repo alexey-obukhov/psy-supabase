@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Coverage for psy_supabase/utilities/keep_words.py: 100%</title>
+    <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
+    <link rel="stylesheet" href="style_cb_8e611ae1.css" type="text/css">
+    <script src="coverage_html_cb_6fb7b396.js" defer></script>
+</head>
+<body class="pyfile">
+<header>
+    <div class="content">
+        <h1>
+            <span class="text">Coverage for </span><b>psy_supabase/utilities/keep_words.py</b>:
+            <span class="pc_cov">100%</span>
+        </h1>
+        <aside id="help_panel_wrapper">
+            <input id="help_panel_state" type="checkbox">
+            <label for="help_panel_state">
+                <img id="keyboard_icon" src="keybd_closed_cb_ce680311.png" alt="Show/hide keyboard shortcuts">
+            </label>
+            <div id="help_panel">
+                <p class="legend">Shortcuts on this page</p>
+                <div class="keyhelp">
+                    <p>
+                        <kbd>r</kbd>
+                        <kbd>m</kbd>
+                        <kbd>x</kbd>
+                        &nbsp; toggle line displays
+                    </p>
+                    <p>
+                        <kbd>j</kbd>
+                        <kbd>k</kbd>
+                        &nbsp; next/prev highlighted chunk
+                    </p>
+                    <p>
+                        <kbd>0</kbd> &nbsp; (zero) top of page
+                    </p>
+                    <p>
+                        <kbd>1</kbd> &nbsp; (one) first highlighted chunk
+                    </p>
+                    <p>
+                        <kbd>[</kbd>
+                        <kbd>]</kbd>
+                        &nbsp; prev/next file
+                    </p>
+                    <p>
+                        <kbd>u</kbd> &nbsp; up to the index
+                    </p>
+                    <p>
+                        <kbd>?</kbd> &nbsp; show/hide this help
+                    </p>
+                </div>
+            </div>
+        </aside>
+        <h2>
+            <span class="text">1 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">1<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">0<span class="text"> missing</span></button>
+            <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
+        </h2>
+        <p class="text">
+            <a id="prevFileLink" class="nav" href="z_7baba763b7c73ce3_embedding_utils_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
+            <a id="nextFileLink" class="nav" href="z_7baba763b7c73ce3_logging_config_py.html">&#xbb; next</a>
+            &nbsp; &nbsp; &nbsp;
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.8.0">coverage.py v7.8.0</a>,
+            created at 2025-04-07 09:51 +0000
+        </p>
+        <aside class="hidden">
+            <button type="button" class="button_next_chunk" data-shortcut="j"></button>
+            <button type="button" class="button_prev_chunk" data-shortcut="k"></button>
+            <button type="button" class="button_top_of_page" data-shortcut="0"></button>
+            <button type="button" class="button_first_chunk" data-shortcut="1"></button>
+            <button type="button" class="button_prev_file" data-shortcut="["></button>
+            <button type="button" class="button_next_file" data-shortcut="]"></button>
+            <button type="button" class="button_to_index" data-shortcut="u"></button>
+            <button type="button" class="button_show_hide_help" data-shortcut="?"></button>
+        </aside>
+    </div>
+</header>
+<main id="source">
+    <p class="pln"><span class="n"><a id="t1" href="#t1">1</a></span><span class="t"><span class="str">"""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t2" href="#t2">2</a></span><span class="t"><span class="str">This module defines a tuple of words that should be preserved during the tokenization and lemmatization process</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t3" href="#t3">3</a></span><span class="t"><span class="str">in the `tokenize_and_lemmatize` function of the `data_augmentation.py` module. These words include key pronouns</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t4" href="#t4">4</a></span><span class="t"><span class="str">and verbs that are important for maintaining the context and meaning of the text data.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t5" href="#t5">5</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t6" href="#t6">6</a></span><span class="t"><span class="str">Purpose:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t7" href="#t7">7</a></span><span class="t"><span class="str">The `keep_words` tuple is used to ensure that certain important words are not removed during the tokenization</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t8" href="#t8">8</a></span><span class="t"><span class="str">and lemmatization process, which helps in preserving the essential structure and meaning of the text.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t9" href="#t9">9</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t10" href="#t10">10</a></span><span class="t"><span class="str">Usage:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t11" href="#t11">11</a></span><span class="t"><span class="str">    from utilities.keep_words import keep_words</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t12" href="#t12">12</a></span><span class="t"><span class="str">"""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t13" href="#t13">13</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t14" href="#t14">14</a></span><span class="t"><span class="nam">keep_words</span> <span class="op">=</span> <span class="op">(</span><span class="str">'a'</span><span class="op">,</span> <span class="str">'about'</span><span class="op">,</span> <span class="str">'above'</span><span class="op">,</span> <span class="str">'after'</span><span class="op">,</span> <span class="str">'again'</span><span class="op">,</span> <span class="str">'against'</span><span class="op">,</span> <span class="str">'am'</span><span class="op">,</span> <span class="str">'an'</span><span class="op">,</span> <span class="str">'and'</span><span class="op">,</span> <span class="str">'are'</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t">              <span class="str">"aren't"</span><span class="op">,</span> <span class="str">'as'</span><span class="op">,</span> <span class="str">'at'</span><span class="op">,</span> <span class="str">'be'</span><span class="op">,</span> <span class="str">'because'</span><span class="op">,</span> <span class="str">'been'</span><span class="op">,</span> <span class="str">'before'</span><span class="op">,</span> <span class="str">'being'</span><span class="op">,</span> <span class="str">'below'</span><span class="op">,</span> <span class="str">'between'</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t16" href="#t16">16</a></span><span class="t">              <span class="str">'but'</span><span class="op">,</span> <span class="str">'by'</span><span class="op">,</span> <span class="str">"can't"</span><span class="op">,</span> <span class="str">'cannot'</span><span class="op">,</span> <span class="str">'could'</span><span class="op">,</span> <span class="str">"couldn't"</span><span class="op">,</span> <span class="str">'did'</span><span class="op">,</span> <span class="str">"didn't"</span><span class="op">,</span> <span class="str">'do'</span><span class="op">,</span> <span class="str">'does'</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t">              <span class="str">"doesn't"</span><span class="op">,</span> <span class="str">'doing'</span><span class="op">,</span> <span class="str">"don't"</span><span class="op">,</span> <span class="str">'down'</span><span class="op">,</span> <span class="str">'during'</span><span class="op">,</span> <span class="str">'for'</span><span class="op">,</span> <span class="str">'from'</span><span class="op">,</span> <span class="str">'further'</span><span class="op">,</span> <span class="str">'had'</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t">              <span class="str">"hadn't"</span><span class="op">,</span> <span class="str">'has'</span><span class="op">,</span> <span class="str">"hasn't"</span><span class="op">,</span> <span class="str">'have'</span><span class="op">,</span> <span class="str">"haven't"</span><span class="op">,</span> <span class="str">'having'</span><span class="op">,</span> <span class="str">'he'</span><span class="op">,</span> <span class="str">"he'd"</span><span class="op">,</span> <span class="str">"he'll"</span><span class="op">,</span> <span class="str">"he's"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t">              <span class="str">'her'</span><span class="op">,</span> <span class="str">'hers'</span><span class="op">,</span> <span class="str">'herself'</span><span class="op">,</span> <span class="str">'him'</span><span class="op">,</span> <span class="str">'himself'</span><span class="op">,</span> <span class="str">'his'</span><span class="op">,</span> <span class="str">'how'</span><span class="op">,</span> <span class="str">'i'</span><span class="op">,</span> <span class="str">"i'd"</span><span class="op">,</span> <span class="str">"i'll"</span><span class="op">,</span> <span class="str">"i'm"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t">              <span class="str">"i've"</span><span class="op">,</span> <span class="str">'if'</span><span class="op">,</span> <span class="str">'in'</span><span class="op">,</span> <span class="str">'into'</span><span class="op">,</span> <span class="str">'is'</span><span class="op">,</span> <span class="str">"isn't"</span><span class="op">,</span> <span class="str">'it'</span><span class="op">,</span> <span class="str">"it's"</span><span class="op">,</span> <span class="str">'its'</span><span class="op">,</span> <span class="str">'itself'</span><span class="op">,</span> <span class="str">'me'</span><span class="op">,</span> <span class="str">"mustn't"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t">              <span class="str">'my'</span><span class="op">,</span> <span class="str">'myself'</span><span class="op">,</span> <span class="str">'of'</span><span class="op">,</span> <span class="str">'off'</span><span class="op">,</span> <span class="str">'on'</span><span class="op">,</span> <span class="str">'once'</span><span class="op">,</span> <span class="str">'or'</span><span class="op">,</span> <span class="str">'our'</span><span class="op">,</span> <span class="str">'ours'</span><span class="op">,</span> <span class="str">'ourselves'</span><span class="op">,</span> <span class="str">'out'</span><span class="op">,</span> <span class="str">'over'</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t">              <span class="str">"shan't"</span><span class="op">,</span> <span class="str">'she'</span><span class="op">,</span> <span class="str">"she'd"</span><span class="op">,</span> <span class="str">"she'll"</span><span class="op">,</span> <span class="str">"she's"</span><span class="op">,</span> <span class="str">'should'</span><span class="op">,</span> <span class="str">"shouldn't"</span><span class="op">,</span> <span class="str">'that'</span><span class="op">,</span> <span class="str">"that'll"</span><span class="op">,</span> <span class="str">'the'</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t">              <span class="str">'their'</span><span class="op">,</span> <span class="str">'theirs'</span><span class="op">,</span> <span class="str">'them'</span><span class="op">,</span> <span class="str">'themselves'</span><span class="op">,</span> <span class="str">'then'</span><span class="op">,</span> <span class="str">'these'</span><span class="op">,</span> <span class="str">'they'</span><span class="op">,</span> <span class="str">"they'd"</span><span class="op">,</span> <span class="str">"they'll"</span><span class="op">,</span> <span class="str">"they're"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t">              <span class="str">"they've"</span><span class="op">,</span> <span class="str">'this'</span><span class="op">,</span> <span class="str">'those'</span><span class="op">,</span> <span class="str">'through'</span><span class="op">,</span> <span class="str">'to'</span><span class="op">,</span> <span class="str">'tought'</span><span class="op">,</span> <span class="str">'under'</span><span class="op">,</span> <span class="str">'until'</span><span class="op">,</span> <span class="str">'up'</span><span class="op">,</span> <span class="str">'was'</span><span class="op">,</span> <span class="str">"wasn't"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t">              <span class="str">'we'</span><span class="op">,</span> <span class="str">"we'd"</span><span class="op">,</span> <span class="str">"we'll"</span><span class="op">,</span> <span class="str">"we're"</span><span class="op">,</span> <span class="str">"we've"</span><span class="op">,</span> <span class="str">'were'</span><span class="op">,</span> <span class="str">"weren't"</span><span class="op">,</span> <span class="str">'what'</span><span class="op">,</span> <span class="str">'when'</span><span class="op">,</span> <span class="str">'where'</span><span class="op">,</span> <span class="str">'which'</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t">              <span class="str">'while'</span><span class="op">,</span> <span class="str">'who'</span><span class="op">,</span> <span class="str">'whom'</span><span class="op">,</span> <span class="str">'why'</span><span class="op">,</span> <span class="str">'with'</span><span class="op">,</span> <span class="str">"won't"</span><span class="op">,</span> <span class="str">'would'</span><span class="op">,</span> <span class="str">"wouldn't"</span><span class="op">,</span> <span class="str">'you'</span><span class="op">,</span> <span class="str">"you'd"</span><span class="op">,</span> <span class="str">"you'll"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t">              <span class="str">"you're"</span><span class="op">,</span> <span class="str">"you've"</span><span class="op">,</span> <span class="str">'your'</span><span class="op">,</span> <span class="str">'yours'</span><span class="op">,</span> <span class="str">'yourself'</span><span class="op">,</span> <span class="str">'yourselves'</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+</main>
+<footer>
+    <div class="content">
+        <p>
+            <a class="nav" href="z_7baba763b7c73ce3_embedding_utils_py.html">&#xab; prev</a> &nbsp; &nbsp;
+            <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
+            <a class="nav" href="z_7baba763b7c73ce3_logging_config_py.html">&#xbb; next</a>
+            &nbsp; &nbsp; &nbsp;
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.8.0">coverage.py v7.8.0</a>,
+            created at 2025-04-07 09:51 +0000
+        </p>
+    </div>
+</footer>
+</body>
+</html>
