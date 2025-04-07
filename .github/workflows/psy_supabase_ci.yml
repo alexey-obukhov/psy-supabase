@@ -102,6 +102,10 @@ jobs:
         # Create directory for test results
         mkdir -p junit
 
+        # Create reports directory
+        mkdir -p reports
+        mkdir -p reports/html
+
         # Ensure we're using the correct transformers version (don't downgrade)
         pip install torch==2.0.1 # Install specific PyTorch version
 
@@ -146,7 +150,7 @@ jobs:
 
         # Run pytest with coverage and generate reports
         echo "Running pytest with coverage..."
-        python -m pytest tests/ --cov=psy_supabase --cov-report=xml:coverage.xml --cov-report=html:htmlcov --junitxml=junit/test-results.xml || echo "::set-output name=pytest_failed::true"
+        python -m pytest tests/ --cov=psy_supabase --cov-report=xml:coverage.xml --cov-report=html:htmlcov --html=reports/html/pytest_report_${{ matrix.python-version }}.html --self-contained-html --junitxml=junit/test-results.xml || echo "::set-output name=pytest_failed::true"
 
         # Check if coverage.xml exists and create a minimal one if not
         if [ ! -f coverage.xml ]; then
@@ -174,7 +178,8 @@ jobs:
           coverage.xml
 
     - name: Create reports directory
-      run: mkdir -p reports
+      run: |
+        mkdir -p reports
 
     - name: Generate coverage badge
       run: |
@@ -210,6 +215,41 @@ jobs:
         # Create a badge JSON file for shields.io
         echo "{\"schemaVersion\": 1, \"label\": \"pylint-py${{ matrix.python-version }}\", \"message\": \"$PYLINT_SCORE/10\", \"color\": \"blue\"}" > reports/pylint-badge.json
 
+    - name: Convert PyLint report to HTML
+      run: |
+        # Create a simple HTML wrapper for PyLint results
+        cat > reports/html/pylint_report_${{ matrix.python-version }}.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>PyLint Report - Python ${{ matrix.python-version }}</title>
+          <style>
+            body { font-family: monospace; max-width: 1000px; margin: 0 auto; padding: 20px; }
+            h1 { color: #333; border-bottom: 2px solid #3498db; }
+            pre { background-color: #f8f8f8; padding: 10px; border-radius: 4px; overflow-x: auto; }
+            .score { font-size: 1.2em; font-weight: bold; }
+            .back-link { margin-top: 20px; }
+            .back-link a { color: #3498db; text-decoration: none; }
+          </style>
+        </head>
+        <body>
+          <h1>PyLint Report - Python ${{ matrix.python-version }}</h1>
+          <div class="score">Score: $PYLINT_SCORE/10</div>
+          <pre>
+        EOF
+
+        # Append the PyLint report content
+        cat reports/pylint-report.txt >> reports/html/pylint_report_${{ matrix.python-version }}.html
+
+        # Close the HTML
+        cat >> reports/html/pylint_report_${{ matrix.python-version }}.html << 'EOF'
+          </pre>
+          <div class="back-link"><a href="index.html">← Back to Reports</a></div>
+        </body>
+        </html>
+        EOF
+
     # Generate pylint badge SVG with Python version in filename
     - name: Generate pylint badge SVG
       run: |
@@ -226,7 +266,56 @@ jobs:
         COVERAGE_PCT=$(echo "$COVERAGE_PCT" | sed -E 's/^[[:space:]]*$|^$/0.0/')
         anybadge --label="coverage-py${{ matrix.python-version }}" --value=$COVERAGE_PCT --file=reports/coverage-py${{ matrix.python-version }}.svg --suffix=% 50=red 60=orange 80=yellow 100=green
 
-    # Upload badge artifacts with Python version in artifact name
+    - name: Generate HTML test report index
+      run: |
+        cat > reports/html/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>PsySupabase Test Reports</title>
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+            .card { border: 1px solid #ddd; border-radius: 4px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            h1 { color: #333; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+            h2 { margin-top: 0; color: #2c3e50; }
+            .badge { display: inline-block; margin-right: 10px; margin-bottom: 10px; }
+            .timestamp { color: #777; font-size: 0.9em; margin-top: 30px; }
+          </style>
+        </head>
+        <body>
+          <h1>PsySupabase Test Reports</h1>
+
+          <div class="card">
+            <h2>Code Quality Badges</h2>
+            <div class="badge"><img src="../badges/pylint-py3.8.svg" alt="Pylint Score Python 3.8"></div>
+            <div class="badge"><img src="../badges/coverage-py3.8.svg" alt="Coverage Python 3.8"></div>
+            <div class="badge"><img src="../badges/pylint-py3.10.svg" alt="Pylint Score Python 3.10"></div>
+            <div class="badge"><img src="../badges/coverage-py3.10.svg" alt="Coverage Python 3.10"></div>
+          </div>
+
+          <div class="card">
+            <h2>Test Reports</h2>
+            <p><a href="pytest_report_3.8.html">Python 3.8 Test Results</a></p>
+            <p><a href="pytest_report_3.10.html">Python 3.10 Test Results</a></p>
+          </div>
+
+          <div class="card">
+            <h2>PyLint Reports</h2>
+            <p><a href="pylint_report_3.8.html">Python 3.8 PyLint Report</a></p>
+            <p><a href="pylint_report_3.10.html">Python 3.10 PyLint Report</a></p>
+          </div>
+
+          <div class="card">
+            <h2>Coverage Report</h2>
+            <p><a href="../htmlcov/index.html">HTML Coverage Report</a></p>
+          </div>
+
+          <p class="timestamp">Generated: $(date -u "+%Y-%m-%d %H:%M:%S UTC")</p>
+        </body>
+        </html>
+        EOF
+
     - name: Upload badge artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -234,6 +323,13 @@ jobs:
         path: |
           reports/pylint-py${{ matrix.python-version }}.svg
           reports/coverage-py${{ matrix.python-version }}.svg
+
+    - name: Upload HTML test reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: html-reports-${{ matrix.python-version }}-${{ github.run_id }}
+        path: reports/html
 
     - name: Create reports directories
       run: |
@@ -357,7 +453,7 @@ jobs:
         path: dist/
         retention-days: 7
 
-  deploy-badges:
+  deploy-reports:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/psy-supabase-pkg'
@@ -367,44 +463,66 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Create badge directory
-        run: mkdir -p badges
+      - name: Create directories
+        run: |
+          mkdir -p site/badges
+          mkdir -p site/reports/html
+          mkdir -p site/htmlcov
 
       - name: Download Python 3.8 badges
         uses: actions/download-artifact@v4
         with:
           name: badges-py3.8-${{ github.sha }}
-          path: badges
+          path: site/badges
 
       - name: Download Python 3.10 badges
         uses: actions/download-artifact@v4
         with:
           name: badges-py3.10-${{ github.sha }}
-          path: badges
+          path: site/badges
 
-      - name: Create badge README
+      - name: Download HTML reports for Python 3.8
+        uses: actions/download-artifact@v4
+        with:
+          name: html-reports-3.8-${{ github.run_id }}
+          path: site/reports/html
+
+      - name: Download HTML reports for Python 3.10
+        uses: actions/download-artifact@v4
+        with:
+          name: html-reports-3.10-${{ github.run_id }}
+          path: site/reports/html
+
+      - name: Download coverage HTML
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*-${{ github.run_id }}
+          path: site/temp
+          merge-multiple: true
+
+      - name: Move coverage HTML
         run: |
-          cat > badges/README.md << EOF
-          # Code Quality Badges
+          if [ -d "site/temp/htmlcov" ]; then
+            cp -r site/temp/htmlcov/* site/htmlcov/
+          fi
 
-          These badges show code quality metrics for the psy_supabase project.
-
-          ## Badges
-          - pylint-py3.8.svg: PyLint score for Python 3.8
-          - coverage-py3.8.svg: Test coverage for Python 3.8
-          - pylint-py3.10.svg: PyLint score for Python 3.10
-          - coverage-py3.10.svg: Test coverage for Python 3.10
-
-          Last updated: $(date -u "+%Y-%m-%d %H:%M:%S UTC")
+      - name: Create redirect index
+        run: |
+          cat > site/index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta http-equiv="refresh" content="0; url='reports/html/index.html'" />
+          </head>
+          <body>
+            <p>Redirecting to <a href="reports/html/index.html">test reports</a>...</p>
+          </body>
+          </html>
           EOF
-
-      - name: Display structure of downloaded files
-        run: ls -la badges/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./badges
-          destination_dir: badges
+          publish_dir: ./site
           keep_files: true
