@@ -160,56 +160,67 @@ class TestRAGProcessor:
             assert documents[1]["content"] == "Document 2"
 
     def test_enhance_context_with_relevant_documents_direct_override(self):
-        """Test enhancing context with direct method override."""
-        # Skip the mock_db_manager completely and create everything fresh
+        """Test enhancing context with relevant documents directly without dependencies."""
         from unittest.mock import Mock
+        from psy_supabase.core.rag_processor import RAGProcessor
 
-        # Create a standalone RAG processor
-        rag_processor = RAGProcessor(db_manager=None, generator=None)
-
-        # Create a specialized mock with debuggable information
+        # Create minimal mocks required for initialization
         mock_db = Mock()
+        mock_generator = Mock()
 
-        # Define expected documents with clear test content
-        expected_docs = [
-            {"id": 1, "content": "Anxiety management techniques include deep breathing.", "similarity": 0.95},
-            {"id": 2, "content": "CBT is effective for anxiety disorders.", "similarity": 0.85}
+        # Create a test instance
+        rag_processor = RAGProcessor(db_manager=mock_db, generator=mock_generator)
+
+        # Create a simple context dictionary for testing
+        context = {
+            "query": "How can I manage anxiety symptoms?",
+            "topics": ["anxiety", "stress"],
+            "session_id": "test_session_123"
+        }
+
+        # Create sample documents with relevance scores
+        relevant_docs = [
+            {
+                "content": "Deep breathing exercises can help manage anxiety symptoms by activating the parasympathetic nervous system.",
+                "relevance": 0.92,
+                "metadata": {"source": "anxiety_management.txt", "topic": "anxiety"}
+            },
+            {
+                "content": "Cognitive behavioral therapy (CBT) is an effective treatment for anxiety disorders.",
+                "relevance": 0.87,
+                "metadata": {"source": "therapy_approaches.txt", "topic": "therapy"}
+            },
+            {
+                "content": "Regular exercise can reduce stress hormones and improve mood.",
+                "relevance": 0.79,
+                "metadata": {"source": "stress_management.txt", "topic": "stress"}
+            }
         ]
 
-        # Configure the mock
-        mock_db.find_similar_documents.return_value = expected_docs
-        mock_db.get_conversation_history.return_value = []
+        # Test the method directly on the instance
+        enhanced_context = rag_processor.enhance_context_with_relevant_documents(context, relevant_docs)
 
-        # Replace the db_manager
-        rag_processor.db_manager = mock_db
+        # Verify the context was properly enhanced
+        assert "relevant_documents" in enhanced_context
+        assert isinstance(enhanced_context["relevant_documents"], list)
+        assert len(enhanced_context["relevant_documents"]) == 3
 
-        # Override the method directly
-        original_method = rag_processor._enhance_context_with_relevant_documents
+        # Verify document content was properly included
+        assert "Deep breathing" in enhanced_context["relevant_documents"][0]
+        assert "Cognitive behavioral therapy" in enhanced_context["relevant_documents"][1]
+        assert "Regular exercise" in enhanced_context["relevant_documents"][2]
 
-        def debug_enhance_context(user_question, question_embedding, session_id):
-            # Create hardcoded result
-            result = {
-                "knowledge_context": "Anxiety management techniques include deep breathing.\n\nCBT is effective for anxiety disorders.",
-                "conversation_context": ""
-            }
-            return result
+        # Test with empty documents
+        empty_context = context.copy()
+        enhanced_empty_context = rag_processor.enhance_context_with_relevant_documents(empty_context, [])
+        assert "relevant_documents" in enhanced_empty_context
+        assert enhanced_empty_context["relevant_documents"] == []
 
-        # Replace the method
-        rag_processor._enhance_context_with_relevant_documents = debug_enhance_context
-
-        try:
-            # Call our replaced method
-            result = rag_processor._enhance_context_with_relevant_documents(
-                user_question="I'm feeling anxious",
-                question_embedding=[0.1] * 768,
-                session_id="test_session"
-            )
-
-            # Check with the hardcoded content
-            assert "Anxiety management techniques" in result["knowledge_context"]
-        finally:
-            # Restore the original method
-            rag_processor._enhance_context_with_relevant_documents = original_method
+        # Test with None documents (error case)
+        none_context = context.copy()
+        enhanced_none_context = rag_processor.enhance_context_with_relevant_documents(none_context, None)
+        assert "relevant_documents" in enhanced_none_context
+        assert enhanced_none_context["relevant_documents"] == []
 
     def test_enhance_context_with_no_documents(self, mock_db_manager):
         """Test enhancing context when no documents are available."""
@@ -490,7 +501,7 @@ class TestRAGProcessor:
         # Set up prompt selector
         mock_selector = MagicMock()
         mock_selector.analyze_question.return_value = {"topic": "test"}
-        mock_selector._determine_topic.return_value = "test_topic"
+        mock_selector.determine_topic.return_value = "test_topic"
         processor.prompt_selector = mock_selector
 
         # Call the method directly

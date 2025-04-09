@@ -17,7 +17,7 @@ def test_rag_implementation_check():
     processor.check_toxicity = lambda text: {"is_toxic": False, "score": 0.0}
     processor.prompt_selector = MagicMock()
     processor.prompt_selector.generate_prompt.return_value = "Test prompt"
-    processor.prompt_selector._determine_topic.return_value = "test_topic"
+    processor.prompt_selector.determine_topic.return_value = "test_topic"
     processor.prompt_selector.generate_category_info.return_value = {}
     processor.prompt_selector.analyze_question.return_value = {"topic": "general"}
 

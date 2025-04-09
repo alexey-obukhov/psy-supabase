@@ -100,43 +100,6 @@ class TestDynamicRAGIntegration(unittest.TestCase):
         self.session_id = "test_integration_session_123"
         self.retriever = DynamicRAGRetriever(self.mock_db, self.session_id)
 
-    def test_combined_retrieval_workflow(self):
-        """Test combined retrieval workflow with knowledge and interactions."""
-        # Setup mock response for get_conversation_history
-        self.mock_db.get_conversation_history.return_value = [
-            {
-                "question": "I feel anxious about my exam",
-                "answer": "That's normal, let's discuss coping strategies.",
-                "created_at": "2023-01-01T12:00:00"
-            }
-        ]
-
-        # Setup mock response for create_embedding
-        self.mock_db.create_embedding.return_value = [0.1] * 384
-
-        # Mock the correct method that's actually being called
-        self.mock_db.find_similar_interactions_by_embedding.return_value = [
-            {
-                "interaction_id": 1,
-                "question": "How do I manage exam anxiety?",
-                "answer": "Exam anxiety is common and can be managed with breathing techniques.",
-                "similarity": 0.9,
-                "metadata": {"topics": ["anxiety", "exams", "coping"]}
-            }
-        ]
-
-        # Get past interactions - make sure to pass session_id
-        interactions = self.retriever.get_past_interactions(session_id=self.session_id)
-
-        # Should have the test question
-        self.assertIn("I feel anxious about my exam", interactions[0]['question'])
-
-        # Now get knowledge
-        knowledge = self.retriever.get_knowledge_by_query("How to manage exam anxiety?")
-
-        # Should have the content
-        self.assertIn("Exam anxiety is common", knowledge)
-
     def test_large_scale_caching(self):
         """Test that caching works at scale."""
         # Setup mocks

@@ -31,7 +31,8 @@ def cleanup_gpu_memory():
     # Teardown: clean up memory after test completes (or fails)
     logger.info("Cleaning up GPU memory after test...")
 
-    cleanup_memory()
+    # Call the enhanced cleanup function with force_cuda_cleanup=True
+    cleanup_memory(force_cuda_cleanup=True)
 
 @pytest.fixture
 def setup_response_generator(mock_db_manager, mock_dynamic_retriever):

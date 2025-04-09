@@ -29,7 +29,7 @@ def test_with_autospec_mock():
     from unittest.mock import MagicMock
     processor.prompt_selector = MagicMock()
     processor.prompt_selector.analyze_question.return_value = {"topic": "test"}
-    processor.prompt_selector._determine_topic.return_value = "test_topic"
+    processor.prompt_selector.determine_topic.return_value = "test_topic"
     processor.prompt_selector.generate_category_info.return_value = {"Test": 1.0}
 
     # Call generate_response

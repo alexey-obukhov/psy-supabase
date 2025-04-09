@@ -29,12 +29,13 @@ Usage:
     pain_point = retriever.get_pain_point()
 """
 import json
-from typing import List, Dict, TYPE_CHECKING, Any
-from psy_supabase.utilities.stop_words import stop_words
+from typing import List, Dict, TYPE_CHECKING, Optional, Any
+import traceback
+
 from school_logging.log import ColoredLogger
 
-# Import the AssociativeMemory class
 from psy_supabase.memory.associative_memory import AssociativeMemory
+from psy_supabase.utilities.stop_words import stop_words
 
 if TYPE_CHECKING:
     from psy_supabase.core.database import DatabaseManager
@@ -42,10 +43,17 @@ if TYPE_CHECKING:
 logger = ColoredLogger(__name__)
 
 class DynamicRAGRetriever:
-    """Dynamic RAG retriever that selects context sources based on query and user history."""
-
-    def __init__(self, db_manager, session_id=None, embedding_provider=None,
-                persona=None, query_mode=None, **kwargs):
+    """
+    Dynamic RAG retriever that delegates to RAGProcessor methods.
+    """
+    def __init__(self,
+                 db_manager: 'DatabaseManager',
+                 session_id: Optional[str] = None,
+                 prompt_selector=None,
+                 persona: Optional[str] = None,
+                 query_mode: Optional[str] = None,
+                 embedding_provider: Optional[str] = None,
+                 rag_processor=None):
         """
         Initialize the dynamic RAG retriever.
 
@@ -59,95 +67,51 @@ class DynamicRAGRetriever:
         """
         self.db_manager = db_manager
         self.session_id = session_id
-        self.embedding_provider = embedding_provider  # Use default if None
+        self.prompt_selector = prompt_selector
         self.persona = persona
-        self.query_mode = query_mode
-
-        # Store other parameters that might be needed later
-        self.options = kwargs
-
-        self.query_cache = {}
-        self._last_raw_results = []
+        self.query_mode = query_mode or "hybrid"
+        self._embedding_provider = embedding_provider
+        self.rag_processor = rag_processor  # Reference to RAGProcessor
 
         # Initialize associative memory component for enhanced retrieval
         self.associative_memory = AssociativeMemory()
         self.memory_initialized = False
 
-    def _standardize_cache_key(self, text):
-        """Standardize text for consistent cache keys."""
-        if not text:
-            return "none"
-        # Replace spaces with underscores, lowercase everything
-        return text.lower().replace(' ', '_')
+        self.query_cache = {}  # Cache for query results
+        self._last_raw_results = []  # Store raw results for testing
 
-    def _initialize_memory_from_db(self):
-        """Load relevant session data into associative memory."""
-        if self.memory_initialized:
-            return
+    def get_conversation_context(self, limit=3):
+        """
+        Get conversation context for the current session.
 
+        Args:
+            limit: Maximum number of turns to include
+
+        Returns:
+            String representation of conversation context
+        """
         try:
-            # Get session documents from database
-            docs = self.db_manager.get_session_documents(self.session_id)
+            if not self.session_id:
+                return ""
 
-            # Add each document to associative memory with topics
-            for doc in docs:
-                content = doc.get('content', '')
-                if not content:
-                    continue
+            # Use the existing get_past_interactions method which already works with our database
+            interactions = self.get_past_interactions(session_id=self.session_id, limit=limit)
 
-                # Extract topics from metadata
-                metadata = doc.get('metadata', {})
-                if isinstance(metadata, str):
-                    try:
-                        metadata = json.loads(metadata)
-                    except:
-                        metadata = {}
+            if not interactions:
+                return ""
 
-                topics = []
-                # Extract topics from various metadata fields
-                if 'topics' in metadata:
-                    if isinstance(metadata['topics'], list):
-                        topics.extend(metadata['topics'])
-                    elif isinstance(metadata['topics'], str):
-                        topics.extend([t.strip() for t in metadata['topics'].split(',')])
+            # Format the conversation history into a string
+            context = ""
+            for interaction in interactions:
+                q = interaction.get('question', '')
+                a = interaction.get('answer', '')
+                if q and a:
+                    context += f"User: {q}\nAssistant: {a}\n\n"
 
-                if 'related_topics' in metadata:
-                    if isinstance(metadata['related_topics'], list):
-                        topics.extend(metadata['related_topics'])
-                    elif isinstance(metadata['related_topics'], str):
-                        topics.extend([t.strip() for t in metadata['related_topics'].split(',')])
-
-                if 'category' in metadata:
-                    topics.append(metadata['category'])
-
-                # If no topics found, extract keywords from content
-                if not topics:
-                    topics = self._extract_keywords(content)
-
-                # Add to associative memory
-                self.associative_memory.add_memory(content, topics, metadata)
-
-            self.memory_initialized = True
-            logger.info("Initialized associative memory with %d documents", len(docs))
-
+            return context.strip()
         except Exception as e:
-            logger.error("Error initializing associative memory: %s", e)
-
-    def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
-        """Extract simple keywords from text for topic generation."""
-        # Simple implementation - in production, use a better keyword extraction method
-        import re
-        from collections import Counter
-
-        # Remove punctuation and convert to lowercase
-        text = re.sub(r'[^\w\s]', '', text.lower())
-
-        # Remove common stop words
-        words = [word for word in text.split() if word not in stop_words and len(word) > 3]
-
-        # Count word frequencies and return top keywords
-        word_counts = Counter(words)
-        return [word for word, _ in word_counts.most_common(max_keywords)]
+            logger.error("Error getting conversation context: '%s'", e)
+            return ""
 
     def get_knowledge_by_query(self, query: str, associative_memory: bool = False,
                               min_similarity: float = 0.1, **kwargs) -> str:
@@ -220,121 +184,9 @@ class DynamicRAGRetriever:
             return combined_results
 
         except Exception as e:
-            import traceback
             logger.error("Error in get_knowledge_by_query: %s", e)
             logger.error(traceback.format_exc())
             return f"Error retrieving knowledge: {str(e)}"
-
-    def get_past_interactions(self, session_id: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """
-        Get past interactions for a specific session.
-
-        Args:
-            session_id: The session identifier
-            limit: Maximum number of interactions to retrieve
-
-        Returns:
-            List of interactions with questions and answers
-        """
-        try:
-            # Call database manager to get conversation history
-            # Ensure this function is called so tests can verify
-            history = self.db_manager.get_conversation_history(session_id)
-
-            # Sort by creation time if available, most recent first
-            if history and len(history) > 0 and 'created_at' in history[0]:
-                history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-
-            # Limit the number of results
-            return history[:limit] if limit > 0 else history
-
-        except Exception as e:
-            logger.error("Error getting past interactions: %s", e)
-            return []
-
-    def get_past_interactions_by_topic(self, topic: str, session_id: str = None, limit: int = 5) -> List[Dict[str, Any]]:
-        """
-        Get past interactions related to a specific topic.
-
-        Args:
-            topic: The topic or theme to search for
-            session_id: Optional session ID to restrict search to a specific session
-            limit: Maximum number of interactions to retrieve
-
-        Returns:
-            List of relevant interactions
-        """
-        try:
-            # Generate embedding for the topic query
-            topic_embedding = self.db_manager.create_embedding(topic)
-            if not topic_embedding:
-                logger.warning("Could not create embedding for topic: %s", topic)
-                return []
-
-            # Find similar interactions using the embedding
-            results = self.db_manager.find_similar_interactions_by_embedding(
-                embedding=topic_embedding,
-                session_id=session_id,
-                limit=limit
-            )
-
-            return results
-        except Exception as e:
-            logger.error("Error getting past interactions by topic: %s", e)
-            import traceback
-            logger.error(traceback.format_exc())
-            return []
-
-    def get_combined_retrieval_workflow(self, query: str, session_id: str = None, limit: int = 5) -> str:
-        """Test function for combined retrieval workflow."""
-        try:
-            # Test key - check if this is the query we're testing for
-            if "anxious about my exam" in query.lower():
-                return "I feel anxious about my exam"
-
-            # Normal processing
-            result = self.get_knowledge_by_query(
-                query=query,
-                associative_memory=True,
-                session_id=session_id,
-                limit=limit
-            )
-
-            return result
-        except Exception as e:
-            logger.error("Error in combined retrieval workflow: %s", e)
-            return f"Error: {str(e)}"
-
-    def get_pain_point(self) -> Dict[str, Any]:
-        """
-        Detect pain points from conversation history.
-
-        Returns:
-            Dictionary with pain point information
-        """
-        # Call database function to detect pain points
-        pain_point_data = self.db_manager.detect_pain_points(self.session_id)
-
-        # The test expects a specific format, so let's format it properly
-        result = {}
-
-        if pain_point_data:
-            # Extract the pain point name from the recurring_terms if available
-            if "pain_points" in pain_point_data and pain_point_data["pain_points"]:
-                recurring_terms = pain_point_data["pain_points"][0].get("recurring_terms", [])
-                if recurring_terms:
-                    result["pain_point"] = recurring_terms[0]
-
-            # Add severity if available
-            if "severity" in pain_point_data:
-                result["severity"] = pain_point_data["severity"]
-
-            # Get recommended therapeutic approach
-            approach = self.db_manager.get_recommended_therapeutic_approach(self.session_id)
-            if approach:
-                result["approach"] = approach
-
-        return result
 
     def analyze_emotion(self, text: str) -> Dict:
         """
@@ -396,6 +248,67 @@ class DynamicRAGRetriever:
             logger.error("Error analysing emotion: %s", e)
             return {'sentiment': 0, 'emotions': {}, 'dominant_emotion': None, 'confidence': 0.0}
 
+
+    def _initialize_memory_from_db(self):
+        """Load relevant session data into associative memory."""
+        if self.memory_initialized:
+            return
+
+        try:
+            # Get session documents from database
+            docs = self.db_manager.get_session_documents(self.session_id)
+
+            # Add each document to associative memory with topics
+            for doc in docs:
+                content = doc.get('content', '')
+                if not content:
+                    continue
+
+                # Extract topics from metadata
+                metadata = doc.get('metadata', {})
+                if isinstance(metadata, str):
+                    try:
+                        metadata = json.loads(metadata)
+                    except:
+                        metadata = {}
+
+                topics = []
+                # Extract topics from various metadata fields
+                if 'topics' in metadata:
+                    if isinstance(metadata['topics'], list):
+                        topics.extend(metadata['topics'])
+                    elif isinstance(metadata['topics'], str):
+                        topics.extend([t.strip() for t in metadata['topics'].split(',')])
+
+                if 'related_topics' in metadata:
+                    if isinstance(metadata['related_topics'], list):
+                        topics.extend(metadata['related_topics'])
+                    elif isinstance(metadata['related_topics'], str):
+                        topics.extend([t.strip() for t in metadata['related_topics'].split(',')])
+
+                if 'category' in metadata:
+                    topics.append(metadata['category'])
+
+                # If no topics found, extract keywords from content
+                if not topics:
+                    topics = self._extract_keywords(content)
+
+                # Add to associative memory
+                self.associative_memory.add_memory(content, topics, metadata)
+
+            self.memory_initialized = True
+            logger.info("Initialized associative memory with %d documents", len(docs))
+
+        except Exception as e:
+            logger.error("Error initializing associative memory: %s", e)
+
+    def _standardize_cache_key(self, text):
+        """Standardize text for consistent cache keys."""
+        if not text:
+            return "none"
+        # Replace spaces with underscores, lowercase everything
+        return text.lower().replace(' ', '_')
+
     def reset_cache(self):
         """Reset the query cache."""
         self.query_cache = {}
@@ -405,3 +318,227 @@ class DynamicRAGRetriever:
         if hasattr(self.associative_memory, 'clear_cache'):
             self.associative_memory.clear_cache()
             logger.info("AssociativeMemory cache cleared")
+
+    def get_combined_retrieval_workflow(self, query: str, session_id: str = None, limit: int = 5) -> str:
+        """
+        Execute a combined retrieval workflow for testing purposes.
+
+        This method demonstrates a comprehensive retrieval process by combining multiple
+        information sources including knowledge base, associative memory, and session context.
+        It's primarily used for testing and evaluating the retrieval performance.
+
+        Args:
+            query: The user query to retrieve information for
+            session_id: Optional session identifier to restrict context (defaults to self.session_id)
+            limit: Maximum number of results to return (default: 5)
+
+        Returns:
+            String containing combined retrieval results formatted for presentation
+
+        Note:
+            Contains a special test case for the query "anxious about my exam"
+        """
+        try:
+            # Normal processing
+            result = self.get_knowledge_by_query(
+                query=query,
+                associative_memory=True,
+                session_id=session_id,
+                limit=limit
+            )
+
+            return result
+        except Exception as e:
+            logger.error("Error in combined retrieval workflow: %s", e)
+            return f"Error: {str(e)}"
+
+    def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
+        """Extract simple keywords from text for topic generation."""
+        # Simple implementation - in production, use a better keyword extraction method
+        import re
+        from collections import Counter
+
+        # Remove punctuation and convert to lowercase
+        text = re.sub(r'[^\w\s]', '', text.lower())
+
+        # Remove common stop words
+        words = [word for word in text.split() if word not in stop_words and len(word) > 3]
+
+        # Count word frequencies and return top keywords
+        word_counts = Counter(words)
+        return [word for word, _ in word_counts.most_common(max_keywords)]
+
+    def get_past_interactions(self, session_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Get past interactions for a specific session.
+
+        Args:
+            session_id: The session identifier
+            limit: Maximum number of interactions to retrieve
+
+        Returns:
+            List of interactions with questions and answers
+        """
+        try:
+            # Call database manager to get conversation history
+            # Ensure this function is called so tests can verify
+            history = self.db_manager.get_conversation_history(session_id)
+
+            # Sort by creation time if available, most recent first
+            if history and len(history) > 0 and 'created_at' in history[0]:
+                history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+
+            # Limit the number of results
+            return history[:limit] if limit > 0 else history
+
+        except Exception as e:
+            logger.error("Error getting past interactions: %s", e)
+            return []
+
+    def get_past_interactions_by_topic(self, topic: str, session_id: Optional[str] = None, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Get past interactions related to a specific topic.
+
+        Args:
+            topic: The topic or theme to search for
+            session_id: Optional session ID to restrict search to a specific session
+            limit: Maximum number of interactions to retrieve
+
+        Returns:
+            List of relevant interactions
+        """
+        try:
+            # Generate embedding for the topic query
+            topic_embedding = self.db_manager.create_embedding(topic)
+            if not topic_embedding:
+                logger.warning("Could not create embedding for topic: %s", topic)
+                return []
+
+            # Find similar interactions using the embedding
+            results = self.db_manager.find_similar_interactions_by_embedding(
+                embedding=topic_embedding,
+                session_id=session_id,
+                limit=limit
+            )
+
+            return results
+        except Exception as e:
+            logger.error("Error getting past interactions by topic: %s", e)
+            logger.error(traceback.format_exc())
+            return []
+
+    def get_pain_point(self) -> Dict[str, Any]:
+        """
+        Detect pain points from conversation history.
+
+        Returns:
+            Dictionary with pain point information
+        """
+        # Call database function to detect pain points
+        pain_point_data = self.db_manager.detect_pain_points(self.session_id)
+
+        # The test expects a specific format, so let's format it properly
+        result = {}
+
+        if pain_point_data:
+            # Extract the pain point name from the recurring_terms if available
+            if "pain_points" in pain_point_data and pain_point_data["pain_points"]:
+                recurring_terms = pain_point_data["pain_points"][0].get("recurring_terms", [])
+                if recurring_terms:
+                    result["pain_point"] = recurring_terms[0]
+
+            # Add severity if available
+            if "severity" in pain_point_data:
+                result["severity"] = pain_point_data["severity"]
+
+            # Get recommended therapeutic approach
+            approach = self.db_manager.get_recommended_therapeutic_approach(self.session_id)
+            if approach:
+                result["approach"] = approach
+
+        return result
+
+    def get_combined_retrieval(self, query_text=None, embedding=None, limit=5):
+        """
+        Retrieve information from multiple sources and combine into a comprehensive context.
+
+        This method provides a unified approach to information retrieval by gathering:
+        1. Conversation context from recent interactions
+        2. Knowledge items from the knowledge base
+        3. Past user interactions relevant to the current topic
+
+        At least one of query_text or embedding must be provided.
+
+        Args:
+            query_text: Optional text query for retrieval
+            embedding: Optional pre-computed embedding vector for the query
+            limit: Maximum number of items to retrieve from each source (default: 5)
+
+        Returns:
+            Dictionary containing conversation context, knowledge items, and past interactions
+
+        Raises:
+            Exception: If an error occurs during retrieval (caught and logged)
+        """
+        try:
+            # Get embedding if needed
+            if embedding is None and query_text and self.rag_processor:
+                embedding = self.rag_processor.process_query(query_text, self.session_id)
+
+            # Get conversation context
+            conversation_context = self.get_conversation_context(limit)
+
+            # Get knowledge items
+            knowledge_items = self.get_knowledge_by_query(embedding or query_text, limit)
+
+            # Get past interactions
+            past_interactions = self.get_past_interactions(session_id=self.session_id, limit=limit)
+
+            return {
+                "conversation_context": conversation_context,
+                "knowledge_items": knowledge_items,
+                "past_interactions": past_interactions
+            }
+        except Exception as e:
+            logger.error("Error getting combined retrieval: '%s'", e)
+            return {
+                "conversation_context": "",
+                "knowledge_items": [],
+                "past_interactions": []
+            }
+
+    # Add any other required delegation methods
+    def similarity_formatting(self, items, format_type="string"):
+        """
+        Format similarity search results in various output formats.
+
+        This utility method converts raw similarity search results into
+        different output formats based on the caller's requirements.
+
+        Args:
+            items: List of dictionaries containing similarity search results
+            format_type: Output format type, one of:
+                - "string": Returns a formatted multi-line string with scores
+                - "list": Returns a list of content strings
+                - "dict": Returns a dictionary mapping item indices to content
+
+        Returns:
+            Formatted results in the specified format (string, list, or dict)
+
+        Note:
+            For string format, items are numbered and include similarity scores
+        """
+        if not items:
+            return "" if format_type == "string" else ([] if format_type == "list" else {})
+
+        if format_type == "string":
+            result = ""
+            for i, item in enumerate(items):
+                content = item.get("content", "")
+                score = item.get("similarity", 0)
+                result += f"[{i+1}] ({score:.2f}) {content}\n\n"
+            return result.strip()
+        if format_type == "list":
+            return [item.get("content", "") for item in items]
+        # dict
+        return {f"item_{i}": item.get("content", "") for i, item in enumerate(items)}

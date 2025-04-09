@@ -13,12 +13,13 @@ Key features:
 - Type checking for function parameters using typeguard
 """
 
-import logging
 import traceback
 from typeguard import typechecked
 from typing import List, Dict, Optional
 
-logger = logging.getLogger(__name__)
+from school_logging.log import ColoredLogger
+
+logger = ColoredLogger(__name__)
 
 def format_vector_for_pgvector(vector) -> str:
     """

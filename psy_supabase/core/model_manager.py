@@ -28,7 +28,7 @@ complexity of model loading and memory management.
 import gc
 import os
 import traceback
-from typing import List, Optional, Dict, ClassVar
+from typing import List, Optional, Dict, ClassVar, Literal
 from typeguard import typechecked
 import torch
 import torch.cuda
@@ -54,6 +54,8 @@ class ModelManager:
     and switch devices (e.g., between CPU and GPU).
     """
 
+    _instance = None
+    _model = None
     # Class variable to store instances (no global variables)
     _instances: ClassVar[Dict[str, 'ModelManager']] = {}
     # Add models directory path
@@ -73,27 +75,11 @@ class ModelManager:
         Returns:
             ModelManager instance
         """
-        # Auto-detect device if not specified
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+        if cls._instance is None:
+            cls._instance = cls(model_name, device, quantize)
+        return cls._instance
 
-        # Use model_name as key (include quantization setting)
-        instance_key = f"{model_name}_{device}_quant={quantize}"
-
-        # Create if doesn't exist
-        if instance_key not in cls._instances:
-            cls._instances[instance_key] = cls(model_name, device, quantize)
-
-        # Get the instance
-        instance = cls._instances[instance_key]
-
-        # Update device if different
-        if instance.preferred_device != device:
-            instance.preferred_device = device
-
-        return instance
-
-    def __init__(self, model_name, device="cpu", quantize=False):
+    def __init__(self, model_name, device: Optional[str] = None, quantize=False):
         """
         Initialize the ModelManager instance.
 
@@ -103,7 +89,14 @@ class ModelManager:
             quantize: Whether to use quantization for the model
         """
         self.model_name = model_name
-        self.preferred_device = device
+
+        # Ensure device is always "cpu" or "cuda", defaulting to "cpu" if None
+        if device is None:
+            # Auto-detect if CUDA is available
+            self.preferred_device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.preferred_device = device
+
         self.quantize = quantize
         self.generator = None
         self.embedding_model = None
@@ -134,6 +127,7 @@ class ModelManager:
 
         return False
 
+    @typechecked
     def get_generator(self):
         """Get or initialize text generator with local model caching."""
         # Initialize on first use
@@ -175,7 +169,7 @@ class ModelManager:
                     # If full model download fails, try direct initialization
                     self.generator = TextGenerator(self.model_name, self.preferred_device, quantize=self.quantize)
 
-            self.current_device = self.preferred_device
+            self.current_device: Literal["cpu", "cuda"] = self.preferred_device
         else:
             # Make sure model is fully on the right device
             self.logger.info("Moving existing model to %s", self.preferred_device)
@@ -184,7 +178,7 @@ class ModelManager:
                 if not (self.quantize and hasattr(self.generator, 'using_device_map') and self.generator.using_device_map):
                     self.generator.model = self.generator.model.to(self.preferred_device)
                 self.generator.device = self.preferred_device
-                self.current_device = self.preferred_device
+                self.current_device: Literal["cpu", "cuda"] = self.preferred_device
         return self.generator
 
     @typechecked
@@ -219,6 +213,26 @@ class ModelManager:
             self.embedding_model = self.embedding_model.to('cpu')
             torch.cuda.empty_cache()
             gc.collect()
+
+    def move_to_cpu(self):
+        """Move model to CPU and clear CUDA cache properly"""
+        # Check if generator exists and has a model attribute
+        if self.generator is not None and hasattr(self.generator, 'model') and self.generator.device == "cuda":
+            # First move model to CPU
+            self.generator.model = self.generator.model.to('cpu')
+            self.generator.device = "cpu"
+            self.current_device = "cpu"  # Update the current_device tracker too
+
+            # Explicitly delete any CUDA tensor caches
+            gc.collect()
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()  # Wait for CUDA operations to finish
+
+            # Log actual memory state
+            if torch.cuda.is_available():
+                allocated = torch.cuda.memory_allocated() / (1024**3)
+                reserved = torch.cuda.memory_reserved() / (1024**3)
+                self.logger.info("After moving to CPU: %.2fGB allocated, %.2fGB reserved", allocated, reserved)
 
     def generate_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -272,9 +286,9 @@ class ModelManager:
             self.logger.error(traceback.format_exc())
 
             # Try with sentence transformer as fallback
-            return self._generate_embedding_with_sentence_transformer(text)
+            return self.generate_embedding_with_sentence_transformer(text)
 
-    def _generate_embedding_with_sentence_transformer(self, text: str) -> Optional[List[float]]:
+    def generate_embedding_with_sentence_transformer(self, text: str) -> Optional[List[float]]:
         """
         Generate embedding using sentence-transformers as a fallback.
 
@@ -408,6 +422,7 @@ class EmbeddingProviderAdapter:
         """Initialize the embedding provider."""
         self.provider_type = provider_type
         self.model_name = model_name
+        self._provider = None
         self.logger = ColoredLogger(__name__)
 
     def get_embedding_dimension(self) -> int:
@@ -419,11 +434,12 @@ class EmbeddingProviderAdapter:
         """
         if "phi" in self.model_name.lower():
             return 2048  # For phi-1.5
-        elif "facebook" in self.model_name.lower() or "fb" in self.model_name.lower():
+        if "facebook" in self.model_name.lower() or "fb" in self.model_name.lower():
             return 768  # For Facebook models
-        else:
-            # Default for other models
-            return 1536
+        if "all-minilm-l6-v2" in self.model_name.lower():
+            return 256  # For sentence-transformers/all-MiniLM-L6-v2
+        # Default for other models
+        return 1536
 
     def generate_embedding(self, text: str) -> List[float]:
         """
@@ -448,7 +464,7 @@ class EmbeddingProviderAdapter:
 
             # If embedding failed, use fallback
             if embedding is None:
-                embedding = model_manager._generate_embedding_with_sentence_transformer(text)
+                embedding = model_manager.generate_embedding_with_sentence_transformer(text)
 
             # If still None, return zeros
             if embedding is None:

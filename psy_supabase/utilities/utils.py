@@ -171,28 +171,59 @@ def debug_errors(logger=None):
         return wrapper
     return decorator
 
-def cleanup_memory():
-    """Clean up GPU memory."""
-    import torch
-    from psy_supabase.core.model_manager import get_model_manager
-    from school_logging.log import ColoredLogger
-    logger = ColoredLogger("MemoryCleanup")
-    # --- Use GPU if available ---
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def cleanup_memory(force_cuda_cleanup=True):
+    """
+    Clean up memory more aggressively, especially CUDA memory.
 
-    # Define model name at module level for consistency
-    model_name = "microsoft/phi-1_5"
-    try:
-        model_manager = get_model_manager(model_name, device)
-        logger.info("Freeing GPU memory...")
-        model_manager.free_memory()
-        torch.cuda.empty_cache()
-        # Also call Python's garbage collector
-        import gc
+    Args:
+        force_cuda_cleanup (bool): Whether to force CUDA memory cleanup
+    """
+    import gc
+    import torch
+    import warnings
+    from school_logging.log import ColoredLogger
+    logger = ColoredLogger("CleanUp")
+
+    # First collect Python garbage
+
+    gc.collect()
+
+    # Then handle CUDA memory if available and requested
+    if force_cuda_cleanup and torch.cuda.is_available():
+        # Get initial memory stats for logging
+        before_allocated = torch.cuda.memory_allocated() / (1024**3)
+        before_reserved = torch.cuda.memory_reserved() / (1024**3)
+
+        # Suppress the specific PyTorch warning
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=".*torch.distributed.reduce_op.*",
+                category=FutureWarning
+            )
+
+            # Move any lingering CUDA tensors to CPU
+            for obj in gc.get_objects():
+                try:
+                    if torch.is_tensor(obj) and obj.device.type == 'cuda':
+                        obj.to('cpu')
+                except:
+                    pass
+
+        # Force garbage collection again after moving tensors
         gc.collect()
-        logger.info("Memory cleanup completed")
-    except Exception as e:
-        logger.error("Error during memory cleanup: %s", e)
+
+        # Clear CUDA cache
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+        # Get final memory stats
+        after_allocated = torch.cuda.memory_allocated() / (1024**3)
+        after_reserved = torch.cuda.memory_reserved() / (1024**3)
+
+        # Log memory change
+        logger.info("GPU memory cleanup: %.2fGB → %.2fGB allocated, %.2fGB → %.2fGB reserved",
+                   before_allocated, after_allocated, before_reserved, after_reserved)
 
 def parse_bool_env(env_var, default=False):
     """Parse boolean environment variables properly."""

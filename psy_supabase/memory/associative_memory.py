@@ -1,9 +1,39 @@
-import numpy as np
+"""
+associative_memory.py
+
+This module implements a semantic associative memory system for psychological counseling applications.
+The AssociativeMemory class provides capabilities to store, retrieve and associate memories based on
+semantic similarity and topic connections, enabling a rich network of psychological concepts.
+
+Key Features:
+- Semantic similarity search using FAISS vector database
+- Topic-based memory associations
+- Hybrid retrieval combining vector similarity and topic relationships
+- Fallback mechanisms for robustness when embedding models are unavailable
+- Memory caching for performance optimization
+
+Technical Implementation:
+- Uses sentence transformer models for semantic embedding generation
+- Employs FAISS for efficient vector similarity search
+- Provides graceful degradation to keyword-based search as fallback
+- Includes caching to optimize repeated queries
+
+Classes:
+- AssociativeMemory: The main class that manages semantic memories and their associations
+
+Dependencies:
+- faiss: For efficient vector similarity search
+- numpy: For numerical operations
+- ModelManager: For consistent embedding generation across the application
+"""
 from typing import List, Dict, Optional
-from faiss import IndexFlatL2
-from transformers import AutoTokenizer, AutoModel
-import torch
+import traceback
+import numpy as np
+from faiss import IndexFlatIP, normalize_L2
 from school_logging.log import ColoredLogger
+
+# Import the ModelManager
+from psy_supabase.core.model_manager import get_embedding_provider
 
 logger = ColoredLogger(__name__)
 
@@ -11,29 +41,52 @@ class AssociativeMemory:
     """
     Associative Memory for psychological counseling that makes connections between related concepts.
     Uses semantic similarity and explicit associations to create a rich memory network.
+
+    The memory system stores content with topic tags and retrieves related information using:
+    1. Direct semantic similarity via vector embeddings
+    2. Associated memories connected through shared topics
+
+    Attributes:
+        memories: List of memory objects containing content, topics, and embeddings
+        memory_embeddings: Numpy array of all memory embeddings
+        index: FAISS index for efficient similarity search
+        memory_index_map: Mapping from FAISS indices to memory indices
+        topics_to_memories: Dictionary mapping topics to memory indices
+        cache: Query cache for performance optimization
+        model_name: Name of the embedding model being used
+        dimension: Dimensionality of the embeddings
     """
 
     def __init__(self, model_name="sentence-transformers/all-MiniLM-L6-v2"):
-        """Initialize the associative memory with a semantic model."""
+        """
+        Initialize the associative memory with a semantic model.
+
+        Args:
+            model_name: Name of the transformer model to use for embeddings
+                       (default: "sentence-transformers/all-MiniLM-L6-v2")
+        """
         self.memories = []
         self.memory_embeddings = None
         self.index = None
         self.memory_index_map = {}  # Maps FAISS index to memory object index
         self.topics_to_memories = {}  # Maps topics to related memories
         self.cache = {}  # Query cache
+        self.model_name = model_name
 
-        # Load model and tokenizer
+        # Use ModelManager instead of direct model loading
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModel.from_pretrained(model_name)
-            self.dimension = self.model.config.hidden_size
-            logger.info("AssociativeMemory initialized with model: %s", model_name)
+            # Initialize the embedding provider through model manager
+            self.embedding_provider = get_embedding_provider(
+                model_name=model_name
+            )
+            self.dimension = self.embedding_provider.get_embedding_dimension()
+            logger.info("AssociativeMemory initialized with model: %s (dim: %d)",
+                       model_name, self.dimension)
         except Exception as e:
             logger.error("Error loading embedding model: %s", e)
             # Fall back to a simple word-based similarity
-            self.tokenizer = None
-            self.model = None
-            self.dimension = 100  # Placeholder dimension
+            self.embedding_provider = None
+            self.dimension = 384
             logger.warning("Using fallback word-based similarity")
 
     def add_memory(self, content: str, topics: List[str], metadata: Optional[Dict] = None) -> int:
@@ -93,13 +146,20 @@ class AssociativeMemory:
         """
         Query the associative memory for relevant memories.
 
+        The query process:
+        1. Checks the cache for previously seen queries
+        2. Performs semantic similarity search using vector embeddings
+        3. Finds associated memories through shared topic connections
+        4. Falls back to keyword search if semantic search fails
+        5. Formats and returns the combined results
+
         Args:
-            query_text: The query text
-            top_k: Maximum number of direct results to return
-            threshold: Similarity threshold for direct results
+            query_text: The query text to search for
+            top_k: Maximum number of direct results to return (default: 5)
+            threshold: Similarity threshold for direct results (default: 0.6)
 
         Returns:
-            List of memory contents, including associated memories
+            List of memory contents, including associated memories with their relevance scores
         """
         try:
             # Check cache first
@@ -116,16 +176,17 @@ class AssociativeMemory:
             # Perform semantic search if index exists
             direct_results = []
             if self.index is not None:
-                # Search the index
-                D, I = self.index.search(np.array([query_embedding]), top_k)
+                # Normalize the query embedding for cosine similarity
+                query_embedding_norm = np.array([query_embedding], dtype=np.float32)
+                normalize_L2(query_embedding_norm)
 
-                # Filter by threshold and get memory objects
-                for i, (dist, idx) in enumerate(zip(D[0], I[0])):
-                    # Convert distance to similarity score (1 is perfect match)
-                    similarity = 1.0 - min(dist / 2, 0.99)  # Scale and cap
+                # Search the index - for IndexFlatIP, higher scores are better
+                S, I = self.index.search(query_embedding_norm, top_k)
 
-                    # Skip if below threshold
-                    if similarity < threshold:
+                # Process results
+                for score, idx in zip(S[0], I[0]):
+                    # Skip if below threshold or invalid index
+                    if score < threshold or idx < 0:
                         continue
 
                     # Map FAISS index to memory object index
@@ -137,7 +198,7 @@ class AssociativeMemory:
                     direct_results.append({
                         'content': memory['content'],
                         'topics': memory['topics'],
-                        'similarity': similarity,
+                        'similarity': float(score),  # Use score directly as similarity
                         'index': memory_idx,
                         'is_direct': True
                     })
@@ -260,39 +321,63 @@ class AssociativeMemory:
 
         except Exception as e:
             logger.error("Error querying associative memory: %s", e)
-            import traceback
             logger.error(traceback.format_exc())
             return ["Error retrieving memories."]
 
     def clear_cache(self):
-        """Clear the query cache."""
+        """
+        Clear the query cache.
+
+        This removes all cached query results, forcing future queries
+        to perform a full search against the memory store.
+        """
         self.cache = {}
         logger.info("Associative memory cache cleared")
 
     def get_topics(self) -> List[str]:
-        """Get all topics in the memory store."""
+        """
+        Get all topics in the memory store.
+
+        Returns:
+            List of all unique topics across all memories
+        """
         return list(self.topics_to_memories.keys())
 
     def get_memories_by_topic(self, topic: str) -> List[Dict]:
-        """Get all memories associated with a topic."""
+        """
+        Get all memories associated with a topic.
+
+        Args:
+            topic: The topic to search for (case-insensitive)
+
+        Returns:
+            List of memory objects that are tagged with the specified topic
+        """
         topic_lower = topic.lower()
         memory_indices = self.topics_to_memories.get(topic_lower, set())
         return [self.memories[idx] for idx in memory_indices if idx < len(self.memories)]
 
     def _generate_embedding(self, text: str) -> np.ndarray:
-        """Generate an embedding for the given text."""
-        if self.model and self.tokenizer:
-            try:
-                # Use transformer model if available
-                inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=512, padding=True)
-                with torch.no_grad():
-                    outputs = self.model(**inputs)
+        """
+        Generate an embedding for the given text using ModelManager.
 
-                # Use mean pooling
-                embeddings = outputs.last_hidden_state.mean(dim=1).cpu().numpy()
-                return embeddings[0]
+        Uses the configured embedding model to generate a vector representation
+        of the input text. Falls back to a simple embedding if the model fails.
+
+        Args:
+            text: The text to generate an embedding for
+
+        Returns:
+            Numpy array containing the embedding vector
+        """
+        if self.embedding_provider is not None:
+            try:
+                # Get embedding as a list of floats
+                embedding_list = self.embedding_provider.generate_embedding(text)
+                # Convert to numpy array
+                return np.array(embedding_list, dtype=np.float32)
             except Exception as e:
-                logger.error("Error generating embedding with model: %s", e)
+                logger.error("Error generating embedding with ModelManager: %s", e)
                 # Fall back to simple embedding
                 return self._simple_embedding(text)
         else:
@@ -300,11 +385,22 @@ class AssociativeMemory:
             return self._simple_embedding(text)
 
     def _simple_embedding(self, text: str) -> np.ndarray:
-        """Generate a simple embedding based on word presence."""
+        """
+        Generate a simple embedding based on word presence.
+
+        This is a fallback method used when the main embedding model fails.
+        It creates a basic word-presence vector using hashing.
+
+        Args:
+            text: The text to generate a simple embedding for
+
+        Returns:
+            Numpy array containing the simple embedding vector
+        """
         # Very simple embedding - just for fallback
         words = text.lower().split()
         vec = np.zeros(self.dimension)
-        for i, word in enumerate(words):
+        for _, word in enumerate(words):
             hash_val = hash(word) % self.dimension
             vec[hash_val % self.dimension] += 1.0
 
@@ -315,26 +411,45 @@ class AssociativeMemory:
         return vec
 
     def _update_index(self):
-        """Update the FAISS index with all memory embeddings."""
+        """
+        Update the FAISS index with all memory embeddings.
+
+        This rebuilds the entire FAISS index whenever new memories are added,
+        enabling efficient similarity search across all memories.
+        """
         try:
             # Collect all embeddings
             embeddings = np.array([m['embedding'] for m in self.memories], dtype=np.float32)
 
-            # Create new index
-            self.index = IndexFlatL2(embeddings.shape[1])
-            self.index.add(embeddings)
+            # Normalize embeddings for cosine similarity
+            normalize_L2(embeddings)
+
+            # Create new index - use IndexFlatIP for cosine similarity
+            self.index = IndexFlatIP(embeddings.shape[1])
+            self.index.add(x=embeddings)  # pylint: disable=no-value-for-parameter
 
             # Update the mapping
             self.memory_index_map = {i: i for i in range(len(self.memories))}
 
-            logger.info("Updated associative memory index with %d memories", len(self.memories))
+            logger.info("Updated associative memory index with %d memories (cosine similarity)", len(self.memories))
 
         except Exception as e:
             logger.error("Error updating FAISS index: %s", e)
             self.index = None
 
     def _keyword_search(self, query: str, top_k: int) -> List[Dict]:
-        """Fallback keyword-based search."""
+        """
+        Fallback keyword-based search for when vector search is unavailable.
+
+        Performs a simple word overlap calculation between the query and memory contents.
+
+        Args:
+            query: The query text
+            top_k: Maximum number of results to return
+
+        Returns:
+            List of memory dictionaries sorted by word overlap similarity
+        """
         results = []
         query_words = set(query.lower().split())
 
@@ -359,7 +474,19 @@ class AssociativeMemory:
         return results[:top_k]
 
     def _find_associations(self, direct_results: List[Dict], query_text: str) -> List[Dict]:
-        """Find associated memories based on topics from direct results."""
+        """
+        Find associated memories based on topics from direct results.
+
+        Discovers second-order connections by finding memories that share topics
+        with the direct search results but weren't included in those results.
+
+        Args:
+            direct_results: List of direct search result dictionaries
+            query_text: The original query text
+
+        Returns:
+            List of associated memory dictionaries
+        """
         if not direct_results:
             return []
 
@@ -370,8 +497,8 @@ class AssociativeMemory:
 
         # Extract topics from query text
         query_words = query_text.lower().split()
-        for topic in self.topics_to_memories.keys():
-            if topic.lower() in query_text.lower():
+        for topic in self.topics_to_memories:
+            if topic.lower() in query_words:
                 topics.add(topic.lower())
 
         # Find memories associated with these topics
@@ -393,9 +520,10 @@ class AssociativeMemory:
             memory = self.memories[idx]
 
             # Calculate association strength
-            topic_overlap = len(set([t.lower() for t in memory['topics']]).intersection(topics))
-            association_strength = 0.8  # Default high relevance for testing
-
+            # Use set comprehension directly and actually use the variable
+            topic_overlap = len({t.lower() for t in memory['topics']}.intersection(topics))
+            # Use topic_overlap to calculate association_strength
+            association_strength = min(0.8, 0.6 + 0.1 * topic_overlap)  # Scale based on overlap
             # Add with format that matches tests
             associated_results.append({
                 'content': memory['content'],

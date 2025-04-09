@@ -30,7 +30,7 @@ def test_rag_save_interaction():
         'confidence': 0.9
     }
     mock_selector.generate_category_info.return_value = {"Test": 0.9}
-    mock_selector._determine_topic.return_value = "test_topic"
+    mock_selector.determine_topic.return_value = "test_topic"
     processor.prompt_selector = mock_selector
 
     # Call generate_response

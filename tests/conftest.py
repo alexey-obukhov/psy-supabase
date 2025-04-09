@@ -151,6 +151,24 @@ def suppress_logging():
     for logger, level in original_module_levels.items():
         logger.setLevel(level)
 
+@pytest.fixture(autouse=True)
+def cleanup_gpu_memory():
+    """
+    Automatically clean up GPU memory after each test.
+    This fixture runs for all tests without needing to be explicitly requested.
+    """
+    from psy_supabase.utilities.utils import cleanup_memory
+
+    from school_logging.log import ColoredLogger
+    logger = ColoredLogger("cleanup_gpu_memory")
+
+    # Setup: yield to test
+    yield
+
+    # Teardown: clean up memory after test completes (or fails)
+    logger.info("Cleaning up GPU memory after test...")
+    cleanup_memory(force_cuda_cleanup=True)
+
 @pytest.fixture
 def mock_supabase():
     """
@@ -698,3 +716,27 @@ def mock_db_manager_with_spy():
     }
 
     return mock_db
+
+@pytest.fixture(scope="session", autouse=True)
+def manage_gpu_for_test_suite():
+    """Setup and teardown GPU resources for entire test suite."""
+    from psy_supabase.core.model_manager import ModelManager
+    # Before tests, ensure clean state
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+    yield
+
+    # After all tests, clean up model manager singleton
+    # and prevent CUDA memory fragmenting
+    if hasattr(ModelManager, '_instance') and ModelManager._instance is not None:
+        ModelManager._instance.move_to_cpu()
+        ModelManager._instance = None
+
+    # Force garbage collection and CUDA cleanup
+    import gc
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()

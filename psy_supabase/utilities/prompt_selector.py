@@ -57,12 +57,15 @@ Usage:
 """
 import re
 import traceback
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, TYPE_CHECKING
 
 from psy_supabase.utilities.utils import load_enhanced_mental_health_taxonomy
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.nlp_utils import get_spacy_model
 from school_logging.log import ColoredLogger
+
+if TYPE_CHECKING:
+    from psy_supabase.core.model_manager import TextGenerator
 
 logger = ColoredLogger(__name__)
 
@@ -72,7 +75,7 @@ class PromptSelector:
     Uses semantic matching and existing prompt templates for optimal responses.
     """
 
-    def __init__(self, generator):
+    def __init__(self, generator: 'TextGenerator', prompt_templates: Dict[str, str] = prompt_templates):
         """Initialize the prompt selector with the text generator."""
         self.generator = generator
         self.prompt_templates = prompt_templates
@@ -288,7 +291,7 @@ class PromptSelector:
             logger.error("Error selecting prompt template: %s", e)
             return "basic_answer", {"detected_topic": "general", "confidence": 0.5}
 
-    def _determine_topic(self, category_info: Dict[str, str], question: str) -> str:
+    def determine_topic(self, category_info: Dict[str, str], question: str) -> str:
         """
         Determine the most relevant therapeutic topic using the enhanced mental health taxonomy.
         Returns 'emotional support' as default when no specific match is found.
@@ -754,7 +757,7 @@ class PromptSelector:
 
             # Log the analysis results
             logger.info(f"Question analysed - Topic: {analysis['topic']} ({analysis['confidence']:.2f}), "
-                      f"Emotion: {analysis['emotion']} ({analysis['emotion_intensity']:.2f})")
+                        f"Emotion: {analysis['emotion']} ({analysis['emotion_intensity']:.2f})")
 
             return analysis
 

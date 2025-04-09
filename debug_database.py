@@ -21,8 +21,8 @@ def main():
     test_user_id = f"test_debug_{uuid.uuid4().hex[:8]}"
     test_session_id = f"debug_session_{uuid.uuid4().hex[:8]}"
 
-    logger.info(f"Test user ID: {test_user_id}")
-    logger.info(f"Test session ID: {test_session_id}")
+    logger.info("Test user ID: %s", test_user_id)
+    logger.info("Test session ID: %s", test_session_id)
 
     # Initialize DatabaseManager
     supabase_url = os.getenv('SUPABASE_URL')
@@ -39,94 +39,94 @@ def main():
     db_manager.create_user_schema_sync()
 
     # Verify schema exists
-    check_query = f"""
+    check_query = """
     SELECT EXISTS (
         SELECT FROM information_schema.schemata
-        WHERE schema_name = '{db_manager.schema_name}'
+        WHERE schema_name = '%s'
     );
-    """
+    """ % db_manager.schema_name
     check_response = db_manager.supabase.rpc('sql', {'command': check_query}).execute()
-    logger.info(f"Schema exists: {check_response.data}")
+    logger.info("Schema exists: %s", check_response.data)
 
     # Step 2: Verify tables
     logger.info("Step 2: Checking tables")
-    tables_query = f"""
+    tables_query = """
     SELECT string_agg(table_name, ', ')
     FROM information_schema.tables
-    WHERE table_schema = '{db_manager.schema_name}'
+    WHERE table_schema = '%s'
     AND table_type = 'BASE TABLE';
-    """
+    """ % db_manager.schema_name
     tables_response = db_manager.supabase.rpc('sql', {'command': tables_query}).execute()
-    logger.info(f"Tables in schema {db_manager.schema_name}: {tables_response.data}")
+    logger.info("Tables in schema %s: %s", db_manager.schema_name, tables_response.data)
 
     # Step 3: Check columns in interactions table
     logger.info("Step 3: Checking table structure")
-    columns_query = f"""
+    columns_query = """
     SELECT string_agg(column_name, ', ')
     FROM information_schema.columns
-    WHERE table_schema = '{db_manager.schema_name}'
+    WHERE table_schema = '%s'
     AND table_name = 'interactions';
-    """
+    """ % db_manager.schema_name
     columns_response = db_manager.supabase.rpc('sql', {'command': columns_query}).execute()
-    logger.info(f"Columns in {db_manager.schema_name}.interactions: {columns_response.data}")
+    logger.info("Columns in %s.interactions: %s", db_manager.schema_name, columns_response.data)
 
     # If session_id column is missing, add it
     if 'session_id' not in str(columns_response.data).lower():
         logger.warning("session_id column missing, adding it")
-        add_column_query = f"""
-        ALTER TABLE "{db_manager.schema_name}".interactions
+        add_column_query = """
+        ALTER TABLE "%s".interactions
         ADD COLUMN session_id TEXT;
 
-        CREATE INDEX IF NOT EXISTS idx_{db_manager.schema_name}_session_id
-        ON "{db_manager.schema_name}".interactions(session_id);
-        """
+        CREATE INDEX IF NOT EXISTS idx_%s_session_id
+        ON "%s".interactions(session_id);
+        """ % (db_manager.schema_name, db_manager.schema_name, db_manager.schema_name)
         db_manager.supabase.rpc('sql', {'command': add_column_query}).execute()
 
     # Step 4: Direct SQL insertion to verify column
     logger.info("Step 4: Adding test interaction directly")
-    logger.info(f"Inserting interaction with session_id {test_session_id}")
+    logger.info("Inserting interaction with session_id %s", test_session_id)
 
     # Try to insert with both styles of column names
-    insert_query = f"""
-    INSERT INTO "{db_manager.schema_name}".interactions
+    insert_query = """
+    INSERT INTO "%s".interactions
     (context, question, answer, metadata, session_id)
     VALUES
     ('Debug context', 'Debug question?', 'Debug answer',
-     '{{"topic": "debug", "session_id": "{test_session_id}"}}',
-     '{test_session_id}')
+     '{"topic": "debug", "session_id": "%s"}',
+     '%s')
     RETURNING "interaction_id";
-    """
+    """ % (db_manager.schema_name, test_session_id, test_session_id)
 
     try:
         insert_response = db_manager.supabase.rpc('sql', {'command': insert_query}).execute()
-        logger.info(f"Insert response: {insert_response.data}")
+        logger.info("Insert response: %s", insert_response.data)
     except Exception as e:
-        logger.info(f"Insert response: {str(e)}")
+        logger.info("Insert response: %s", str(e))
 
         try:
             insert_response = db_manager.supabase.rpc('sql', {'command': insert_query}).execute()
-            logger.info(f"Insert with lowercase: {insert_response.data}")
+            logger.info("Insert with lowercase: %s", insert_response.data)
         except Exception as e:
-            logger.info(f"Insert with lowercase failed: {str(e)}")
+            logger.info("Insert with lowercase failed: %s", str(e))
 
-    logger.info(f"Inserted interaction with ID: {insert_response.data}")
+    logger.info("Inserted interaction with ID: %s", insert_response.data)
 
     # Step 5: Retrieve conversation history
     logger.info("Step 5: Retrieving conversation history")
     time.sleep(1)  # Wait a moment for any async processes
 
-    logger.info(f"Getting conversation history for session_id {test_session_id}")
-    history_query = f"""
-    SELECT * FROM "{db_manager.schema_name}".interactions
-    WHERE session_id = '{test_session_id}'
-    OR metadata->>'session_id' = '{test_session_id}';
-    """
+    logger.info("Getting conversation history for session_id %s", test_session_id)
+    history_query = """
+    SELECT * FROM "%s".interactions
+    WHERE session_id = '%s'
+    OR metadata->>'session_id' = '%s';
+    """ % (db_manager.schema_name, test_session_id, test_session_id)
 
     try:
         history_response = db_manager.supabase.rpc('sql', {'command': history_query}).execute()
-        logger.info(f"Query response: {history_response.data}")
+        logger.info("Query response: %s", history_response.data)
     except Exception as e:
-        logger.warning(f"Query response: {str(e)}")
+        logger.warning("Query response: %s", str(e))
 
     # Step 6: Test DatabaseManager.save_interaction
     logger.info("Step 6: Testing DatabaseManager.save_interaction method")
@@ -138,28 +138,28 @@ def main():
         session_id=test_session_id
     )
 
-    logger.info(f"save_interaction result: {result}")
+    logger.info("save_interaction result: %s", result)
 
     # Step 7: Check conversation history after save_interaction
     logger.info("Step 7: Checking history after using save_interaction")
     time.sleep(1)
 
-    logger.info(f"Getting conversation history for session_id {test_session_id}")
+    logger.info("Getting conversation history for session_id %s", test_session_id)
     try:
         history = db_manager.get_conversation_history(test_session_id)
-        logger.info(f"History items: {len(history)}")
+        logger.info("History items: %d", len(history))
         if history:
-            logger.info(f"First item: {history[0]}")
+            logger.info("First item: %s", history[0])
     except Exception as e:
-        logger.info(f"Query response: {str(e)}")
+        logger.info("Query response: %s", str(e))
 
     # Step 8: Clean up
     logger.info("Step 8: Cleaning up")
-    cleanup_query = f"""
-    DROP SCHEMA IF EXISTS "{db_manager.schema_name}" CASCADE;
-    """
+    cleanup_query = """
+    DROP SCHEMA IF EXISTS "%s" CASCADE;
+    """ % db_manager.schema_name
     db_manager.supabase.rpc('sql', {'command': cleanup_query}).execute()
-    logger.info(f"Schema {db_manager.schema_name} dropped")
+    logger.info("Schema %s dropped", db_manager.schema_name)
 
 if __name__ == "__main__":
     main()

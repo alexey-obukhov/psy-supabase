@@ -674,7 +674,31 @@ class TextGenerator:
             self._load_model()  # Only load if not already loaded
 
         try:
-            inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=1024).to(self.device)
+            # First tokenize without sending to device
+            inputs = self.tokenizer(
+                text,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=1024
+            )
+
+            # Handle different input types:
+            # 1. If inputs is a BatchEncoding (dictionary-like)
+            if hasattr(inputs, 'items'):
+                # Then properly move each tensor to device
+                if self.device:
+                    inputs = {
+                        k: v.to(self.device)
+                        for k, v in inputs.items()}
+            # 2. If inputs is a simple list or tensor
+            elif isinstance(inputs, (list, torch.Tensor)):
+                # Move the tensor to the device directly
+                if self.device:
+                    inputs = (inputs.to(self.device)
+                              if isinstance(inputs, torch.Tensor)
+                              else torch.tensor(inputs).to(self.device))
+
             with torch.no_grad():
                 outputs = self.model(**inputs, output_hidden_states=True)
 
@@ -812,9 +836,13 @@ class TextGenerator:
             "your feelings are valid. Would you feel comfortable sharing more about what's on your mind? I'm here to listen and help."
         )
 
-    def generate_therapeutic_response(self, user_question: str, template_name: str,
-                                    context: Dict[str, Any],
-                                    conversation_history: Optional[List[Dict]] = None) -> str:
+    def generate_therapeutic_response(
+            self,
+            user_question: str,
+            template_name: str,
+            context: Dict[str, Any],
+            conversation_history: Optional[List[Dict]] = None
+            ) -> str:
         """
         Generate a therapeutic response with real-time knowledge retrieval.
 

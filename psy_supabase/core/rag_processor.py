@@ -68,6 +68,10 @@ from psy_supabase.core.model_manager import EmbeddingProviderAdapter
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 from psy_supabase.utilities.embedding_utils import format_embedding_for_db
 from psy_supabase.core.response_generator import ResponseGenerator
+from psy_supabase.rag.context_determination import (
+    determine_context,
+    create_context_from_similar_interactions
+)
 
 
 # Set up logging
@@ -145,101 +149,8 @@ class RAGProcessor:
         self.VECTOR_CACHE_ENABLED = True      # Enable vector caching for similar questions
 
     @typechecked
-    def generate_response(self,
-                          user_question: str,
-                          session_id: str = "default_session",
-                          device: Optional[str] = 'cuda',
-                          question_id: Optional[int] = None
-                          ) -> str:
-        """
-        Generate a therapeutic response using Dynamic RAG with pain point detection.
-
-        This method is the core orchestration engine of the psychological RAG system,
-        implementing a comprehensive therapeutic response pipeline with specialized
-        components for mental health support.
-
-        The process follows a clinically-informed sequence:
-
-        1. INPUT VALIDATION & SAFETY
-        - Validates input for appropriate content and format
-        - Performs toxicity detection to ensure user safety
-        - Routes potentially harmful content to appropriate handlers
-
-        2. SEMANTIC UNDERSTANDING
-        - Processes query to extract semantic meaning via embeddings
-        - Identifies psychological topics and emotional undertones
-        - Maps user concerns to therapeutic domains (anxiety, depression, etc.)
-
-        3. PAIN POINT DETECTION
-        - Analyzes for recurring psychological fixations across conversations
-        - Detects potential rumination patterns requiring therapeutic intervention
-        - Identifies emotional intensities and cognitive patterns
-
-        4. CONTEXT ENHANCEMENT
-        - Retrieves relevant psychological knowledge using vector similarity
-        - Incorporates conversation history for continuity of care
-        - Identifies "hot topics" requiring specialized handling
-
-        5. THERAPEUTIC APPROACH SELECTION
-        - Dynamically selects therapeutic approaches based on user needs:
-            * CBT techniques for negative thought patterns
-            * Mindfulness approaches for anxiety and rumination
-            * Validation strategies for emotional processing
-            * Exploratory approaches for self-discovery
-
-        6. RESPONSE GENERATION
-        - Applies specialized therapeutic templates matched to user needs
-        - Dynamically retrieves additional knowledge during generation
-        - Ensures responses follow therapeutic best practices
-
-        7. CONTEXT DETERMINATION & PERSISTENCE
-        - Determines the most appropriate psychological context
-        - Saves interaction with relevant metadata for continuity of care
-        - Creates conversation memory for future reference
-
-        Unlike conventional chatbots, this system implements evidence-based
-        therapeutic principles including:
-
-        - Validation before problem-solving (Linehan's DBT principles)
-        - Progressive exposure for anxiety concerns (exposure therapy)
-        - Cognitive restructuring for negative thought patterns (Beck's CBT)
-        - Mindful awareness for rumination and fixation (MBCT techniques)
-        - Attachment-informed responses for relationship concerns
-
-        Args:
-            user_question (str): The user's question or statement to respond to
-            session_id (str): Identifier for the conversation session, enabling
-                            continuity of care across multiple interactions
-            device (Optional[str]): Computational device for embedding operations
-                                (CPU or CUDA for GPU acceleration)
-            question_id (Optional[int]): Unique identifier for tracking specific questions
-
-        Returns:
-            str: A therapeutically-informed response tailored to the user's psychological needs,
-                taking into account conversation history, detected pain points, and appropriate
-                therapeutic approaches.
-
-        Raises:
-            ValueError: For invalid inputs (handled internally with appropriate messaging)
-            Exception: For processing errors (with graceful degradation to maintain conversation)
-
-        Implementation Details:
-        ----------------------
-        - Uses pgvector for efficient similarity search in vector space
-        - Implements conversation memory for contextual awareness
-        - Employs dynamic RAG for real-time knowledge retrieval
-        - Provides specialized handling for mental health topics
-        - Ensures safe degradation modes for all failure points
-
-        Clinical Considerations:
-        ----------------------
-        This implementation prioritizes user safety and therapeutic efficacy by:
-        1. Never reinforcing harmful ideation or behaviors
-        2. Identifying potential risk patterns in conversation
-        3. Providing evidence-informed approaches for common concerns
-        4. Maintaining appropriate therapeutic boundaries
-        5. Avoiding directive advice in favor of guided exploration
-        """
+    def generate_response(self, user_question, session_id="default_session", device="cuda", question_id=None):
+        """Generate a therapeutic response using Dynamic RAG with pain point detection."""
         # Handle invalid inputs
         if not self.response_generator.is_valid_input(user_question):
             return self.response_generator.get_default_response(user_question)
@@ -258,15 +169,47 @@ class RAGProcessor:
             tracking_id = self.response_generator.initialize_tracking(question_id)
             metadata = {"tracking_id": tracking_id, "session_id": session_id}
 
-            # Initialize the dynamic retriever
-            dynamic_retriever = DynamicRAGRetriever(
-                db_manager=self.db_manager,
+            # Process query to get semantic meaning first
+            query_embedding = self.process_query(user_question, session_id)
+
+            # Use both context determination approaches
+            # Get chronological context (most recent conversations)
+            conversation_context = determine_context(
+                self.db_manager,
+                user_question,
                 session_id=session_id,
-                allow_dynamic_queries=True
+                limit=self.MAX_CONVERSATION_EXCHANGES
             )
 
-            # Process query to get semantic meaning
-            query_embedding = self.process_query(user_question, session_id)
+            # Get semantically similar interactions
+            semantic_context = create_context_from_similar_interactions(
+                self.db_manager,
+                query_embedding,
+                session_id=session_id,
+                limit=3
+            )
+
+            # Combine both approaches for the richest context
+            context_sources = []
+            combined_context = ""
+
+            if conversation_context:
+                combined_context += f"Recent conversation history:\n{conversation_context}\n\n"
+                context_sources.append("chronological")
+
+            if semantic_context:
+                combined_context += f"Related past interactions:\n{semantic_context}"
+                context_sources.append("semantic")
+
+            # Add context information to metadata
+            if not metadata:
+                metadata = {}
+
+            if combined_context:
+                metadata["context_determination_used"] = True
+                metadata["context_sources"] = context_sources
+                metadata["context_length"] = len(combined_context)
+                logger.info("Using combined context determination: %d chars", len(combined_context))
 
             # Detect pain points based on query embedding
             pain_point_results = self.detect_pain_points_from_embedding(
@@ -282,6 +225,9 @@ class RAGProcessor:
             # Get hot topics
             hot_topics = self._identify_hot_topics(user_question, query_embedding)
 
+            # Initialize the dynamic retriever
+            dynamic_retriever = self.create_dynamic_retriever(session_id=session_id)
+
             # Build generation context
             generation_context = self.response_generator.build_generation_context(
                 user_question=user_question,
@@ -293,50 +239,53 @@ class RAGProcessor:
                 hot_topics=hot_topics
             )
 
-            # Get conversation history
-            conversation_history = self.get_recent_conversation_history(session_id, limit=2)
+            # This gives us rich context using pgvector similarity search
+            enhanced_context = self._enhance_context_with_relevant_documents(
+                user_question,
+                query_embedding,
+                session_id
+            )
+
+            # Add enhanced knowledge context to generation context
+            if enhanced_context.get('knowledge_context'):
+                generation_context['knowledge_context'] = enhanced_context.get('knowledge_context')
+
+            # Get documents using existing method for relevant documents
+            relevant_documents = self.get_relevant_documents(query_embedding, top_k=5)
+
+            if relevant_documents:
+                generation_context = self.enhance_context_with_relevant_documents(
+                    generation_context,
+                    relevant_documents
+                )
+
+            # Add the combined context to the generation context
+            if combined_context:
+                generation_context["conversation_context"] = combined_context
 
             # Generate response
             response = self.response_generator.generate_response_with_template(
                 user_question=user_question,
                 session_id=session_id,
                 generation_context=generation_context,
-                pain_point_results=pain_point_results,
-                conversation_history=conversation_history
+                pain_point_results=pain_point_results
             )
 
-            # Debug context determination
-            self.response_generator.debug_context_determination(
-                user_question=user_question,
-                detected_topic=topics_context["detected_topic"],
-                extracted_topics=topics_context["extracted_topics"],
-                approach_type=pain_point_results["approach_type"],
-                pain_point=pain_point_results["pain_point"].get("pain_point", {}) if pain_point_results["pain_point"] else {}
-            )
-
-            # Determine final context
-            context, updated_metadata = self.response_generator.determine_final_context(
-                user_question=user_question,
-                topics_context=topics_context,
-                pain_point_results=pain_point_results,
+            # Save interaction with metadata including context sources
+            self.db_manager.save_interaction(
+                question=user_question,
+                answer=response,
+                context=topics_context if topics_context else "",
+                session_id=session_id,
                 metadata=metadata
-            )
-
-            # Save interaction
-            self.response_generator.save_interaction(
-                context=context,
-                user_question=user_question,
-                response=response,
-                metadata=updated_metadata,
-                session_id=session_id
             )
 
             return response
 
         except Exception as e:
             logger.error("Error generating response: %s", e)
-            logger.error(traceback.format_exc())
-            return "I'm sorry, I encountered an error while generating a response. Could you please try again?"
+            logger.error("Traceback (most recent call last):", exc_info=True)
+            return "I apologize, but I'm having trouble generating a response right now. Please try again later."
 
     @typechecked
     def generate_simple_response(self, user_question: str) -> str:
@@ -611,6 +560,34 @@ class RAGProcessor:
                 'has_conversation': False,
                 'user_question': user_question  # Include user question even in error case
             }
+
+    def enhance_context_with_relevant_documents(self, context, relevant_documents):
+        """
+        Enhance generation context with relevant documents from retrieval.
+
+        Args:
+            context: The generation context to enhance
+            relevant_documents: List of documents with relevance scores
+
+        Returns:
+            Enhanced context with added document content
+        """
+        # Make a copy to avoid modifying the original
+        enhanced_context = context.copy() if context else {}
+
+        # Initialize the relevant documents list
+        enhanced_context["relevant_documents"] = []
+
+        # Handle None case defensively
+        if not relevant_documents:
+            return enhanced_context
+
+        # Process and add each relevant document
+        for doc in relevant_documents:
+            if isinstance(doc, dict) and "content" in doc:
+                enhanced_context["relevant_documents"].append(doc["content"])
+
+        return enhanced_context
 
     def _generate_pain_point_approach(self, original_question: str, current_question: str,
                                       emotions: List[Dict], repetition_pattern: Dict) -> Dict:
@@ -1148,13 +1125,11 @@ class RAGProcessor:
 
                     # Log high-quality matches
                     if doc.get('similarity', 0) > 0.8:
-                        logger.info(f"Found highly relevant document (similarity: {doc.get('similarity', 0):.3f})")
-
+                        logger.info("Found highly relevant document (similarity: %.3f)", doc.get('similarity', 0))
             # Add debug logging to see what documents are being retrieved
             for i, doc in enumerate(relevant_documents):
                 content_preview = doc.get('content', '')[:100] + "..." if doc.get('content') else ""
-                logger.debug(f"Retrieved document {i+1} (sim: {doc.get('similarity', 0):.3f}): {content_preview}")
-
+                logger.debug("Retrieved document %d (sim: %.3f): %s", i+1, doc.get('similarity', 0), content_preview)
             return relevant_documents
 
         except Exception as e:
@@ -1184,14 +1159,14 @@ class RAGProcessor:
                 session_id="default_session"  # Use consistent session ID, not None
             )
 
-            logger.info(
-                f"Pain point detected: {pain_point.get('pain_point', 'unknown')} "
-                f"(count: {pain_point.get('count', 0)}, severity: {pain_point.get('severity', 'unknown')})"
-            )
+            logger.info("Pain point detected: %s (count: %d, severity: %s)",
+                        pain_point.get('pain_point', 'unknown'),
+                        pain_point.get('count', 0),
+                        pain_point.get('severity', 'unknown'))
         except Exception as e:
             logger.error("Error logging pain point detection: %s", e)
 
-    def create_dynamic_retriever(self, session_id=None, rag_options=None):
+    def create_dynamic_retriever(self, session_id: Optional[str] = None, rag_options: Optional[dict] = None):
         """
         Create a DynamicRAGRetriever with compatible parameters.
 

@@ -61,19 +61,18 @@ Usage:
     # Analyze psychological themes
     themes = db_manager.extract_psychological_themes(session_id="session_123")
 """
-from supabase import create_client
 from typing import List, Dict, Optional, Any
 import json
 import re
 import traceback
-from typeguard import typechecked
 from datetime import datetime
+from typeguard import typechecked
+from supabase import create_client
 
 from school_logging.log import ColoredLogger
 from psy_supabase.utilities.utils import clean_text, debug_errors
 from psy_supabase.utilities.embedding_utils import detect_repetition_pattern
 from psy_supabase.core.model_manager import get_embedding_provider
-from psy_supabase.utilities.embedding_utils import format_embedding_for_db
 from psy_supabase.utilities.utils_mapping import map_theme_to_approach_type, map_approach_name
 from psy_supabase.utilities.vector_utils import optimize_vector_operations as optimize_vectors
 from psy_supabase.utilities.vector_utils import ensure_vector_indexes, update_table_statistics
@@ -145,19 +144,27 @@ class DatabaseManager:
             # Log for debugging
             logger.debug("Retrieving conversation history for session: %s", session_id)
 
+            # Build parameters for RPC call
+            rpc_params = {
+                'p_schema_name': self.schema_name,
+                'p_session_id': session_id
+            }
+
             # Check if schema exists
             response = self.supabase.rpc(
                 'get_conversation_history',
-                {'p_schema_name': self.schema_name, 'p_session_id': session_id}
+                rpc_params
             ).execute()
+
             if bool(response.data) and all(v is None for v in response.data[0].values()):
                 logger.debug("No data returned from get_conversation_history")
                 return []
+
             # Process the results - handle different response formats
             result = []
             for item in response.data:
                 if isinstance(item, dict):
-                    interaction_id = item['interaction_id']
+                    interaction_id = item.get('interaction_id')
                     question = item.get('question', '')
                     answer = item.get('answer', '')
                     context = item.get('context', '')
@@ -233,7 +240,6 @@ class DatabaseManager:
                 insert_data['session_id'] = session_id
 
             # Direct table insertion
-            #response = self.supabase.table(table_name).insert(insert_data).execute()
             response = self.supabase.rpc('add_interaction', {
                 'p_schema_name': self.schema_name,
                 'p_context': context,
@@ -266,6 +272,7 @@ class DatabaseManager:
                     logger.error("Failed to add embedding for interaction %d", interaction_id)
                     return {'success': False, 'error': 'Failed to add embedding for interaction'}
                 return {'success': True}
+            return {'success': False, 'error': 'Question is empty'}
 
         except Exception as e:
             logger.error("Error adding interaction: %s", e)
@@ -333,7 +340,7 @@ class DatabaseManager:
             if response.data is None:
                 logger.error("Schema creation failed for user %s - no data in response", self.user_id)
                 return False
-            elif response.data is False:
+            if response.data is False:
                 error_message = response.error if response.error else "Schema creation failed"
                 logger.error("Error creating schema for user %s: %s", self.user_id, error_message)
                 return False
@@ -427,9 +434,8 @@ class DatabaseManager:
 
                 logger.info("Retrieved %d documents from knowledge base", len(processed_results))
                 return processed_results
-            else:
-                logger.warning("No documents found in knowledge base")
-                return []
+            logger.warning("No documents found in knowledge base")
+            return []
         except Exception as e:
             logger.error("Error retrieving documents and embeddings: %s", e)
             traceback.print_exc()
@@ -487,9 +493,8 @@ class DatabaseManager:
             # Check if the response contains data
             if response.data:
                 return response.data
-            else:
-                logger.warning("No high-quality interactions found for topic: %s", topic_filter)
-                return []
+            logger.warning("No high-quality interactions found for topic: %s", topic_filter)
+            return []
 
         except Exception as e:
             logger.error("Error retrieving high-quality interactions: %s", e)
@@ -582,7 +587,6 @@ class DatabaseManager:
 
         except Exception as e:
             logger.error("Error finding similar documents: %s", e)
-            import traceback
             logger.error(traceback.format_exc())
             return []
 
@@ -721,13 +725,11 @@ class DatabaseManager:
 
                 logger.info("Found %d similar documents", len(results))
                 return results
-            else:
-                logger.warning("No similar documents found")
-                return []
+            logger.warning("No similar documents found")
+            return []
 
         except Exception as e:
             logger.error("Error finding similar documents via RPC: %s", e)
-            import traceback
             logger.error(traceback.format_exc())
             return []
 
@@ -768,10 +770,9 @@ class DatabaseManager:
             if response.data:
                 logger.info("Successfully added vector index to knowledge_base table for %s", self.schema_name)
                 return True
-            else:
-                # Change warning to info since index creation is often asynchronous
-                logger.info("Vector index creation initiated for %s (this process runs in background)", self.schema_name)
-                return True  # Return true since the operation was initiated
+            # Change warning to info since index creation is often asynchronous
+            logger.info("Vector index creation initiated for %s (this process runs in background)", self.schema_name)
+            return True  # Return true since the operation was initiated
         except Exception as e:
             logger.error("Exception adding vector index: %s", str(e))
             logger.error(traceback.format_exc())
@@ -1080,7 +1081,22 @@ class DatabaseManager:
             logger.error(traceback.format_exc())
             return []
 
-    def find_similar_memories(self, embedding: list, session_id: str, limit: int = 5, threshold: float = 0.6):
+    def find_similar_memories(self, embedding: list, session_id: str, limit: int = 5, threshold: float = 0.6) -> list:
+        """
+        Find psychological memories similar to the provided embedding from a specific session.
+
+        Uses PostgreSQL's pgvector extension to efficiently find interactions with similar
+        vector embeddings, which represent conceptually related memories or experiences.
+
+        Args:
+            embedding: Vector embedding representing the query concept
+            session_id: Session identifier to search within
+            limit: Maximum number of memories to return
+            threshold: Minimum similarity threshold (0-1) for inclusion
+
+        Returns:
+            List of dictionaries containing similar memories with their metadata and similarity scores
+        """
         try:
             # Convert embedding to string format for Postgres
             embedding_str = str(embedding).replace('[', '{').replace(']', '}')
@@ -1528,9 +1544,8 @@ class DatabaseManager:
                 # Create vector index for better performance
                 self.ensure_vector_indexes(self.schema_name)
                 return True
-            else:
-                logger.error("Failed to add any knowledge base entries")
-                return False
+            logger.error("Failed to add any knowledge base entries")
+            return False
         except Exception as e:
             logger.error("Error initializing knowledge base: %s", e)
             logger.error(traceback.format_exc())
@@ -1704,8 +1719,78 @@ class DatabaseManager:
             logger.error(traceback.format_exc())
             return []
 
+    def analyze_emotional_response_to_interaction(self, session_id: str, interaction_id: int) -> Dict[str, Any]:
+        """
+        Analyze the emotional content and quality of an interaction response.
+
+        Args:
+            session_id: Session identifier
+            interaction_id: Interaction ID to analyze
+
+        Returns:
+            Dictionary with emotional analysis results
+        """
+        try:
+            # Get the interaction data
+            history = self.get_conversation_history(session_id)
+
+            # Return default values if history is empty or invalid
+            if not history:
+                logger.warning(f"Empty history for session {session_id}")
+                return {"emotion": "neutral", "quality": 0.5}
+
+            logger.debug(f"Found {len(history)} interactions for session {session_id}")
+
+            # Find the specific interaction
+            target_interaction = None
+            response_text = ""
+
+            for interaction in history:
+                interaction_id_value = None
+
+                # Check what format we're dealing with
+                if isinstance(interaction, dict):
+                    # Dictionary format
+                    interaction_id_value = interaction.get('id')
+                    if interaction_id_value == interaction_id:
+                        response_text = interaction.get("response", "")
+                        target_interaction = interaction
+                        break
+                elif isinstance(interaction, list) and len(interaction) > 0:
+                    # List format
+                    interaction_id_value = interaction[0]
+                    if interaction_id_value == interaction_id and len(interaction) > 2:
+                        response_text = interaction[2]
+                        target_interaction = {
+                            "id": interaction[0],
+                            "question": interaction[1] if len(interaction) > 1 else "",
+                            "response": interaction[2] if len(interaction) > 2 else "",
+                            "timestamp": interaction[3] if len(interaction) > 3 else ""
+                        }
+                        break
+
+            if not target_interaction:
+                logger.warning(f"Interaction {interaction_id} not found in history for session {session_id}")
+                return {"emotion": "neutral", "quality": 0.5}
+
+            # Perform analysis on response_text
+            # For demonstration, return simple metrics
+            word_count = len(response_text.split())
+            quality = min(0.9, max(0.1, word_count / 50))  # Simple metric based on length
+
+            return {
+                "emotion": "empathetic",  # Could be replaced with sentiment analysis
+                "quality": quality,
+                "length": len(response_text)
+            }
+
+        except Exception as e:
+            logger.error(f"Error analysing emotional response to interaction: {str(e)}")
+            # Return default values in case of error
+            return {"emotion": "neutral", "quality": 0.5}
+
     @debug_errors(logger=logger)
-    def analyze_emotional_response_to_interaction(self, interaction_id: int, session_id: str) -> List[Dict]:
+    def analyze_emotional_response_to_interaction_my(self, interaction_id: int, session_id: str) -> List[Dict]:
         """
         Analyze emotional response in interactions with robust type handling.
 
@@ -2059,14 +2144,12 @@ class DatabaseManager:
             if response.data:
                 if isinstance(response.data, list):
                     count = len(response.data)
-                else:
-                    count = 1
+                count = 1
 
                 logger.info("Migrated %d embeddings to interaction_embeddings table", count)
                 return count
-            else:
-                logger.info("No embeddings to migrate")
-                return 0
+            logger.info("No embeddings to migrate")
+            return 0
 
         except Exception as e:
             logger.error("Error migrating embeddings to interaction_embeddings table: %s", e)
@@ -2084,8 +2167,6 @@ class DatabaseManager:
             List[float]: Embedding vector
         """
         try:
-            from psy_supabase.core.model_manager import get_embedding_provider
-
             # Get the embedding provider
             embedding_provider = get_embedding_provider()
 
@@ -2125,7 +2206,6 @@ class DatabaseManager:
                 logger.info("Adding session_id to metadata: %s", session_id)
 
             # Clean the text data
-            clean_context = self._clean_text_for_db(context)
             clean_question = self._clean_text_for_db(question)
             clean_answer = self._clean_text_for_db(answer)
 
@@ -2140,7 +2220,7 @@ class DatabaseManager:
             # Add the interaction using our updated RPC function
             response = self.supabase.rpc('add_interaction', {
                 'p_schema_name': self.schema_name,
-                'p_context': clean_context,
+                'p_context': context,
                 'p_question': clean_question,
                 'p_answer': clean_answer,
                 'p_metadata': metadata_str,
@@ -2150,36 +2230,7 @@ class DatabaseManager:
             # Check response
             logger.info("RPC response: %s", response.data)
 
-            if response.data is None:
-                logger.error("Error saving interaction via RPC - null response")
-
-                # Try direct SQL as fallback
-                logger.info("Trying direct SQL insertion as fallback")
-                query = f"""
-                INSERT INTO "{self.schema_name}".interactions
-                (context, question, answer, metadata, session_id)
-                VALUES (
-                    '{clean_context.replace("'", "''")}',
-                    '{clean_question.replace("'", "''")}',
-                    '{clean_answer.replace("'", "''")}',
-                    '{metadata_str}'::jsonb,
-                    '{session_id}'
-                )
-                RETURNING "interaction_id";
-                """
-
-                try:
-                    fallback_response = self.supabase.rpc('sql', {'command': query}).execute()
-                    if fallback_response.data:
-                        interaction_id = fallback_response.data
-                        logger.info("Fallback successful, interaction ID: %d", interaction_id)
-                    else:
-                        logger.error("Fallback failed")
-                        return False
-                except Exception as fallback_error:
-                    logger.error("Error in SQL fallback: %s", fallback_error)
-                    return False
-            else:
+            if response.data is not None:
                 try:
                     interaction_id = int(response.data)
                     logger.info("Interaction saved successfully with ID: %d", interaction_id)
@@ -2217,10 +2268,10 @@ class DatabaseManager:
 
         except Exception as e:
             logger.error("Error saving interaction: %s", e)
-            import traceback
             logger.error(traceback.format_exc())
             return False
 
+    @typechecked
     def _clean_text_for_db(self, text: str) -> str:
         """
         Clean and escape text for database storage.
@@ -2360,7 +2411,7 @@ class DatabaseManager:
                 severity = 'low'
 
             # Find the first detected pain point
-            first_detected_at = min([p['first_occurrence'] for p in pain_points]) if pain_points else None
+            first_detected_at = min(p['first_occurrence'] for p in pain_points) if pain_points else None
 
             return {
                 'pain_points': pain_points,
@@ -2559,7 +2610,6 @@ class DatabaseManager:
                             continue
 
                         # Extract milliseconds from timestamp
-                        import datetime
                         try:
                             dt = datetime.datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                             ms = int(dt.timestamp() * 1000)
@@ -2887,23 +2937,3 @@ class DatabaseManager:
             logger.info("Schema %s already exists.", self.schema_name)
             return True
         return False
-
-    def execute_query(self, query, params=None):
-        """Execute a SQL query and handle response consistently."""
-        try:
-            # Execute the query
-            response = self.supabase.rpc('sql', {'command': query}).execute()
-
-            # Treat success as having a non-None data attribute
-            if hasattr(response, 'data'):
-                return response.data, None
-
-            # If we reach here, we have an unusual response
-            logger.warning(f"Unusual response format: {type(response)}")
-            return None, "Unexpected response format"
-
-        except Exception as e:
-            # Catch any exceptions and return as error
-            error_msg = str(e)
-            logger.error(f"Exception in database query: {error_msg}")
-            return None, error_msg

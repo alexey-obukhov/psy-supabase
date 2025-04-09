@@ -17,7 +17,7 @@ def test_rag_direct_save():
         # Configure the mock selector
         mock_selector.generate_prompt.return_value = "Test prompt"
         mock_selector.generate_category_info.return_value = {"Test Category": 0.9}
-        mock_selector._determine_topic.return_value = "test_topic"
+        mock_selector.determine_topic.return_value = "test_topic"
         mock_selector.analyze_question.return_value = {"topic": "test", "confidence": 0.9}
 
         # Create processor

@@ -13,7 +13,7 @@ This project uses a multi-model architecture to provide comprehensive therapeuti
    hardware requirements, making it accessible for deployment on consumer hardware.
 
 2. **Sentence-Transformers (all-MiniLM-L6-v2)**: Powers the associative memory component,
-   creating 384-dimensional embeddings that connect related psychological concepts and enable
+   creating 256-dimensional embeddings that connect related psychological concepts and enable
    semantic similarity calculations.
 
 3. **Facebook RoBERTa Hate Speech Detector**: Uses the facebook/roberta-hate-speech-dynabench-r4-target
@@ -66,7 +66,9 @@ The code in this project is licensed under the MIT License. See LICENSE for deta
 ## Citation
 
 If you use this project in your research or derivative work, please cite:
-@software{psy_supabase, author = {Alexey Obukhov}, title = {PSY Supabase: An AI Therapy Assistant}, year = {2025}, url = {https://github.com/alexey-obukhov/psy-supabase} }
+@software{psy_supabase, author = {Alexey Obukhov},
+title = {PSY Supabase: An AI Therapy Assistant}, year = {2025},
+url = {https://github.com/alexey-obukhov/psy-supabase} }
 
 ## Disclaimer
 
@@ -239,8 +241,6 @@ def before_request():
     if not schema_created:
         return jsonify({'error': 'Failed to create user schema'}), 500
 
-    # Add vector index to knowledge base
-    g.db_manager.add_vector_index_to_knowledge_base()
     return None  # Consistent return value
 
 @app.route('/health', methods=['GET'])
@@ -276,45 +276,11 @@ def chat():
         if not data or 'question' not in data:
             return jsonify({"error": "Missing question parameter"}), 400
 
-        user_id = request.headers.get('X-User-ID', 'default_user')
+        user_id = g.user_id  # request.headers.get('X-User-ID', 'default_user')
         question = data['question']
 
         # Log the incoming request
         logger.info("Received chat request from user %s: %s...", user_id, question[:50])
-
-        # Check if knowledge base is empty and initialize if needed
-        # This should be done before expensive model operations
-        try:
-            # Use a SQL query through RPC instead of direct table access
-            # This avoids errors if the table doesn't exist
-            check_query = (
-                f"SELECT COUNT(*) FROM information_schema.tables "
-                f"WHERE table_schema = '{g.db_manager.schema_name}' "
-                f"AND table_name = 'knowledge_base';"
-            )
-
-            table_exists = g.db_manager.supabase.rpc('sql', {'command': check_query}).execute()
-
-            if table_exists.data and table_exists.data[0] == '0':
-                logger.info("Knowledge base table doesn't exist for %s, creating it...", user_id)
-                g.db_manager.create_user_schema_sync()
-
-            # Now check if the table has data
-            count_query = f"SELECT COUNT(*) FROM \"{g.db_manager.schema_name}\".knowledge_base;"
-
-            try:
-                count_result = g.db_manager.supabase.rpc('sql', {'command': count_query}).execute()
-                if count_result.data and count_result.data[0] == '0':
-                    logger.info("Knowledge base for %s is empty, initializing...", user_id)
-                    g.db_manager.initialize_knowledge_base(user_id)
-            except Exception as count_e:
-                # If this fails, the table might not exist despite our earlier check
-                logger.error("Error checking knowledge base count: %s", count_e)
-                g.db_manager.initialize_knowledge_base(user_id)
-
-        except Exception as kb_e:
-            logger.error("Error checking or initializing knowledge base: %s", kb_e)
-            # Continue with chat process even if this fails
 
         # Get the model manager instance and then get the generator
         model_manager = get_model_manager(MODEL_NAME, DEVICE)
@@ -332,26 +298,6 @@ def chat():
                 question_id=0,
             )
 
-            # Validate response before returning
-            if not response or len(response.strip()) < 10:
-                logger.error("Invalid response generated: %s", response)
-                if "anxiety" in question.lower() or "worry" in question.lower() or "stress" in question.lower():
-                    response = (
-                        "I notice you mentioned anxiety or stress. This is a common concern. "
-                        "I'd like to understand more about your specific experience. "
-                        "Could you tell me when you typically feel this way?"
-                    )
-                elif "depress" in question.lower() or "sad" in question.lower() or "down" in question.lower():
-                    response = (
-                        "Thank you for sharing these feelings with me. Depression and sadness can be challenging. "
-                        "I'm here to listen and support you. Would it help to talk about what might be contributing to these feelings?"
-                    )
-                else:
-                    # More general fallback that doesn't make assumptions
-                    response = (
-                        "I want to make sure I understand your concerns correctly. Could you share a bit more "
-                        "about what you're experiencing? I'm here to listen and support you."
-                    )
         finally:
             # Always ensure we free memory for expensive operations
             # Chat is the most memory-intensive operation, so we clean up explicitly
@@ -362,44 +308,10 @@ def chat():
     except Exception as e:
         logger.error("Error in chat endpoint: %s", e)
         logger.error(traceback.format_exc())
-        return jsonify({"response": "I apologise, but I encountered an error. Could you try expressing your concern in a different way?"}), 500
-
-@app.route('/add_document', methods=['POST'])
-def add_document():
-    """Handles document addition requests."""
-    try:
-        data = request.get_json()
-        content = data.get('content')
-
-        if not content:
-            return jsonify({'error': 'Missing content'}), 400
-
-        # Get model manager instance
-        model_manager = get_model_manager(MODEL_NAME, DEVICE)
-
-        try:
-            # Use the embedding method directly from model manager
-            embedding = model_manager.generate_embedding(content)
-
-            if embedding is not None:
-                # Store document with embedding
-                g.db_manager.add_document_to_knowledge_base(content, embedding)
-                return jsonify({'message': 'Document added successfully'})
-
-            return jsonify({'error': 'Failed to generate embedding'}), 500
-        finally:
-            # Clean up if this was an expensive operation (long content)
-            if len(content) > 5000 and DEVICE == "cuda":
-                cleanup_memory()
-    except Exception as e:
-        logger.error("Error in add_document endpoint: %s", e)
-        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
-
-@app.route('/get_documents', methods=['GET'])
-def get_documents():
-    """Retrieves all documents for the authenticated user."""
-    documents = g.db_manager.get_all_documents_and_embeddings()
-    return jsonify({'documents': documents})
+        return jsonify({
+            "response":
+            "I apologise, but I encountered an error. Could you try expressing your concern in a different way?"
+            }), 500
 
 @app.route('/optimize_vectors', methods=['POST'])
 def optimize_vectors():

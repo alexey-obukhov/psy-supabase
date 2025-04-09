@@ -215,6 +215,65 @@ class TestDatabaseManager:
         assert result.get('success') is False
         assert 'error' in result
 
+    def test_add_interaction_with_empty_question(self, db_manager):
+        """Test that add_interaction handles empty question correctly."""
+        # Create test data with empty question
+        data_point = {
+            'question': '',
+            'answer': 'This is an answer',
+            'context': 'Testing empty question',
+            'metadata': {'test_key': 'test_value'}
+        }
+
+        # Call the method
+        result = db_manager.add_interaction(data_point, session_id='test_session')
+
+        # Verify the result
+        assert isinstance(result, dict)
+        assert result.get('success', True) is False
+        assert result.get('error') == 'Question is empty'
+
+    @patch('psy_supabase.core.database.get_embedding_provider')
+    def test_add_interaction_skips_embedding_for_empty_question(self, mock_get_provider, db_manager):
+        """Test that add_interaction doesn't try to create embeddings for empty questions."""
+        # Setup mock embedding provider
+        mock_provider = Mock()
+        mock_get_provider.return_value = mock_provider
+
+        # Configure mock response for RPC call
+        mock_response = Mock()
+        mock_response.data = 123  # Mock interaction_id
+        db_manager.supabase.rpc.return_value.execute.return_value = mock_response
+
+        # Create test data with empty question
+        data_point = {
+            'question': '',
+            'answer': 'This is an answer',
+            'context': 'Testing empty question',
+            'metadata': {'test_key': 'test_value'}
+        }
+
+        # Call the method
+        result = db_manager.add_interaction(data_point, session_id='test_session')
+
+        # Verify the embedding provider wasn't used
+        mock_provider.generate_embedding.assert_not_called()
+
+        # Verify the result indicates failure due to empty question
+        assert isinstance(result, dict)
+        assert result.get('success') is False
+        assert result.get('error') == 'Question is empty'
+
+        # Verify RPC was still called to create the interaction
+        db_manager.supabase.rpc.assert_called_with('add_interaction', {
+            'p_schema_name': db_manager.schema_name,
+            'p_context': 'Testing empty question',
+            'p_question': '',
+            'p_answer': 'This is an answer',
+            'p_metadata': {'test_key': 'test_value', 'session_id': 'test_session'},
+            'p_session_id': 'test_session'
+        })
+
     def test_add_interaction_both_methods_fail(self, db_manager, sample_interaction):
         """Test handling when both RPC and table insert fail."""
         # Configure both methods to fail

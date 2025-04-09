@@ -49,23 +49,23 @@ def main():
         from psy_supabase.core.model_manager import get_embedding_provider
         embedding_provider = get_embedding_provider()
         test_embedding = embedding_provider.generate_embedding(test_question)
-        logger.info(f"Generated test embedding with length {len(test_embedding)}")
+        logger.info("Generated test embedding with length %d", len(test_embedding))
 
         # Then use generate_response with a session ID that clearly identifies it as a session
         response = processor.generate_response(test_question, session_id="health_check")
 
-        logger.info(f"Sample response: {response[:100]}...")
+        logger.info("Sample response: %s...", response[:100])
 
         logger.info("Cleaning up")
-        cleanup_query = f"""
-        DROP SCHEMA IF EXISTS "{db_manager.schema_name}" CASCADE;
-        """
+        cleanup_query = """
+        DROP SCHEMA IF EXISTS "%s" CASCADE;
+        """ % db_manager.schema_name
         db_manager.supabase.rpc('sql', {'command': cleanup_query}).execute()
         logger.info("Schema %s dropped", db_manager.schema_name)
         logger.info("Health check completed successfully!")
         return True
     except Exception as e:
-        logger.error(f"Health check failed: {e}", exc_info=True)
+        logger.error("Health check failed: %s", e, exc_info=True)
         return False
 
 if __name__ == "__main__":

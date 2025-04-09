@@ -17,17 +17,18 @@ DatabaseManager: For saving interactions and retrieving conversation history
 PromptSelector: For template selection and question analysis
 """
 
-from typing import Dict, List, Optional, Any, Tuple
-import json
+from typing import Dict, List, Optional, Tuple
 import traceback
-import re
 from datetime import datetime
+import re
+from typeguard import typechecked
 
 from school_logging.log import ColoredLogger
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
+from psy_supabase.utilities.utils_mapping import map_approach_to_template
 
 # Set up logging
 logger = ColoredLogger(__name__)
@@ -49,6 +50,7 @@ class ResponseGenerator:
         prompt_selector (PromptSelector): Selector for therapeutic prompts
     """
 
+    @typechecked
     def __init__(self, text_generator: TextGenerator, db_manager: DatabaseManager, prompt_selector: PromptSelector):
         """Initialize with required dependencies."""
         self.text_generator = text_generator
@@ -169,7 +171,7 @@ class ResponseGenerator:
 
         # Ensure we have at least one topic
         if not extracted_topics:
-            topic_from_text = self.prompt_selector._determine_topic(category_info, user_question)
+            topic_from_text = self.prompt_selector.determine_topic(category_info, user_question)
             if topic_from_text != "emotional support":
                 extracted_topics.append(topic_from_text)
             else:
@@ -204,6 +206,7 @@ class ResponseGenerator:
             "use_dynamic_retrieval": True,  # Signal to use dynamic retrieval
             "session_id": session_id,
             "extracted_topics": extracted_topics,  # Add extracted topics for the template
+            "query_embedding": query_embedding,
             "psychological_context": {
                 "topic": detected_topic,
                 "emotion": emotion,
@@ -221,31 +224,51 @@ class ResponseGenerator:
 
         return context
 
-    def generate_response_with_template(self, user_question: str, session_id: str,
-                                      generation_context: Dict, pain_point_results: Dict,
-                                      conversation_history: List[Dict]) -> str:
-        """Generate a response using the appropriate template."""
-        template_used = pain_point_results["template_used"]
+    def generate_response_with_template(
+        self,
+        user_question: str,
+        session_id: str,
+        generation_context: Dict,
+        pain_point_results: Dict = None,
+        conversation_history: Optional[List[Dict]] = None
+        ) -> str:
+        """
+        Generate a response using the appropriate template.
 
-        try:
-            # Generate response with dynamic retrieval capability
-            response = self.text_generator.generate_therapeutic_response_with_dynamic_retrieval(
-                user_question=user_question,
-                template_name=template_used,  # Use the appropriate template
-                context=generation_context,
-                conversation_history=conversation_history
-            )
+        Args:
+            user_question: User's question
+            session_id: Session ID
+            generation_context: Context for generation
+            pain_point_results: Results from pain point detection
+            conversation_history: Optional legacy conversation history format (for backwards compatibility)
 
-            # If response is None or empty, generate a fallback response
-            if not response:
-                logger.warning("Received empty response from text generator, using fallback")
-                response = "I apologise, but I'm having trouble generating a response right now. Could you please try asking again?"
+        Returns:
+            Generated response
+        """
+        # Select appropriate template based on pain point results
+        approach_type = pain_point_results.get("approach_type", "default_approach") if pain_point_results else "default_approach"
+        template_name = map_approach_to_template(approach_type)
 
-            return response
+        # Use dynamic retriever if available - don't check for use_dynamic_retrieval flag
+        if 'dynamic_retriever' in generation_context:
+            try:
+                dynamic_retriever = generation_context['dynamic_retriever']
+                # Check if the method exists to avoid AttributeError
+                if hasattr(dynamic_retriever, 'get_conversation_context'):
+                    conversation_context = dynamic_retriever.get_conversation_context()
+                    if conversation_context:
+                        generation_context['conversation_context'] = conversation_context
+            except Exception as e:
+                logger.error("Error using dynamic retriever: %s", str(e))
 
-        except Exception as gen_error:
-            logger.error("Error generating response with dynamic retrieval: %s", gen_error)
-            return "I apologise, but I'm experiencing a technical issue. Please try again with a different question."
+        # Generate using the template
+        response = self.text_generator.generate_therapeutic_response_with_dynamic_retrieval(
+            user_question=user_question,
+            template_name=template_name,
+            context=generation_context
+        )
+
+        return response
 
     def determine_final_context(self, user_question: str, topics_context: Dict,
                               pain_point_results: Dict, metadata: Dict) -> Tuple[str, Dict]:
@@ -255,17 +278,14 @@ class ResponseGenerator:
         pain_point = pain_point_results.get("pain_point", {})
         approach_type = pain_point_results.get("approach_type")
 
-        # Import the mapping function
-        from psy_supabase.utilities.utils_mapping import map_approach_to_template
-
         # Now determine the context
         context = "therapeutic_dialogue"  # Default fallback
 
-        # Get extracted topics from _determine_topic if needed
+        # Get extracted topics from determine_topic if needed
         extracted_topics = []
         category_info = self.prompt_selector.generate_category_info(user_question)
         if category_info:
-            determined_topic = self.prompt_selector._determine_topic(category_info, user_question)
+            determined_topic = self.prompt_selector.determine_topic(category_info, user_question)
             if determined_topic:
                 extracted_topics = [determined_topic]
 

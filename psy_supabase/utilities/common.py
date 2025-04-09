@@ -64,7 +64,7 @@ def load_toxicity_model(logger_instance=None):
     # Check if model exists locally
     if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
         # Use local model
-        log.info(f"Loading toxicity model from local path: {local_path}")
+        log.info("Loading toxicity model from local path: %s", local_path)
         toxicity_tokenizer = AutoTokenizer.from_pretrained(local_path)
         toxicity_model = AutoModelForSequenceClassification.from_pretrained(
             local_path,
@@ -72,7 +72,7 @@ def load_toxicity_model(logger_instance=None):
         )
     else:
         # Download model and save locally
-        log.info(f"Downloading toxicity model to {local_path}")
+        log.info("Downloading toxicity model to %s", local_path)
         ensure_dir_exists(local_path)
 
         # Download and save tokenizer
@@ -85,7 +85,7 @@ def load_toxicity_model(logger_instance=None):
             torch_dtype=torch.float32
         )
         toxicity_model.save_pretrained(local_path)
-        log.info(f"Toxicity model saved to {local_path}")
+        log.info("Toxicity model saved to %s", local_path)
 
     # Always keep toxicity model on CPU for efficiency
     toxicity_model = toxicity_model.to("cpu")

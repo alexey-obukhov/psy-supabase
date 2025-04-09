@@ -285,15 +285,6 @@ class PainPointDemo:
 
         # Look up the conversation in the database to verify it was added
         try:
-            # Using direct SQL to get all interactions for this session
-            query = f"""
-            SELECT question, answer, context, metadata
-            FROM "{self.db_manager.schema_name}"."interactions"
-            WHERE session_id = '{session_id}'
-            ORDER BY created_at;
-            """
-
-            # response = self.db_manager.supabase.rpc('sql', {'command': query}).execute()
             conversations_list = self.db_manager.get_conversation_history(session_id)
             if conversations_list:
                 found_count = len(conversations_list)
