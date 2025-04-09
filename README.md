@@ -1,3 +1,10 @@
+## Colab
+
+**Quickstart on Google Colab:**
+
+Explore `psy-supabase` features here: [https://colab.research.google.com/drive/1ad6ifI8YG9M4INvqVuDlf4pluhnGfuhU#scrollTo=PHLEpbxl7NsU]
+(Requires your existing Supabase Project URL and anon Key).
+
 # Psy Supabase
 
 [![PsySupabase CI](https://github.com/alexey-obukhov/psy-supabase/actions/workflows/psy_supabase_ci.yml/badge.svg)](https://github.com/alexey-obukhov/psy-supabase/actions/workflows/psy_supabase_ci.yml)
