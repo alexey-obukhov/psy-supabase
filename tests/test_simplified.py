@@ -1,5 +1,7 @@
-import pytest
+""" Tests for DynamicRAGRetriever functionality and template selection."""
+
 from unittest.mock import MagicMock
+
 
 def test_rag_processor_simplified():
     """Simplified test for RAG processor."""
@@ -14,10 +16,7 @@ def test_rag_processor_simplified():
     mock_text_gen.generate_text.return_value = "Test response string"
 
     # Create processor
-    processor = RAGProcessor(
-        db_manager=mock_db,
-        generator=mock_text_gen
-    )
+    processor = RAGProcessor(db_manager=mock_db, generator=mock_text_gen)
 
     # Disable toxicity check
     processor.check_toxicity = lambda text: {"is_toxic": False, "score": 0.1}

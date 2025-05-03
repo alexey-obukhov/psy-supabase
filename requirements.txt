@@ -54,8 +54,11 @@ pluggy==1.5.0
 pytest==8.3.5
 typeguard==4.4.0
 
+# Development tools
+pre-commit>=2.17.0   # Pre-commit hooks
+
 # Own logging module
-git+https://github.com/vertok/school_logging.git@main#egg=school-logging
+prismalog==0.1.1
 
 # Installation notes:
 # 1. Install language model: python -m spacy download en_core_web_sm

@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 
 def test_mock_called():
     """Verify that assert_called works properly on a MagicMock."""
@@ -17,6 +19,3 @@ def test_mock_called():
     args, kwargs = mock_func.call_args
     assert args == (1, 2, 3)
     assert kwargs == {"name": "test"}
-
-    # This would fail if we didn't call the mock
-    # mock_func.assert_not_called()

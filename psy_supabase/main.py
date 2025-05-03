@@ -1,5 +1,5 @@
 """
-# PSY Supabase: An AI Therapy Assistant
+# Psy-Supabase: An AI Therapy Assistant
 
 This project implements a therapeutic AI assistant using retrieval-augmented generation (RAG)
 and associative memory to provide mental health support conversations.
@@ -60,14 +60,14 @@ The system supports various environment variables:
 
 The code in this project is licensed under the MIT License. See LICENSE for details.
 
-> Note: While this project uses the microsoft/phi-1_5 model, users should ensure they comply
+> Note: While this project uses the rasyosef/Phi-1_5-Instruct-v0.1 model, users should ensure they comply
 > with Microsoft's licensing terms for the model itself, which may differ from the project code license.
 
 ## Citation
 
 If you use this project in your research or derivative work, please cite:
 @software{psy_supabase, author = {Alexey Obukhov},
-title = {PSY Supabase: An AI Therapy Assistant}, year = {2025},
+title = {Psy-Supabase: An AI Therapy Assistant}, year = {2025},
 url = {https://github.com/alexey-obukhov/psy-supabase} }
 
 ## Disclaimer
@@ -77,40 +77,40 @@ replacement for professional mental health services. The system should not be us
 or treat any medical or psychological condition.
 """
 
-# Standard library imports
-import os
-import sys
-import logging
-import subprocess
-import time
-import random
-import traceback
 import multiprocessing as mp
 
-# Third-party imports
-from flask import Flask, request, jsonify, g
-import torch
+# Standard library imports
+import os
+import random
+import subprocess
+import sys
+import time
+import traceback
+from typing import Optional, Tuple, Union
+
 import spacy
-from school_logging.log import ColoredLogger
+import torch
+
+# Third-party imports
+from flask import Flask, Response, g, jsonify, request
+from prismalog.log import get_logger
 from typeguard import install_import_hook
+
+from psy_supabase.core.database import DatabaseManager
+from psy_supabase.core.model_manager import get_model_manager
+from psy_supabase.core.rag_processor import RAGProcessor
 
 # Local imports
 from psy_supabase.utilities.common import is_github_actions
 from psy_supabase.utilities.nlp_utils import get_spacy_model
 from psy_supabase.utilities.utils import cleanup_memory, parse_bool_env
-from psy_supabase.utilities.logging_config import configure_logging
-from psy_supabase.core.rag_processor import RAGProcessor
-from psy_supabase.core.database import DatabaseManager
-from psy_supabase.core.model_manager import get_model_manager
 
 # Install type checking
-install_import_hook('psy_supabase')
+install_import_hook("psy_supabase")
 
-# Configure logging first thing
-configure_logging(level=logging.INFO)  # Use logging.DEBUG for development
 
 # Set up logging
-logger = ColoredLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Initialize spaCy model at startup
@@ -120,6 +120,7 @@ if nlp is None:
 
 if not is_github_actions():
     from dotenv import load_dotenv
+
     load_dotenv()  # Load environment variables from .env file
     logger.info("Local development: Loading environment from .env file")
 else:
@@ -131,7 +132,8 @@ REQUEST_COUNTER = 0  # Changed to uppercase for constant
 CLEANUP_THRESHOLD = 10  # Clean up after 10 requests
 CLEANUP_TIME_THRESHOLD = 300  # Clean up after 5 minutes
 
-def ensure_spacy_model():
+
+def ensure_spacy_model() -> None:
     """Ensure that the spaCy model is available, downloading if necessary."""
     try:
         # Try to load the spaCy model
@@ -148,10 +150,10 @@ def ensure_spacy_model():
             logger.error("Please install it manually with: python -m spacy download en_core_web_sm")
             # Don't raise an exception, application might still work without the model
 
+
 # Ensure spaCy model is available at startup
 ensure_spacy_model()
 
-# --- Disable tokenizer parallelism ---
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Move these variables to module level so they're available regardless of how the app runs
@@ -165,15 +167,15 @@ if not supabase_url or not supabase_key:
     logger.critical("Error: Please set SUPABASE_URL and SUPABASE_KEY environment variables.")
     # Don't exit here, as it would prevent module import
 
-# --- Use GPU if available ---
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"  # Changed to uppercase for constant
 
 # Define model name at module level for consistency
-MODEL_NAME = "microsoft/phi-1_5"  # Changed to uppercase for constant
+MODEL_NAME = "rasyosef/Phi-1_5-Instruct-v0.1"  # Changed to uppercase for constant
 
 app = Flask(__name__)
 
-def initialize_app():
+
+def initialize_app() -> None:
     """Set up the application before the first request."""
     logger.info("Setting up application...")
     logger.info("Welcome to the Therapy AI Assistant! Using model: %s on %s", MODEL_NAME, DEVICE)
@@ -183,10 +185,12 @@ def initialize_app():
     get_model_manager(MODEL_NAME, DEVICE)
     logger.info("Model manager initialized for %s", MODEL_NAME)
 
+
 # Call initialize directly
 initialize_app()
 
-def should_cleanup_memory():
+
+def should_cleanup_memory() -> bool:
     """Determine if we should clean up GPU memory based on request count and time."""
     global REQUEST_COUNTER, last_memory_cleanup  # pylint: disable=global-statement
 
@@ -198,9 +202,9 @@ def should_cleanup_memory():
     # 1. We've processed enough requests OR
     # 2. It's been long enough since last cleanup OR
     # 3. Randomly with low probability (to avoid memory fragmentation)
-    if (REQUEST_COUNTER >= CLEANUP_THRESHOLD or
-        time_since_cleanup >= CLEANUP_TIME_THRESHOLD or
-        random.random() < 0.05):  # 5% chance to clean up
+    if (
+        REQUEST_COUNTER >= CLEANUP_THRESHOLD or time_since_cleanup >= CLEANUP_TIME_THRESHOLD or random.random() < 0.05
+    ):  # 5% chance to clean up
 
         REQUEST_COUNTER = 0
         last_memory_cleanup = current_time
@@ -208,48 +212,61 @@ def should_cleanup_memory():
 
     return False
 
+
 @app.teardown_request
-def teardown_request(_exception=None):  # Renamed parameter with underscore to mark as unused
+def teardown_request(_exception: Optional[BaseException] = None) -> None:
     """Clean up after request if needed."""
     if DEVICE == "cuda" and should_cleanup_memory():
         cleanup_memory()
 
+
 @app.before_request
-def before_request():
+def before_request() -> Optional[Union[Response, Tuple[Response, int]]]:
     """Initialize DatabaseManager before each request."""
     # Skip for preflight requests
-    if request.method == 'OPTIONS':
+    if request.method == "OPTIONS":
         return None  # Consistent return value
 
     # Skip for paths that don't need authentication
-    if request.path in ['/health', '/memory_status', '/free_memory']:
+    if request.path in ["/health", "/memory_status", "/free_memory"]:
         return None  # Consistent return value
 
-    user_id = request.headers.get('X-User-ID')
+    user_id = request.headers.get("X-User-ID")
     if not user_id:
-        return jsonify({'error': 'User not authenticated'}), 401
+        return jsonify({"error": "User not authenticated"}), 401
 
     # Store user_id in Flask's 'g' object
     g.user_id = user_id
+
+    if not supabase_url or not supabase_key:
+        logger.error("Supabase URL or Key not configured for before_request.")
+        # Return 500 error as the server is misconfigured
+        return jsonify({"error": "Server configuration error"}), 500
 
     # Initialize DatabaseManager and store in 'g'
     g.db_manager = DatabaseManager(supabase_url, supabase_key, g.user_id)
 
     # Create user schema synchronously
-    schema_created = g.db_manager.create_user_schema_sync()
-
-    if not schema_created:
-        return jsonify({'error': 'Failed to create user schema'}), 500
+    try:
+        schema_created = g.db_manager.create_user_schema_sync()
+        if not schema_created:
+            logger.error("Failed to create user schema for user %s", user_id)
+            return jsonify({"error": "Failed to initialize user session"}), 500
+    except Exception as e:
+        logger.error("Exception during schema creation for user %s: %s", user_id, e, exc_info=True)
+        return jsonify({"error": "Failed to initialize user session due to server error"}), 500
 
     return None  # Consistent return value
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Simple health check endpoint."""
-    return jsonify({'status': 'ok'})
 
-@app.route('/memory_status', methods=['GET'])
-def memory_status():
+@app.route("/health", methods=["GET"])
+def health_check() -> Response:
+    """Simple health check endpoint."""
+    return jsonify({"status": "ok"})
+
+
+@app.route("/memory_status", methods=["GET"])
+def memory_status() -> Response:
     """Report memory usage status (useful for monitoring)."""
     if torch.cuda.is_available():
         total = torch.cuda.get_device_properties(0).total_memory / 1e9  # GB
@@ -257,27 +274,30 @@ def memory_status():
         allocated = torch.cuda.memory_allocated(0) / 1e9  # GB
         free = total - reserved
 
-        return jsonify({
-            'device': torch.cuda.get_device_name(0),
-            'total_memory_gb': round(total, 2),
-            'reserved_memory_gb': round(reserved, 2),
-            'allocated_memory_gb': round(allocated, 2),
-            'free_memory_gb': round(free, 2),
-            'utilization_percent': round((reserved / total) * 100, 2)
-        })
+        return jsonify(
+            {
+                "device": torch.cuda.get_device_name(0),
+                "total_memory_gb": round(total, 2),
+                "reserved_memory_gb": round(reserved, 2),
+                "allocated_memory_gb": round(allocated, 2),
+                "free_memory_gb": round(free, 2),
+                "utilization_percent": round((reserved / total) * 100, 2),
+            }
+        )
 
-    return jsonify({'device': 'CPU', 'message': 'No CUDA device available'})
+    return jsonify({"device": "CPU", "message": "No CUDA device available"})
 
-@app.route('/chat', methods=['POST'])
-def chat():
+
+@app.route("/chat", methods=["POST"])
+def chat() -> Union[Response, Tuple[Response, int]]:
     """Handle chat requests with therapeutic responses."""
     try:
         data = request.json
-        if not data or 'question' not in data:
+        if not data or "question" not in data:
             return jsonify({"error": "Missing question parameter"}), 400
 
         user_id = g.user_id  # request.headers.get('X-User-ID', 'default_user')
-        question = data['question']
+        question = data["question"]
 
         # Log the incoming request
         logger.info("Received chat request from user %s: %s...", user_id, question[:50])
@@ -308,13 +328,18 @@ def chat():
     except Exception as e:
         logger.error("Error in chat endpoint: %s", e)
         logger.error(traceback.format_exc())
-        return jsonify({
-            "response":
-            "I apologise, but I encountered an error. Could you try expressing your concern in a different way?"
-            }), 500
+        return (
+            jsonify(
+                {
+                    "response": "I apologise, but I encountered an error. Could you try expressing your concern in a different way?"
+                }
+            ),
+            500,
+        )
 
-@app.route('/optimize_vectors', methods=['POST'])
-def optimize_vectors():
+
+@app.route("/optimize_vectors", methods=["POST"])
+def optimize_vectors() -> Union[Response, Tuple[Response, int]]:
     """Optimize vector operations for the authenticated user."""
     try:
         # Get model manager for embedding generation
@@ -328,9 +353,7 @@ def optimize_vectors():
         interactions = g.db_manager.get_interactions_without_embeddings()
 
         if not interactions:
-            return jsonify({
-                'message': 'No interactions found that need embeddings.'
-            })
+            return jsonify({"message": "No interactions found that need embeddings."})
 
         total_interactions = len(interactions)
         batch_size = min(10, total_interactions)  # Process in smaller batches
@@ -341,13 +364,13 @@ def optimize_vectors():
         try:
             # Process in batches to avoid memory issues
             for i in range(0, total_interactions, batch_size):
-                batch = interactions[i:i+batch_size]
+                batch = interactions[i : i + batch_size]
 
                 for interaction in batch:
                     try:
-                        interaction_id = interaction.get('interaction_id')
-                        question = interaction.get('question', '')
-                        answer = interaction.get('answer', '')
+                        interaction_id = interaction.get("interaction_id")
+                        question = interaction.get("question", "")
+                        answer = interaction.get("answer", "")
 
                         # Generate embedding from combined text - variable removed as unused
                         text_to_embed = f"Question: {question}\nAnswer: {answer}"
@@ -375,32 +398,36 @@ def optimize_vectors():
         # Ensure vector indexes exist
         g.db_manager.ensure_vector_indexes()
 
-        return jsonify({
-            'message': (
-                f'Vector operations optimized. {enriched_count}/{total_interactions} '
-                f'interactions enriched with embeddings.'
-            )
-        })
+        return jsonify(
+            {
+                "message": (
+                    f"Vector operations optimized. {enriched_count}/{total_interactions} "
+                    f"interactions enriched with embeddings."
+                )
+            }
+        )
     except Exception as e:
         logger.error("Error in optimize_vectors endpoint: %s", e)
-        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-@app.route('/free_memory', methods=['POST'])
-def free_memory():
+
+@app.route("/free_memory", methods=["POST"])
+def free_memory() -> Union[Response, Tuple[Response, int]]:
     """Explicitly free GPU memory on demand."""
     if DEVICE != "cuda":
-        return jsonify({'message': 'Running on CPU, no GPU memory to free'})
+        return jsonify({"message": "Running on CPU, no GPU memory to free"})
 
     try:
         cleanup_memory()
-        return jsonify({'message': 'GPU memory freed successfully'})
+        return jsonify({"message": "GPU memory freed successfully"})
     except Exception as e:
         logger.error("Error freeing memory: %s", e)
-        return jsonify({'error': f'Failed to free memory: {str(e)}'}), 500
+        return jsonify({"error": f"Failed to free memory: {str(e)}"}), 500
 
-if __name__ == '__main__':
-    logger = ColoredLogger("psy_supabase")
+
+if __name__ == "__main__":
+    logger = get_logger(__name__)
     if mp.get_start_method(allow_none=True) is None:
-        mp.set_start_method('spawn')
+        mp.set_start_method("spawn")
 
     app.run(debug=False, port=5008)

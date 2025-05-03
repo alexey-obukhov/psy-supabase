@@ -22,12 +22,13 @@ Example usage:
             self.assertTrue(result)
 """
 
-import unittest
 import random
 import string
+import unittest
 from unittest.mock import MagicMock
 
-from school_logging.log import ColoredLogger
+from prismalog.log import get_logger
+
 from psy_supabase.utilities.utils import cleanup_memory
 
 
@@ -49,7 +50,8 @@ def generate_id(length=8):
         >>> print(user_id)
         '8a3f15e2'
     """
-    return ''.join(random.choice(string.hexdigits.lower()) for _ in range(length))
+    return "".join(random.choice(string.hexdigits.lower()) for _ in range(length))
+
 
 def get_optimal_device_for_testing():
     """
@@ -67,12 +69,12 @@ def get_optimal_device_for_testing():
     """
     try:
         import torch
+
         if not torch.cuda.is_available():
             return "cpu"
 
         # Check available memory
-        free_memory_gb = (torch.cuda.get_device_properties(0).total_memory -
-                         torch.cuda.memory_allocated()) / (1024**3)
+        free_memory_gb = (torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated()) / (1024**3)
 
         # If less than 2GB free, use CPU for stability
         if free_memory_gb < 2.0:
@@ -82,6 +84,7 @@ def get_optimal_device_for_testing():
     except (ImportError, Exception):
         # If torch import fails or any other error
         return "cpu"
+
 
 class DatabaseTestBase(unittest.TestCase):
     """
@@ -100,7 +103,7 @@ class DatabaseTestBase(unittest.TestCase):
         test_session_id (str): Unique session ID for this test run
         db_manager (DatabaseManager): Database manager instance configured for testing
         has_db_access (bool): Whether a real database connection is available
-        logger (ColoredLogger): Test-specific logger
+        logger (Logger): Test-specific logger
 
     Test Methods:
         Tests extending this class should use self.db_manager for database operations
@@ -120,7 +123,7 @@ class DatabaseTestBase(unittest.TestCase):
         the class attribute 'allow_no_db' is set to True.
         """
         # Setup logger
-        self.logger = ColoredLogger(__name__)
+        self.logger = get_logger(__name__)
         self.logger.info("Setting up database test environment")
 
         # Generate unique test IDs
@@ -143,7 +146,7 @@ class DatabaseTestBase(unittest.TestCase):
         self.logger.info(f"Using device for tests: {self.test_device}")
 
         # If no DB access, skip integration tests but allow unit tests to run
-        if not self.has_db_access and not getattr(self, 'allow_no_db', False):
+        if not self.has_db_access and not getattr(self, "allow_no_db", False):
             self.skipTest("Unable to connect to database. Skipping integration tests.")
 
     def _create_db_manager(self):
@@ -167,24 +170,25 @@ class DatabaseTestBase(unittest.TestCase):
             import os
 
             # Try to get from environment variables first
-            supabase_url = os.environ.get('SUPABASE_URL')
-            supabase_key = os.environ.get('SUPABASE_KEY')
+            supabase_url = os.environ.get("SUPABASE_URL")
+            supabase_key = os.environ.get("SUPABASE_KEY")
+            self.logger.info("Supabase URL: %s", supabase_url)
+            self.logger.info("Supabase Key: %s", supabase_key)
+            # Check if we are in a CI environment
 
             # If not in environment, use test values
-            if not supabase_url or not supabase_key:
-                self.logger.warning("Using test credentials - real database operations will be limited")
-                supabase_url = "https://example-test.supabase.co"  # Test URL
-                supabase_key = "test_key"  # Test key
+            # if not supabase_url or not supabase_key:
+            #     self.logger.warning("Using test credentials - real database operations will be limited")
+            #     supabase_url = "https://example-test.supabase.co"  # Test URL
+            #     supabase_key = "test_key"  # Test key
 
             # Create a real DB manager for integration tests
             db_manager = DatabaseManager(
-                user_id=self.test_user_id,
-                supabase_url=supabase_url,
-                supabase_key=supabase_key
+                user_id=self.test_user_id, supabase_url=supabase_url, supabase_key=supabase_key
             )
 
             # If needed, set session_id as an attribute
-            if hasattr(db_manager, 'session_id'):
+            if hasattr(db_manager, "session_id"):
                 db_manager.session_id = self.test_session_id
 
             return db_manager
@@ -199,7 +203,7 @@ class DatabaseTestBase(unittest.TestCase):
             # Set up mock supabase
             mock_db.supabase = MagicMock()
             mock_response = MagicMock()
-            mock_response.data = [{'success': True}]  # Default success response
+            mock_response.data = [{"success": True}]  # Default success response
             mock_db.supabase.rpc.return_value.execute.return_value = mock_response
 
             return mock_db
@@ -219,10 +223,12 @@ class DatabaseTestBase(unittest.TestCase):
             test_query = "SELECT 1 as test;"
 
             # Execute query
-            response = self.db_manager.supabase.rpc('sql', {'command': test_query}).execute()
+            # pylint: disable=all
+            response = self.db_manager.supabase.rpc("sql", {"command": test_query}).execute()
+            # pylint: enable=all  # Re-enable checks after the line
 
             # Check if we got a successful response with data
-            if hasattr(response, 'data'):
+            if hasattr(response, "data"):
                 # Any data means we connected
                 self.logger.info("Database connection successful")
                 return True
@@ -230,8 +236,9 @@ class DatabaseTestBase(unittest.TestCase):
                 # No data attribute is a problem
                 self.logger.warning("Database connection test failed: unexpected response format")
                 return False
-        except Exception as e:
-            self.logger.warning(f"Unable to connect to database: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-exception-caught # Acceptable here for test robustness
+            # Fallback for unexpected errors during the test call, but log differently
+            self.logger.error("Unexpected error during database connection test: %s", str(e), exc_info=True)
             return False
 
     def tearDown(self):

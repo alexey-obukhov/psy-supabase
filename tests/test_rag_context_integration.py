@@ -1,19 +1,20 @@
-import pytest
 import uuid
-from unittest.mock import MagicMock, patch
-from typing import List, Dict, Any
 from contextlib import nullcontext
 from time import sleep
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
+from psy_supabase.core.rag_processor import RAGProcessor
+from psy_supabase.core.response_generator import ResponseGenerator
+from psy_supabase.core.text_generator import TextGenerator
+from psy_supabase.rag.context_determination import create_context_from_similar_interactions, determine_context
+from psy_supabase.utilities.prompt_selector import PromptSelector
 
 # Import the base test class
 from tests.helpers.database_test_base import DatabaseTestBase
-
-from psy_supabase.core.rag_processor import RAGProcessor
-from psy_supabase.core.text_generator import TextGenerator
-from psy_supabase.rag.context_determination import determine_context, create_context_from_similar_interactions
-from psy_supabase.core.response_generator import ResponseGenerator
-from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
-from psy_supabase.utilities.prompt_selector import PromptSelector
 
 
 class TestRAGContextIntegration(DatabaseTestBase):
@@ -44,16 +45,14 @@ class TestRAGContextIntegration(DatabaseTestBase):
 
         # Create RAG processor using our real db_manager from DatabaseTestBase
         # and mock text generator
-        with patch("psy_supabase.core.model_manager.EmbeddingProviderAdapter",
-                   return_value=self.mock_embedding_provider):
-            self.rag_processor = RAGProcessor(
-                db_manager=self.db_manager,
-                generator=self.mock_text_generator
-            )
+        with patch(
+            "psy_supabase.core.model_manager.EmbeddingProviderAdapter", return_value=self.mock_embedding_provider
+        ):
+            self.rag_processor = RAGProcessor(db_manager=self.db_manager, generator=self.mock_text_generator)
 
         # IMPORTANT: Disable toxicity detection for all tests
         # This prevents the early exit that's causing our tests to fail
-        patcher = patch.object(self.rag_processor.response_generator, 'check_toxic_content', return_value=None)
+        patcher = patch.object(self.rag_processor.response_generator, "check_toxic_content", return_value=None)
         self.addCleanup(patcher.stop)
         self.mock_toxic_check = patcher.start()
         self.logger.info("Toxicity detection disabled for testing")
@@ -81,14 +80,14 @@ class TestRAGContextIntegration(DatabaseTestBase):
                 "question": "I'm feeling very anxious about my presentation tomorrow.",
                 "answer": "It's normal to feel anxious before a presentation. Have you tried any relaxation techniques?",
                 "created_at": "2025-04-05T10:00:00Z",
-                "metadata": {"topic": "anxiety", "emotion": "fear"}
+                "metadata": {"topic": "anxiety", "emotion": "fear"},
             },
             {
                 "question": "I tried deep breathing but still feel nervous.",
                 "answer": "Deep breathing is a good start. Another technique is to visualize yourself succeeding.",
                 "created_at": "2025-04-05T10:05:00Z",
-                "metadata": {"topic": "anxiety", "emotion": "fear"}
-            }
+                "metadata": {"topic": "anxiety", "emotion": "fear"},
+            },
         ]
 
         # Setup mock similar interactions for semantic search
@@ -97,7 +96,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
                 "question": "How can I overcome stage fright?",
                 "answer": "Stage fright is common. Practice, preparation, and gradual exposure can help build confidence.",
                 "created_at": "2025-03-15T14:30:00Z",
-                "metadata": {"topic": "anxiety", "emotion": "fear"}
+                "metadata": {"topic": "anxiety", "emotion": "fear"},
             }
         ]
 
@@ -108,8 +107,8 @@ class TestRAGContextIntegration(DatabaseTestBase):
 
         # Mock embedding-related methods
         self.db_manager.find_similar_documents.return_value = [
-            {"content": "Anxiety is a normal response to stress.", "similarity": 0.85, "id": "1"},
-            {"content": "Public speaking anxiety affects many people.", "similarity": 0.82, "id": "2"}
+            {"content": "anxiety is a normal response to stress.", "similarity": 0.85, "id": "1"},
+            {"content": "Public speaking anxiety affects many people.", "similarity": 0.82, "id": "2"},
         ]
 
         # Mock pain point detection
@@ -120,8 +119,8 @@ class TestRAGContextIntegration(DatabaseTestBase):
             "recurring_terms": ["anxious", "nervous"],
             "suggested_approach": {
                 "approach_type": "anxiety_exploration",
-                "guidance_question": "I notice anxiety seems to be a recurring theme. What aspects of your presentation worry you most?"
-            }
+                "guidance_question": "I notice anxiety seems to be a recurring theme. What aspects of your presentation worry you most?",
+            },
         }
 
     def _setup_test_data(self):
@@ -140,7 +139,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
                 answer="It's normal to feel anxious before a presentation. Have you tried any relaxation techniques?",
                 context="anxiety",
                 session_id=self.test_session_id,
-                metadata={"topic": "anxiety", "emotion": "fear"}
+                metadata={"topic": "anxiety", "emotion": "fear"},
             )
 
             # Add second interaction
@@ -149,7 +148,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
                 answer="Deep breathing is a good start. Another technique is to visualize yourself succeeding.",
                 context="anxiety",
                 session_id=self.test_session_id,
-                metadata={"topic": "anxiety", "emotion": "fear"}
+                metadata={"topic": "anxiety", "emotion": "fear"},
             )
 
             self.logger.info(f"Test data created for session {self.test_session_id}")
@@ -163,7 +162,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
             try:
                 # Delete test interactions by session ID
                 # This depends on your database structure and methods
-                if hasattr(self.db_manager, 'delete_session_interactions'):
+                if hasattr(self.db_manager, "delete_session_interactions"):
                     self.db_manager.delete_session_interactions(self.test_session_id)
                 self.logger.info(f"Cleaned up test session {self.test_session_id}")
             except Exception as e:
@@ -183,12 +182,17 @@ class TestRAGContextIntegration(DatabaseTestBase):
         user_question = "I'm worried about my presentation. Any tips?"
 
         # Use the correct path based on the log output
-        with patch("psy_supabase.core.rag_processor.determine_context") as mock_determine_context, \
-             patch("psy_supabase.core.rag_processor.create_context_from_similar_interactions") as mock_create_context:
+        with patch("psy_supabase.core.rag_processor.determine_context") as mock_determine_context, patch(
+            "psy_supabase.core.rag_processor.create_context_from_similar_interactions"
+        ) as mock_create_context:
 
             # Configure mock return values
-            mock_determine_context.return_value = "Recent conversation:\nUser: I'm feeling anxious\nAssistant: That's understandable"
-            mock_create_context.return_value = "Similar past conversations:\nUser: How to handle nervousness\nAssistant: Try deep breathing"
+            mock_determine_context.return_value = (
+                "Recent conversation:\nUser: I'm feeling anxious\nAssistant: That's understandable"
+            )
+            mock_create_context.return_value = (
+                "Similar past conversations:\nUser: How to handle nervousness\nAssistant: Try deep breathing"
+            )
 
             # Generate a response
             response = self.rag_processor.generate_response(user_question, session_id)
@@ -207,15 +211,16 @@ class TestRAGContextIntegration(DatabaseTestBase):
         user_question = "How can I manage my anxiety before speaking?"
 
         # The order matters here - patch the exact locations where these are imported in RAGProcessor
-        with patch("psy_supabase.core.rag_processor.determine_context") as mock_det_context, \
-             patch("psy_supabase.core.rag_processor.create_context_from_similar_interactions") as mock_create_context:
+        with patch("psy_supabase.core.rag_processor.determine_context") as mock_det_context, patch(
+            "psy_supabase.core.rag_processor.create_context_from_similar_interactions"
+        ) as mock_create_context:
 
             # Set up distinct return values to check combination
             mock_det_context.return_value = "CHRONOLOGICAL_CONTEXT"
             mock_create_context.return_value = "SEMANTIC_CONTEXT"
 
             # Patch save_interaction to inspect metadata
-            with patch.object(self.db_manager, 'save_interaction') as mock_save:
+            with patch.object(self.db_manager, "save_interaction") as mock_save:
                 # Generate a response
                 response = self.rag_processor.generate_response(user_question, session_id)
 
@@ -229,7 +234,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
 
                 for call in mock_save.call_args_list:
                     args, kwargs = call
-                    metadata = kwargs.get('metadata', {})
+                    metadata = kwargs.get("metadata", {})
                     self.logger.info(f"Metadata in save_interaction: {metadata}")
 
                 # Check the response was generated
@@ -243,8 +248,9 @@ class TestRAGContextIntegration(DatabaseTestBase):
         user_question = "I keep having anxiety attacks before public speaking"
 
         # Mock the context determination functions to return specific values
-        with patch("psy_supabase.core.rag_processor.determine_context", return_value="Chronological context"), \
-             patch("psy_supabase.core.rag_processor.create_context_from_similar_interactions", return_value="Semantic context"):
+        with patch("psy_supabase.core.rag_processor.determine_context", return_value="Chronological context"), patch(
+            "psy_supabase.core.rag_processor.create_context_from_similar_interactions", return_value="Semantic context"
+        ):
 
             # Generate a response which should trigger save_interaction
             response = self.rag_processor.generate_response(user_question, session_id)
@@ -267,8 +273,9 @@ class TestRAGContextIntegration(DatabaseTestBase):
         user_question = "Why do I feel so anxious?"
 
         # Both context methods fail
-        with patch("psy_supabase.core.rag_processor.determine_context", return_value=None) as mock_det_context, \
-             patch("psy_supabase.core.rag_processor.create_context_from_similar_interactions", return_value=None) as mock_create_context:
+        with patch("psy_supabase.core.rag_processor.determine_context", return_value=None) as mock_det_context, patch(
+            "psy_supabase.core.rag_processor.create_context_from_similar_interactions", return_value=None
+        ) as mock_create_context:
 
             # Generate a response
             response = self.rag_processor.generate_response(user_question, session_id)
@@ -301,8 +308,10 @@ class TestRAGContextIntegration(DatabaseTestBase):
         user_question = "I have a presentation in an hour and I'm panicking. Help!"
 
         # Only mock the text generator response to avoid sending to LLM
-        with patch.object(self.rag_processor.response_generator, 'generate_response_with_template') as mock_generate:
-            mock_generate.return_value = "I understand this is a stressful time. Panicking before a presentation is very common."
+        with patch.object(self.rag_processor.response_generator, "generate_response_with_template") as mock_generate:
+            mock_generate.return_value = (
+                "I understand this is a stressful time. Panicking before a presentation is very common."
+            )
 
             # Generate response using real context determination
             response = self.rag_processor.generate_response(user_question, session_id)
@@ -312,7 +321,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
             self.assertGreater(len(response), 0)
 
             # Check the interaction was saved without using limit parameter
-            if hasattr(self.db_manager, 'get_conversation_history'):
+            if hasattr(self.db_manager, "get_conversation_history"):
                 # Modify this to match your actual method signature
                 try:
                     # Try different approaches depending on your implementation
@@ -324,7 +333,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
                     # Find our question in the interactions
                     found = False
                     for interaction in recent_interactions:
-                        if interaction.get('question') == user_question:
+                        if interaction.get("question") == user_question:
                             found = True
                             break
 
@@ -349,25 +358,36 @@ class TestRAGContextIntegration(DatabaseTestBase):
                 all_calls.append(f"CALLED: {name} with {len(args)} args, {len(kwargs)} kwargs")
                 self.logger.info(f"Function called: {name}")
                 return "MOCK CONTEXT"
+
             return _log
 
         # Patch many potential paths to see which ones are used
-        with patch("psy_supabase.rag.context_determination.determine_context", side_effect=log_call("determine_context")), \
-             patch("psy_supabase.rag.context_determination.create_context_from_similar_interactions", side_effect=log_call("create_context")), \
-             patch("psy_supabase.core.rag_processor.determine_context", side_effect=log_call("rag_processor.determine_context")), \
-             patch("psy_supabase.core.rag_processor.create_context_from_similar_interactions", side_effect=log_call("rag_processor.create_context")):
+        with patch(
+            "psy_supabase.rag.context_determination.determine_context", side_effect=log_call("determine_context")
+        ), patch(
+            "psy_supabase.rag.context_determination.create_context_from_similar_interactions",
+            side_effect=log_call("create_context"),
+        ), patch(
+            "psy_supabase.core.rag_processor.determine_context", side_effect=log_call("rag_processor.determine_context")
+        ), patch(
+            "psy_supabase.core.rag_processor.create_context_from_similar_interactions",
+            side_effect=log_call("rag_processor.create_context"),
+        ):
 
             # Also monitor key methods in RAGProcessor
             original_process_query = self.rag_processor.process_query
-            self.rag_processor.process_query = MagicMock(side_effect=lambda *args, **kwargs:
-                all_calls.append(f"CALLED: process_query") or original_process_query(*args, **kwargs))
+            self.rag_processor.process_query = MagicMock(
+                side_effect=lambda *args, **kwargs: all_calls.append(f"CALLED: process_query")
+                or original_process_query(*args, **kwargs)
+            )
 
             # Monitor response generator
-            if hasattr(self.rag_processor, 'response_generator'):
+            if hasattr(self.rag_processor, "response_generator"):
                 original_build = self.rag_processor.response_generator.build_generation_context
                 self.rag_processor.response_generator.build_generation_context = MagicMock(
-                    side_effect=lambda *args, **kwargs:
-                        all_calls.append(f"CALLED: build_generation_context") or original_build(*args, **kwargs))
+                    side_effect=lambda *args, **kwargs: all_calls.append(f"CALLED: build_generation_context")
+                    or original_build(*args, **kwargs)
+                )
 
             # Generate a response and see what gets called
             try:
@@ -380,11 +400,11 @@ class TestRAGContextIntegration(DatabaseTestBase):
             self.logger.info(f"Functions called during generation: {all_calls}")
 
             # Output to help diagnose the issue
-            if not any('determine_context' in call for call in all_calls):
+            if not any("determine_context" in call for call in all_calls):
                 self.logger.warning("determine_context was never called!")
                 # See what methods are available in RAGProcessor
                 for method_name in dir(self.rag_processor):
-                    if not method_name.startswith('_'):
+                    if not method_name.startswith("_"):
                         self.logger.info(f"RAGProcessor has method: {method_name}")
 
     def test_debug_save_interaction(self):
@@ -413,8 +433,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
             recent_interactions = self.db_manager.get_conversation_history(session_id)
 
             # Verify there's at least one interaction
-            self.assertTrue(len(recent_interactions) > 0,
-                           f"No interactions found for session {session_id}")
+            self.assertTrue(len(recent_interactions) > 0, f"No interactions found for session {session_id}")
 
             # Log what we found
             self.logger.info(f"Found {len(recent_interactions)} interactions for session {session_id}")
@@ -422,7 +441,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
             # Check if our question is in the saved interactions
             found = False
             for item in recent_interactions:
-                if user_question.lower() in item.get('question', '').lower():
+                if user_question.lower() in item.get("question", "").lower():
                     found = True
                     self.logger.info("Found our question in the saved interactions")
                     break
@@ -441,4 +460,5 @@ class TestRAGContextIntegration(DatabaseTestBase):
 if __name__ == "__main__":
     # Run tests directly
     import unittest
+
     unittest.main()

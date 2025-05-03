@@ -1,7 +1,8 @@
 def test_rag_implementation_check():
     """Check if the RAGProcessor correctly implements save_interaction call."""
-    from psy_supabase.core.rag_processor import RAGProcessor
     from unittest.mock import MagicMock
+
+    from psy_supabase.core.rag_processor import RAGProcessor
 
     # Create explicit mocks
     db_mock = MagicMock()
@@ -19,7 +20,7 @@ def test_rag_implementation_check():
     processor.prompt_selector.generate_prompt.return_value = "Test prompt"
     processor.prompt_selector.determine_topic.return_value = "test_topic"
     processor.prompt_selector.generate_category_info.return_value = {}
-    processor.prompt_selector.analyze_question.return_value = {"topic": "general"}
+    processor.prompt_selector.analyze_question.return_value = {"topic": "test_topic"}
 
     # Call generate_response
     response = processor.generate_response("Test question", session_id="test")

@@ -1,0 +1,14 @@
+# This is a configuration file for the psy_supabase application.
+log_dir: ./logs
+default_level: debug
+rotation_size_mb: 5
+backup_count: 3
+colored_console: true
+exit_on_critical: false
+
+
+# External loggers configuration - silence noisy libraries
+external_loggers:
+  nltk: WARNING  # Only show WARNING and above from NLTK
+  urllib3: WARNING  # NLTK uses urllib3 for downloads
+  requests: WARNING  # Sometimes used for downloads

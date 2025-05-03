@@ -1,17 +1,20 @@
-import pytest
-import torch
-import logging
+""" Tests for DynamicRAGRetriever functionality and template selection."""
+
+import os
 import traceback
-from unittest.mock import Mock, patch, MagicMock, mock_open
+from unittest.mock import Mock, mock_open, patch
+
+import torch
 from jinja2 import Template
+from prismalog.log import get_logger
 
 from psy_supabase.core.text_generator import TextGenerator
-from tests.conftest import mock_model, mock_tokenizer, text_generator
-from tests.conftest import create_text_generator_mocks, setup_text_generator_for_testing
+from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
+from tests.conftest import setup_text_generator_for_testing
 
 # Configure logging for this test file
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
 
 class TestTemplateDebugging:
     """
@@ -20,6 +23,7 @@ class TestTemplateDebugging:
 
     def test_identify_iteration_point(self, text_generator):
         """Test to identify exactly where the iteration happens."""
+
         # Create a special dict to track access
         class AccessTrackingDict(dict):
             def __init__(self, *args, **kwargs):
@@ -31,9 +35,7 @@ class TestTemplateDebugging:
                 return super().__getitem__(key)
 
         # Create a context with tracking
-        context = AccessTrackingDict({
-            'user_question': "Test question for iteration tracking"
-        })
+        context = AccessTrackingDict({"user_question": "Test question for iteration tracking"})
 
         # Create a special mock template that logs render calls
         class DebugTemplate:
@@ -49,14 +51,14 @@ class TestTemplateDebugging:
 
         try:
             # Patch _load_template to return our debug template
-            with patch.object(text_generator, '_load_template', return_value=debug_template):
+            with patch.object(text_generator, "_load_template", return_value=debug_template):
                 # Patch generate_text to return a simple string
-                with patch.object(text_generator, 'generate_text', return_value="Generated response"):
+                with patch.object(text_generator, "generate_text", return_value="Generated response"):
                     # Run the method
                     result = text_generator.generate_therapeutic_response(
                         user_question="Test question for iteration tracking",
                         template_name="debug_template",
-                        context=context
+                        context=context,
                     )
 
                     # If we get here without error, show successful flow
@@ -79,19 +81,17 @@ class TestTemplateDebugging:
 
         # Test the specific code that might fail
         try:
-            with patch.object(text_generator, '_load_template', return_value=mock_template):
+            with patch.object(text_generator, "_load_template", return_value=mock_template):
                 # Call generate_therapeutic_response
                 checkpoint["value"] = 1
                 result = text_generator.generate_therapeutic_response(
-                    "testing",
-                    "test_template",
-                    {'user_question': "testing"}
+                    "testing", "test_template", {"user_question": "testing"}
                 )
                 checkpoint["value"] = 2
 
                 logger.info("Success! Result: %s", result)
         except Exception as e:
-            logger.error("Failure at checkpoint %s: %s", checkpoint['value'], str(e))
+            logger.error("Failure at checkpoint %s: %s", checkpoint["value"], str(e))
             logger.error(traceback.format_exc())
 
     def test_isolate_mock_issues(self, text_generator):
@@ -109,15 +109,13 @@ class TestTemplateDebugging:
             return torch.tensor(list(range(1, 11)))  # Return 10 tokens
 
         # Apply our mocks
-        with patch.object(text_generator, '_load_template', return_value=mock_template):
+        with patch.object(text_generator, "_load_template", return_value=mock_template):
             # Replace tokenizer.encode with our debug version
             text_generator.tokenizer.encode = mock_encode
 
             try:
                 result = text_generator.generate_therapeutic_response(
-                    "test question",
-                    "test_template",
-                    {'user_question': "test question"}
+                    "test question", "test_template", {"user_question": "test question"}
                 )
                 logger.info("Success! Result: %s", result)
             except Exception as e:
@@ -142,9 +140,7 @@ class TestTemplateDebugging:
 
         try:
             result = text_generator.generate_therapeutic_response(
-                "test question",
-                "test_template",
-                {'user_question': "test question"}
+                "test question", "test_template", {"user_question": "test question"}
             )
             logger.info("Success with bypassed template! Result: %s", result)
         except Exception as e:
@@ -168,12 +164,12 @@ class TestTemplateDebugging:
             logger.debug("Executing step: %s", step_name)
 
         try:
-            with patch.object(text_generator, '_load_template', return_value=mock_template):
+            with patch.object(text_generator, "_load_template", return_value=mock_template):
                 # Detailed step-by-step execution
                 step_logger("Start")
 
                 user_question = "Test question"
-                context = {'user_question': user_question}
+                context = {"user_question": user_question}
                 template_name = "test_template"
 
                 step_logger("Loading template")
@@ -208,7 +204,7 @@ class TestTemplateDebugging:
         </|system|>
 
         <|user|>
-        {{user_question}}
+        {{ user_question }}
         </|user|>
 
         <|assistant|>
@@ -219,12 +215,8 @@ class TestTemplateDebugging:
         try:
             # Create context with all required fields
             context = {
-                'user_question': "How are you today?",
-                'psychological_context': {
-                    'emotion': 'happy',
-                    'topic': 'greeting',
-                    'confidence': 0.9
-                }
+                "user_question": "How are you today?",
+                "psychological_context": {"emotion": "happy", "topic": "greeting", "confidence": 0.9},
             }
 
             # Manually render template
@@ -232,12 +224,10 @@ class TestTemplateDebugging:
             logger.info("Template rendered successfully: %s", rendered)
 
             # Now try the whole function with a patched template
-            with patch.object(text_generator, '_load_template', return_value=real_template):
-                with patch.object(text_generator, 'generate_text', return_value="I'm doing well, thank you!"):
+            with patch.object(text_generator, "_load_template", return_value=real_template):
+                with patch.object(text_generator, "generate_text", return_value="I'm doing well, thank you!"):
                     result = text_generator.generate_therapeutic_response(
-                        "How are you today?",
-                        "test_template",
-                        context
+                        "How are you today?", "test_template", context
                     )
                     logger.info("Function result: %s", result)
 
@@ -248,7 +238,7 @@ class TestTemplateDebugging:
     def test_inspect_template_loading_code(self, text_generator):
         """Test focused on the template loading process."""
         # Inspect _load_template method
-        template_dir = getattr(text_generator, 'template_dir', 'unknown')
+        template_dir = getattr(text_generator, "template_dir", "unknown")
         logger.info("Template directory: %s", template_dir)
 
         # Mock the filesystem operations
@@ -258,23 +248,22 @@ class TestTemplateDebugging:
         </|system|>
 
         <|user|>
-        {{user_question}}
+        {{ user_question }}
         </|user|>
 
         <|assistant|>
         """
 
-        with patch('os.path.join', return_value='/mock/path/to/template.j2'):
-            with patch('os.path.exists', return_value=True):
-                with patch('builtins.open', mock_open(read_data=mock_template_content)):
+        with patch("os.path.join", return_value="/mock/path/to/template.j2"):
+            with patch("os.path.exists", return_value=True):
+                with patch("builtins.open", mock_open(read_data=mock_template_content)):
                     try:
                         # Try to load a template directly
-                        template = text_generator._load_template('any_template')
+                        template = text_generator._load_template("any_template")
                         logger.info("Template loaded: %s", type(template))
 
                         # Try rendering it
-                        rendered = template.render(user_question="test",
-                                                psychological_context={"emotion": "happy"})
+                        rendered = template.render(user_question="test", psychological_context={"emotion": "happy"})
                         logger.info("Template rendered successfully: %s...", rendered[:50])
 
                     except Exception as e:
@@ -285,11 +274,9 @@ class TestTemplateDebugging:
         """Test to pinpoint exactly where template rendering is failing."""
         logger.info("Starting targeted template rendering test")
 
-        # CRITICAL: The issue is in how the template.render() method is mocked
-        # Let's create a robust mock that actually returns a renderable string
         mock_template = Mock()
 
-        # This is CRITICAL: mock_template.render() must return a string, not a Mock!
+        # mock_template.render() must return a string, not a Mock
         mock_template.render.return_value = "This is an actual string that can be iterated"
 
         # Track operation stages
@@ -299,15 +286,15 @@ class TestTemplateDebugging:
             stages.append("Setup mocks")
 
             # Mock the _load_template to return our proper mock
-            with patch.object(text_generator, '_load_template', return_value=mock_template):
+            with patch.object(text_generator, "_load_template", return_value=mock_template):
                 stages.append("After template mock")
 
                 # Mock generate_text to simply return a string
-                with patch.object(text_generator, 'generate_text', return_value="Generated response"):
+                with patch.object(text_generator, "generate_text", return_value="Generated response"):
                     stages.append("After generate_text mock")
 
                     # Create minimal context
-                    context = {'user_question': "Test question"}
+                    context = {"user_question": "Test question"}
 
                     # Now instrument each step of the function that might fail
                     original_encode = text_generator.tokenizer.encode
@@ -326,11 +313,7 @@ class TestTemplateDebugging:
 
                     # Now execute
                     stages.append("Before function call")
-                    result = text_generator.generate_therapeutic_response(
-                        "Test question",
-                        "test_template",
-                        context
-                    )
+                    result = text_generator.generate_therapeutic_response("Test question", "test_template", context)
                     stages.append("After function call")
 
                     logger.info("Result: %s", result)
@@ -347,10 +330,9 @@ class TestTemplateDebugging:
                 logger.error("ITERATION ERROR CONFIRMED: This is our target bug")
 
     def test_fix_template_implementation(self, text_generator):
-        """Test a potential fix for the template rendering issues."""
+        """Test the template rendering issues."""
         logger.info("Testing template rendering fix")
 
-        # Implement the fix directly in this test
         # 1. Create a wrapper class that ensures strings are returned
         class SafeTemplateMock:
             def __init__(self):
@@ -365,24 +347,16 @@ class TestTemplateDebugging:
         safe_template = SafeTemplateMock()
 
         # Set up the test
-        with patch.object(text_generator, '_load_template', return_value=safe_template):
-            with patch.object(text_generator, 'generate_text', return_value="Generated response"):
+        with patch.object(text_generator, "_load_template", return_value=safe_template):
+            with patch.object(text_generator, "generate_text", return_value="Generated response"):
                 # Use a complete context
                 context = {
-                    'user_question': "Test question",
-                    'psychological_context': {
-                        'emotion': 'curious',
-                        'topic': 'testing',
-                        'confidence': 0.9
-                    }
+                    "user_question": "Test question",
+                    "psychological_context": {"emotion": "curious", "topic": "testing", "confidence": 0.9},
                 }
 
                 # Call the method
-                result = text_generator.generate_therapeutic_response(
-                    "Test question",
-                    "test_template",
-                    context
-                )
+                result = text_generator.generate_therapeutic_response("Test question", "test_template", context)
 
                 # Check success
                 logger.info("SUCCESS! Result: %s", result)
@@ -391,15 +365,20 @@ class TestTemplateDebugging:
     def test_example_with_clean_setup(self, mock_model, mock_tokenizer):
         """Test example with clean TextGenerator setup."""
         # Create a fresh TextGenerator with our helper
-        with patch('psy_supabase.core.text_generator.AutoModelForCausalLM.from_pretrained',
-                  return_value=mock_model), \
-             patch('psy_supabase.core.text_generator.AutoTokenizer.from_pretrained',
-                   return_value=mock_tokenizer):
+        with patch(
+            "psy_supabase.core.text_generator.AutoModelForCausalLM.from_pretrained", return_value=mock_model
+        ), patch("psy_supabase.core.text_generator.AutoTokenizer.from_pretrained", return_value=mock_tokenizer):
 
-            fresh_generator = TextGenerator(
-                model_name="test-model",
-                device="cpu"
-            )
+            fresh_generator = TextGenerator(model_name="test-model", device="cpu")
 
             # Apply our testing setup
             setup_text_generator_for_testing(fresh_generator)
+
+    def test_mapping_consistency(self):
+        for theme, data in TherapeuticMappings.THERAPEUTIC_THEMES.items():
+            approach = data.get("approach")
+            logger.info(approach)
+            logger.info(data)
+            assert approach in TherapeuticMappings.APPROACH_TO_TEMPLATE, f"Missing approach: {approach}"
+            template = data.get("template")
+            assert os.path.exists(f"./templates/{template}.j2"), f"Missing template: {template}.j2"

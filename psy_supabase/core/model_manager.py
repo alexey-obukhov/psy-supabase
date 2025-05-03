@@ -28,17 +28,21 @@ complexity of model loading and memory management.
 import gc
 import os
 import traceback
-from typing import List, Optional, Dict, ClassVar, Literal
-from typeguard import typechecked
+from logging import Logger
+from typing import Any, ClassVar, Dict, List, Optional, Tuple
+
 import torch
 import torch.cuda
+from prismalog.log import get_logger
 from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from school_logging.log import ColoredLogger
-from psy_supabase.utilities.common import get_models_dir, load_toxicity_model as common_load_toxicity_model
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from typeguard import typechecked
 
-# Use conditional imports to break the cycle
 from psy_supabase.core.text_generator import TextGenerator
+from psy_supabase.utilities.common import get_models_dir
+from psy_supabase.utilities.common import load_toxicity_model as common_load_toxicity_model
+from psy_supabase.utilities.utils import download_and_store_model
+
 
 # Create a model manager class to handle loading/unloading
 class ModelManager:
@@ -57,13 +61,19 @@ class ModelManager:
     _instance = None
     _model = None
     # Class variable to store instances (no global variables)
-    _instances: ClassVar[Dict[str, 'ModelManager']] = {}
-    # Add models directory path
-    MODELS_DIR = get_models_dir()
+    _instances: ClassVar[Dict[str, "ModelManager"]] = {}
+
+    embedding_model: Optional[SentenceTransformer] = None
+    sentence_transformer: Optional[SentenceTransformer] = None
+    generator: Optional[TextGenerator] = None
+    toxicity_model: Optional[AutoModelForCausalLM] = None
+    toxicity_tokenizer: Optional[AutoTokenizer] = None
 
     @classmethod
     @typechecked
-    def get_instance(cls, model_name: str = "microsoft/phi-1_5", device: Optional[str] = None, quantize: bool = False) -> 'ModelManager':
+    def get_instance(
+        cls, model_name: str = "rasyosef/Phi-1_5-Instruct-v0.1", device: Optional[str] = None, quantize: bool = False
+    ) -> "ModelManager":
         """
         Get or create a ModelManager instance.
 
@@ -79,44 +89,62 @@ class ModelManager:
             cls._instance = cls(model_name, device, quantize)
         return cls._instance
 
-    def __init__(self, model_name, device: Optional[str] = None, quantize=False):
-        """
-        Initialize the ModelManager instance.
-
-        Args:
-            model_name: Name of the model to manage
-            device: Device to use (e.g., "cpu" or "cuda")
-            quantize: Whether to use quantization for the model
-        """
+    def __init__(self, model_name: str, device: Optional[str] = None, quantize: bool = False) -> None:
         self.model_name = model_name
-
-        # Ensure device is always "cpu" or "cuda", defaulting to "cpu" if None
-        if device is None:
-            # Auto-detect if CUDA is available
-            self.preferred_device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.preferred_device = device
-
+        self.logger = get_logger(__name__)
+        self.MODELS_DIR = get_models_dir()
+        self.preferred_device = "cuda" if torch.cuda.is_available() else "cpu" if device is None else device
         self.quantize = quantize
-        self.generator = None
-        self.embedding_model = None
-        self.toxicity_model = None
-        self.sentence_transformer = None
-        self.current_device = None
-        self.logger = ColoredLogger(__name__)
 
-        # Preload toxicity model
-        self.load_toxicity_model()
+        # Download and store main generation model
+        self.generation_model_path = self._download_if_needed(model_name, AutoModelForCausalLM, "generation")
 
-        self.logger.info("ModelManager initialized with model: %s, device: %s, quantize: %s", model_name, device, quantize)
+        # Download and store embedding model (sentence-transformers)
+        self.embedding_model_path = self._download_if_needed(
+            "sentence-transformers/all-mpnet-base-v2", SentenceTransformer, "embedding"
+        )
 
-    def get_local_model_path(self):
+        # Download and store toxicity model (customize as needed)
+        self.toxicity_model_path = self._download_if_needed(
+            "facebook/roberta-hate-speech-dynabench-r4-target", AutoModelForCausalLM, "toxicity"
+        )
+
+        # Now load models from local paths
+        self.generator = TextGenerator(self.generation_model_path, self.preferred_device, quantize=self.quantize)
+        self.sentence_transformer = SentenceTransformer(self.embedding_model_path)
+        self.toxicity_model = AutoModelForCausalLM.from_pretrained(self.toxicity_model_path)
+        self.toxicity_tokenizer = AutoTokenizer.from_pretrained(self.toxicity_model_path)
+
+    def _download_if_needed(self, model_name: str, model_class: Any, model_type: str) -> str:
+        """
+        Download model if not present locally.
+        """
+        local_path = os.path.join(self.MODELS_DIR, model_name.replace("/", "_"))
+        if not (os.path.exists(local_path) and os.listdir(local_path)):
+            self.logger.info(f"Downloading model {model_name} to {local_path}")
+            os.makedirs(local_path, exist_ok=True)
+            if model_class is SentenceTransformer:
+                # Download and save SentenceTransformer model
+                model = SentenceTransformer(model_name)
+                model.save(local_path)
+            else:
+                # Download and save Hugging Face model and tokenizer
+                model = model_class.from_pretrained(model_name)
+                tokenizer = AutoTokenizer.from_pretrained(model_name)
+                model.save_pretrained(local_path)
+                tokenizer.save_pretrained(local_path)
+            self.logger.info(f"{model_type.capitalize()} model saved to {local_path}")
+        else:
+            self.logger.info(f"{model_type.capitalize()} model found locally at {local_path}")
+        return local_path
+
+    def get_local_model_path(self) -> str:
         """Get the local path for the model"""
         # Use just the model name without organisation prefix for folder
-        model_folder = self.model_name.split('/')[-1] if '/' in self.model_name else self.model_name
+        model_folder = self.model_name.split("/")[-1] if "/" in self.model_name else self.model_name
         return os.path.join(self.MODELS_DIR, model_folder)
 
-    def is_model_downloaded(self):
+    def is_model_downloaded(self) -> bool:
         """Check if the model is already downloaded locally"""
         model_path = self.get_local_model_path()
 
@@ -128,7 +156,7 @@ class ModelManager:
         return False
 
     @typechecked
-    def get_generator(self):
+    def get_generator(self) -> TextGenerator:
         """Get or initialize text generator with local model caching."""
         # Initialize on first use
         if self.generator is None:
@@ -169,37 +197,58 @@ class ModelManager:
                     # If full model download fails, try direct initialization
                     self.generator = TextGenerator(self.model_name, self.preferred_device, quantize=self.quantize)
 
-            self.current_device: Literal["cpu", "cuda"] = self.preferred_device
+            self.current_device = self.preferred_device
         else:
             # Make sure model is fully on the right device
-            self.logger.info("Moving existing model to %s", self.preferred_device)
-            if hasattr(self.generator, 'model'):
+            self.logger.info("Ensuring generator model is on device: %s", self.preferred_device)
+            if self.generator is not None and hasattr(self.generator, "model") and self.generator.model is not None:
                 # Only try to move model if not using device_map='auto'
-                if not (self.quantize and hasattr(self.generator, 'using_device_map') and self.generator.using_device_map):
+                if not (
+                    self.quantize and hasattr(self.generator, "using_device_map") and self.generator.using_device_map
+                ):
                     self.generator.model = self.generator.model.to(self.preferred_device)
-                self.generator.device = self.preferred_device
-                self.current_device: Literal["cpu", "cuda"] = self.preferred_device
+                if hasattr(self.generator, "device"):
+                    self.generator.device = self.preferred_device
+                    self.current_device = self.preferred_device
+
         return self.generator
 
     @typechecked
-    def load_toxicity_model(self):
-        """Load the toxicity detection model with local caching support."""
+    def load_toxicity_model(self) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+        """Load the toxicity detection model using the common utility."""
         try:
-            # Use the shared function to load toxicity model
-            self.toxicity_model, self.toxicity_tokenizer = common_load_toxicity_model(self.logger)
+            # Call the common function
+            model, tokenizer = common_load_toxicity_model(self.logger)
+
+            if model is None or tokenizer is None:
+                raise RuntimeError("Toxicity model or tokenizer failed to load.")
+
+            if not isinstance(tokenizer, AutoTokenizer):
+                # This should ideally not happen based on previous logs, but good safety check
+                self.logger.error("Tokenizer loaded by common function is not AutoTokenizer. Type: %s", type(tokenizer))
+                raise TypeError(f"Expected AutoTokenizer, got {type(tokenizer)}")
+
+            # Assign to attributes
+            self.toxicity_model = model
+            self.toxicity_tokenizer = tokenizer  # Assign the Fast tokenizer
+
             return self.toxicity_model, self.toxicity_tokenizer
+
         except Exception as e:
             self.logger.error("Error loading toxicity model: %s", e)
+            self.toxicity_model = None
+            self.toxicity_tokenizer = None
             raise
 
-    def free_memory(self):
+    def free_memory(self) -> None:
         """Free up GPU memory by moving model to CPU and releasing CUDA memory."""
-        if self.generator and hasattr(self.generator, 'model'):
-            self.logger.info("Freeing GPU memory - moving model to CPU")
-            # Explicitly move model to CPU
-            self.generator.model = self.generator.model.to('cpu')
-            self.generator.device = 'cpu'
-            self.current_device = 'cpu'
+        if self.generator is not None and hasattr(self.generator, "model") and self.generator.model is not None:
+            self.logger.info("Freeing GPU memory - moving generator model to CPU")
+            self.generator.model = self.generator.model.to("cpu")
+            if hasattr(self.generator, "device"):
+                self.generator.device = "cpu"
+            self.current_device = "cpu"
+            self.logger.info("Generator model moved to CPU.")
 
             # Release CUDA memory
             torch.cuda.empty_cache()
@@ -210,18 +259,24 @@ class ModelManager:
         # Also free the embedding model if it exists
         if self.embedding_model is not None:
             self.logger.info("Freeing embedding model memory")
-            self.embedding_model = self.embedding_model.to('cpu')
+            self.embedding_model = self.embedding_model.to("cpu")
             torch.cuda.empty_cache()
             gc.collect()
 
-    def move_to_cpu(self):
+    def move_to_cpu(self) -> None:
         """Move model to CPU and clear CUDA cache properly"""
         # Check if generator exists and has a model attribute
-        if self.generator is not None and hasattr(self.generator, 'model') and self.generator.device == "cuda":
+        if (
+            self.generator is not None
+            and hasattr(self.generator, "model")
+            and self.generator.model is not None
+            and hasattr(self.generator, "device")
+            and self.generator.device == "cuda"
+        ):
             # First move model to CPU
-            self.generator.model = self.generator.model.to('cpu')
+            self.generator.model = self.generator.model.to("cpu")
             self.generator.device = "cpu"
-            self.current_device = "cpu"  # Update the current_device tracker too
+            self.current_device = "cpu"
 
             # Explicitly delete any CUDA tensor caches
             gc.collect()
@@ -253,7 +308,7 @@ class ModelManager:
         try:
             # Use TextGenerator's embedding function if it exists
             generator = self.get_generator()
-            if hasattr(generator, 'get_embedding'):
+            if hasattr(generator, "get_embedding"):
                 self.logger.info("Using TextGenerator for embedding generation")
                 embedding_tensor = generator.get_embedding(text)
                 if embedding_tensor is not None:
@@ -261,13 +316,9 @@ class ModelManager:
 
             # Fallback: Generate embedding directly using the model
             self.logger.info("Generating embedding directly from model hidden states")
-            if hasattr(generator, 'model') and hasattr(generator, 'tokenizer'):
+            if hasattr(generator, "model") and hasattr(generator, "tokenizer"):
                 inputs = generator.tokenizer(
-                    text,
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    max_length=512
+                    text, return_tensors="pt", padding=True, truncation=True, max_length=512
                 ).to(generator.device)
 
                 with torch.no_grad():
@@ -309,7 +360,9 @@ class ModelManager:
                     if self.preferred_device == "cuda" and torch.cuda.is_available():
                         self.sentence_transformer = self.sentence_transformer.to(self.preferred_device)
                 except ImportError:
-                    self.logger.error("sentence-transformers not installed. Install with: pip install sentence-transformers")
+                    self.logger.error(
+                        "sentence-transformers not installed. Install with: pip install sentence-transformers"
+                    )
                     return None
 
             # Generate embedding
@@ -377,7 +430,7 @@ class ModelManager:
                 embeddings = self.sentence_transformer.encode(processed_texts)
 
                 # Format results
-                results = []
+                results: List[Optional[List[float]]] = []
                 for i, text in enumerate(texts):
                     if not text or not text.strip():
                         results.append([0.0] * embedding_dim)  # Zero vector
@@ -395,7 +448,9 @@ class ModelManager:
 
 
 @typechecked
-def get_model_manager(model_name: str = "microsoft/phi-1_5", device: Optional[str] = None, quantize: bool = False) -> ModelManager:
+def get_model_manager(
+    model_name: str = "rasyosef/Phi-1_5-Instruct-v0.1", device: Optional[str] = None, quantize: bool = False
+) -> ModelManager:
     """
     Get a ModelManager instance.
 
@@ -418,12 +473,12 @@ class EmbeddingProviderAdapter:
     It is compatible with the `ai_providers.py` interface and supports batch embedding generation.
     """
 
-    def __init__(self, provider_type: str = "local", model_name: str = "microsoft/phi-1_5"):
+    def __init__(self, provider_type: str = "local", model_name: str = "rasyosef/Phi-1_5-Instruct-v0.1"):
         """Initialize the embedding provider."""
         self.provider_type = provider_type
         self.model_name = model_name
         self._provider = None
-        self.logger = ColoredLogger(__name__)
+        self.logger = get_logger(__name__)
 
     def get_embedding_dimension(self) -> int:
         """
@@ -477,7 +532,7 @@ class EmbeddingProviderAdapter:
             self.logger.error("Error generating embedding: %s", e)
             return [0.0] * self.get_embedding_dimension()
 
-    def _initialize_provider(self):
+    def _initialize_provider(self) -> None:
         """
         Initialize the provider instance.
 
@@ -496,7 +551,7 @@ class EmbeddingProviderAdapter:
             self.logger.warning("Provider type %s initialization not implemented", self.provider_type)
             self._provider = None
 
-    def batch_generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def batch_generate_embeddings(self, texts: List[str]) -> List[Optional[List[float]]]:
         """
         Generate embeddings for multiple texts.
 
@@ -504,7 +559,7 @@ class EmbeddingProviderAdapter:
             texts: List of texts to embed
 
         Returns:
-            List of embedding vectors
+            List of embedding vectors (or None for failed embeddings)
         """
         if not texts:
             return []
@@ -513,11 +568,20 @@ class EmbeddingProviderAdapter:
             # Get the model manager
             model_manager = get_model_manager(self.model_name)
 
-            # Use the batch function
-            return model_manager.batch_generate_embeddings(texts) or [[0.0] * self.get_embedding_dimension() for _ in texts]
+            # Use the batch function from ModelManager
+            results = model_manager.batch_generate_embeddings(texts)  # This returns List[Optional[List[float]]]
+
+            # Handle potential None return from model_manager.batch_generate_embeddings itself
+            if results is None:
+                self.logger.error("Batch embedding generation failed unexpectedly, returning zeros.")
+                return [[0.0] * self.get_embedding_dimension() for _ in texts]
+
+            return results
+
         except Exception as e:
             self.logger.error("Error in batch embedding: %s", e)
-            return [[0.0] * self.get_embedding_dimension() for _ in texts]
+            # Return list of None values matching the expected type
+            return [None for _ in texts]  # Or return zeros
 
 
 @typechecked
@@ -537,7 +601,7 @@ def get_embedding_provider(model_name: Optional[str] = None) -> EmbeddingProvide
         EmbeddingProviderAdapter with consistent generate_embedding methods
     """
     # Use model name if provided, otherwise use default
-    model = model_name if model_name else "microsoft/phi-1_5"
+    model = model_name if model_name else "rasyosef/Phi-1_5-Instruct-v0.1"
 
     # Create adapter
     return EmbeddingProviderAdapter(model)

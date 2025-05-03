@@ -14,14 +14,21 @@ Key features:
 """
 
 import traceback
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+
+from prismalog.log import get_logger
 from typeguard import typechecked
-from typing import List, Dict, Optional
 
-from school_logging.log import ColoredLogger
+if TYPE_CHECKING:
+    from psy_supabase.core.database import DatabaseManager
 
-logger = ColoredLogger(__name__)
+logger = get_logger(__name__)
 
-def format_vector_for_pgvector(vector) -> str:
+# Define a type alias for possible vector inputs
+VectorInputType = Union[List[float], List[int], str, Any]  # Use Any for numpy/torch if optional
+
+
+def format_vector_for_pgvector(vector: VectorInputType) -> str:
     """
     Format a vector for pgvector insertion.
 
@@ -33,24 +40,32 @@ def format_vector_for_pgvector(vector) -> str:
     """
     if isinstance(vector, str):
         # Check if it's already in the right format
-        if vector.startswith('[') and vector.endswith(']'):
+        if vector.startswith("[") and vector.endswith("]"):
             return vector
-        else:
-            # Try to convert string to vector
-            try:
-                parts = [float(x.strip()) for x in vector.split(',')]
-                return str(parts).replace(' ', '')
-            except ValueError:
-                logger.error(f"Invalid vector string format: {vector}")
-                return "[]"
-    elif hasattr(vector, 'tolist'):  # numpy array or similar
+        # Try to convert string to vector
+        try:
+            parts: List[float] = [float(x.strip()) for x in vector.split(",")]
+            return str(parts).replace(" ", "")
+        except ValueError:
+            logger.error(f"Invalid vector string format: {vector}")
+            return "[]"
+    elif hasattr(vector, "tolist"):  # numpy array or similar
         # Convert to list and then to string
-        return str(vector.tolist()).replace(' ', '')
-    else:
+        return str(vector.tolist()).replace(" ", "")
+    elif isinstance(vector, (list, tuple)):
         # Assume it's already a list-like object
-        return str(vector).replace(' ', '')
+        return str(list(vector)).replace(" ", "")  # Ensure it's a list for str()
+    else:
+        logger.warning(f"Attempting to format unknown vector type: {type(vector)}")
+        try:
+            # Fallback attempt to convert to string representation of a list
+            return str(list(vector)).replace(" ", "")
+        except Exception:
+            logger.error(f"Could not format vector of type {type(vector)}")
+            return "[]"
 
-def validate_vector_format(vector) -> bool:
+
+def validate_vector_format(vector: VectorInputType) -> bool:
     """
     Validate that the input is a proper vector format for pgvector.
 
@@ -78,27 +93,27 @@ def validate_vector_format(vector) -> bool:
             # Must have at least a few elements to be a meaningful vector
             return len(vector) >= 3 and all(isinstance(x, (int, float)) for x in vector)
 
-        elif hasattr(vector, 'tolist'):  # Numpy array or similar
+        if hasattr(vector, "tolist") and hasattr(vector, "size"):  # Numpy array or similar
             return vector.size >= 3
 
-        elif isinstance(vector, str):
+        if isinstance(vector, str):
             # Must start and end with brackets
-            if not (vector.startswith('[') and vector.endswith(']')):
+            if not (vector.startswith("[") and vector.endswith("]")):
                 return False
 
             # Check content between brackets
-            content = vector.strip('[]')
+            content: str = vector.strip("[]")
             if not content:
                 return False  # Empty vector
 
             # Try parsing as numbers
             try:
-                parts = content.split(',')
+                parts: List[str] = content.split(",")
                 if len(parts) < 3:
                     return False  # Too short
 
                 # Try converting parts to float
-                [float(p.strip()) for p in parts]
+                all(float(p.strip()) for p in parts)
                 return True
             except ValueError:
                 return False
@@ -108,13 +123,16 @@ def validate_vector_format(vector) -> bool:
     except Exception:
         return False
 
+
 @typechecked
-def find_similar_interactions(db_manager,
-                              embedding: List[float],
-                              schema_name: Optional[str] = None,
-                              session_id: Optional[str] = None,
-                              limit: int = 5,
-                              threshold: float = 0.7):
+def find_similar_interactions(
+    db_manager: "DatabaseManager",
+    embedding: List[float],
+    schema_name: Optional[str] = None,
+    session_id: Optional[str] = None,
+    limit: int = 5,
+    threshold: float = 0.7,
+) -> List[Dict[str, Any]]:
     """
     Find similar interactions using vector similarity search.
 
@@ -140,24 +158,24 @@ def find_similar_interactions(db_manager,
 
     try:
         # Use the DatabaseManager's method if available (for real DB operations)
-        if hasattr(db_manager, 'find_similar_interactions_by_embedding'):
+        if hasattr(db_manager, "find_similar_interactions_by_embedding"):
             return db_manager.find_similar_interactions_by_embedding(
-                embedding=embedding,
-                session_id=session_id,
-                limit=limit,
-                threshold=threshold
+                embedding=embedding, session_id=session_id, limit=limit, threshold=threshold
             )
 
         # Fallback for tests where the full DatabaseManager might not be available
-        response = db_manager.supabase.rpc('find_similar_interactions', {
-            'p_schema_name': schema_name,
-            'p_embedding': embedding,
-            'p_session_id': session_id,
-            'p_threshold': threshold,
-            'p_limit': limit
-        }).execute()
+        response: Any = db_manager.supabase.rpc(
+            "find_similar_interactions",
+            {
+                "p_schema_name": schema_name,
+                "p_embedding": embedding,
+                "p_session_id": session_id,
+                "p_threshold": threshold,
+                "p_limit": limit,
+            },
+        ).execute()
 
-        if hasattr(response, 'data'):
+        if hasattr(response, "data"):
             return response.data or []
         return []
 
@@ -166,8 +184,16 @@ def find_similar_interactions(db_manager,
         logger.error(traceback.format_exc())
         return []
 
-def unified_vector_search(db_manager, embedding, table="interactions", schema_name=None,
-                         session_id=None, limit=5, threshold=0.7):
+
+def unified_vector_search(
+    db_manager: "DatabaseManager",
+    embedding: VectorInputType,  # Use the alias
+    table: str = "interactions",
+    schema_name: Optional[str] = None,
+    session_id: Optional[str] = None,
+    limit: int = 5,
+    threshold: float = 0.7,
+) -> List[Dict[str, Any]]:
     """
     Unified interface for vector similarity search across different tables.
 
@@ -193,29 +219,30 @@ def unified_vector_search(db_manager, embedding, table="interactions", schema_na
         return []
 
     # Format embedding for pgvector
-    vector_str = format_vector_for_pgvector(embedding)
+    vector_str: str = format_vector_for_pgvector(embedding)
 
     try:
         # Build the appropriate query based on table
         if table == "interactions":
-            rpc_function = "find_similar_interactions"
-        elif table == "knowledge_database":
-            rpc_function = "find_similar_knowledge"
+            rpc_function: str = "find_similar_interactions"
         else:
             # Default to a generic function name based on table
             rpc_function = f"find_similar_{table}"
 
         # Call the appropriate RPC function
-        response = db_manager.supabase.rpc(rpc_function, {
-            'p_schema_name': schema_name,
-            'p_embedding': vector_str,
-            'p_session_id': session_id,
-            'p_threshold': threshold,
-            'p_limit': limit
-        }).execute()
+        response: Any = db_manager.supabase.rpc(
+            rpc_function,
+            {
+                "p_schema_name": schema_name,
+                "p_embedding": vector_str,  # Pass the formatted string
+                "p_session_id": session_id,
+                "p_threshold": threshold,
+                "p_limit": limit,
+            },
+        ).execute()
 
         # Return data if it exists, otherwise empty list
-        if hasattr(response, 'data'):
+        if hasattr(response, "data"):
             return response.data or []
         return []
 
@@ -224,7 +251,8 @@ def unified_vector_search(db_manager, embedding, table="interactions", schema_na
         logger.error(traceback.format_exc())
         return []
 
-def ensure_vector_indexes(db_manager, schema_name: str) -> bool:
+
+def ensure_vector_indexes(db_manager: "DatabaseManager", schema_name: str) -> bool:
     """
     Ensure that vector indexes exist for the schema tables.
 
@@ -236,18 +264,19 @@ def ensure_vector_indexes(db_manager, schema_name: str) -> bool:
     """
     try:
         # Call the enhanced SQL function
-        query = f"SELECT ensure_vector_indexes('{schema_name}') as success;"
+        query: str = f"SELECT ensure_vector_indexes('{schema_name}') as success;"
 
         # Execute query
-        response = db_manager.supabase.rpc('sql', {'command': query}).execute()
+
+        response: Any = db_manager.supabase.rpc("sql", {"command": query}).execute()
 
         # Check result (should almost always be true due to error handling in SQL)
-        success = False
-        if hasattr(response, 'data'):
+        success: bool = False
+        if hasattr(response, "data"):
             if isinstance(response.data, list) and response.data:
-                success = response.data[0].get('success', False)
+                success = response.data[0].get("success", False)
             elif isinstance(response.data, dict):
-                success = response.data.get('success', False)
+                success = response.data.get("success", False)
             elif response.data is True:
                 success = True
 
@@ -264,17 +293,18 @@ def ensure_vector_indexes(db_manager, schema_name: str) -> bool:
         logger.error(traceback.format_exc())
         return False
 
-def update_table_statistics(db_manager, schema_name: str) -> bool:
+
+def update_table_statistics(db_manager: "DatabaseManager", schema_name: str) -> bool:
     """Update table statistics for better query planning."""
     try:
         # Generate a simpler statistics update query that works across PostgreSQL versions
-        statistics_query = f"""
+        statistics_query: str = f"""
         ANALYZE "{schema_name}".interactions;
         SELECT TRUE as success;
         """
 
         # Execute without checking for .error
-        db_manager.supabase.rpc('sql', {'command': statistics_query}).execute()
+        db_manager.supabase.rpc("sql", {"command": statistics_query}).execute()
 
         # Consider any non-exception response a success
         logger.info("Updated table statistics for query planning")
@@ -284,8 +314,10 @@ def update_table_statistics(db_manager, schema_name: str) -> bool:
         logger.error(f"Error updating table statistics: {str(e)}")
         return False
 
-def batch_enrich_interactions(db_manager, schema_name: str, batch_size: int = 100,
-                             max_interactions: int = 1000) -> int:
+
+def batch_enrich_interactions(
+    db_manager: "DatabaseManager", schema_name: str, batch_size: int = 100, max_interactions: int = 1000
+) -> int:
     """
     Batch enrich interactions with embeddings.
 
@@ -300,7 +332,7 @@ def batch_enrich_interactions(db_manager, schema_name: str, batch_size: int = 10
     """
     try:
         # Get interactions without embeddings
-        query = f"""
+        query: str = f"""
         SELECT interaction_id, question, answer, context
         FROM "{schema_name}".interactions
         WHERE embedding IS NULL
@@ -308,11 +340,12 @@ def batch_enrich_interactions(db_manager, schema_name: str, batch_size: int = 10
         """
 
         # Execute query to get interactions needing embeddings
-        response = db_manager.supabase.rpc('sql', {'command': query}).execute()
+
+        response: Any = db_manager.supabase.rpc("sql", {"command": query}).execute()
 
         # Check if we have data to process
-        interactions = []
-        if hasattr(response, 'data'):
+        interactions: List[Dict[str, Any]] = []
+        if hasattr(response, "data"):
             if isinstance(response.data, list):
                 interactions = response.data
             elif response.data and isinstance(response.data, dict):
@@ -323,36 +356,41 @@ def batch_enrich_interactions(db_manager, schema_name: str, batch_size: int = 10
             return 0
 
         # Get embedding provider
-        provider = get_embedding_provider()
+        provider: Any = get_embedding_provider()
 
         # Count of processed interactions
-        processed_count = len(interactions)
+        processed_count: int = len(interactions)
 
         # For each interaction, generate and store embedding
         for interaction in interactions:
-            interaction_id = interaction.get('interaction_id')
-            question = interaction.get('question', '')
-            answer = interaction.get('answer', '')
-            context = interaction.get('context', '')
+            interaction_id: Optional[int] = interaction.get("interaction_id")
+            question: str = interaction.get("question", "")
+            answer: str = interaction.get("answer", "")
+            context: str = interaction.get("context", "")
+
+            # Check if interaction_id is valid
+            if interaction_id is None:
+                logger.warning(f"Skipping interaction due to missing interaction_id: {interaction}")
+                continue
 
             # Generate text for embedding
-            text = f"{question} {answer} {context}".strip()
+            text: str = f"{question} {answer} {context}".strip()
 
             # Generate embedding
-            embedding = provider.generate_embedding(text)
+            embedding: List[float] = provider.generate_embedding(text)
 
             # Format for database
-            vector_str = format_vector_for_pgvector(embedding)
+            vector_str: str = format_vector_for_pgvector(embedding)
 
             # Update interaction with embedding
-            update_query = f"""
+            update_query: str = f"""
             UPDATE "{schema_name}".interactions
             SET embedding = '{vector_str}'::vector
             WHERE interaction_id = {interaction_id};
             """
 
             # Execute update
-            db_manager.supabase.rpc('sql', {'command': update_query}).execute()
+            db_manager.supabase.rpc("sql", {"command": update_query}).execute()
 
         return processed_count
 
@@ -361,15 +399,18 @@ def batch_enrich_interactions(db_manager, schema_name: str, batch_size: int = 10
         logger.error(traceback.format_exc())
         return 0
 
-def get_embedding_provider():
+
+def get_embedding_provider() -> Any:
     """Get the embedding provider."""
     # This is a stub for tests
     from unittest.mock import MagicMock
+
     mock_provider = MagicMock()
     mock_provider.generate_embedding.return_value = [0.1, 0.2, 0.3, 0.4]
     return mock_provider
 
-def optimize_vector_operations(db_manager, schema_name: str = None) -> Dict:
+
+def optimize_vector_operations(db_manager: "DatabaseManager", schema_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Optimize vector-related operations in the database.
 
@@ -388,41 +429,39 @@ def optimize_vector_operations(db_manager, schema_name: str = None) -> Dict:
     if not schema_name:
         schema_name = db_manager.schema_name
 
-    result = {
-        'column_added': False,
-        'indexes_created': False,
-        'interactions_enriched': 0,
-        'statistics_updated': False
+    result: Dict[str, Any] = {
+        "column_added": False,
+        "indexes_created": False,
+        "interactions_enriched": 0,
+        "statistics_updated": False,
     }
 
     try:
         # 1. Call ensure_vector_indexes
-        index_query = f"SELECT ensure_vector_indexes('{schema_name}') as success;"
-        index_response = db_manager.supabase.rpc('sql', {'command': index_query}).execute()
+        index_query: str = f"SELECT ensure_vector_indexes('{schema_name}') as success;"
+        index_response: Any = db_manager.supabase.rpc("sql", {"command": index_query}).execute()
 
         # Process response
-        success = False
-        if hasattr(index_response, 'data'):
+        success: bool = False
+        if hasattr(index_response, "data"):
             if isinstance(index_response.data, list) and index_response.data:
-                success = index_response.data[0].get('success', False)
+                success = index_response.data[0].get("success", False)
             elif isinstance(index_response.data, dict):
-                success = index_response.data.get('success', False)
+                success = index_response.data.get("success", False)
             elif index_response.data is True:
                 success = True
             elif index_response.data:  # Any truthy value
                 success = True
 
         # Set result flags
-        result['indexes_created'] = success
-        result['statistics_updated'] = success
+        result["indexes_created"] = success
+        result["statistics_updated"] = success
 
         # 2. Call batch_enrich_interactions to handle embeddings
-        enriched_count = batch_enrich_interactions(
-            db_manager, schema_name, batch_size=100, max_interactions=1000
-        )
+        enriched_count: int = batch_enrich_interactions(db_manager, schema_name, batch_size=100, max_interactions=1000)
 
         # Save the enriched count in the result
-        result['interactions_enriched'] = enriched_count
+        result["interactions_enriched"] = enriched_count
 
         return result
 
@@ -430,12 +469,3 @@ def optimize_vector_operations(db_manager, schema_name: str = None) -> Dict:
         logger.error(f"Error optimizing vector operations: {e}")
         logger.error(traceback.format_exc())
         return result
-
-def ensure_embedding_column(db_manager, schema_name: str) -> bool:
-    """Simple stub for tests."""
-    return True
-
-# Add this function to satisfy the test
-def add_vector_embedding(db_manager, interaction_id, content_type="interaction", text="", schema_name=None):
-    """Simple stub for tests."""
-    return True

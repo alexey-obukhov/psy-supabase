@@ -16,31 +16,124 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Database",
 ]
+keywords = ["ai", "psychology", "nlp", "supabase", "chatbot", "rag", "llm", "transformers"]
+
 
 # Dependencies can also be specified here
-# dependencies = [
-#    "torch>=2.4.1",
-#    "transformers>=4.46.3",
-#    "supabase>=2.6.0",
-#    "spacy>=3.7.5"
-# ]
+dependencies = [
+    "torch>=2.4.1",
+    "transformers>=4.46.3",
+    "flask==3.0.3",
+    "faiss-cpu>=1.8.0",
+    "detoxify>=0.5.2",
+    "sentence_transformers>=3.2.1",
+    "typeguard>=4.4.0",
+    "supabase>=2.6.0",
+    "python-dotenv>=1.0.1",
+    "pandas>=2.0.3",
+    "numpy>=1.24.4",
+    "httpx[http2]>=0.26.0,<0.28.0",
+    "werkzeug==3.0.6",
+    "spacy==3.7.5",
+    "nltk>=3.9.1",
+    "text2emotion>=0.0.5",
+    "jinja2>=3.0.0",
+    "detoxify>=0.5.1",
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl",
+    "prismalog==0.1.1",
+]
+
+[project.optional-dependencies]
+# Development tools
+dev = [
+    "black>=22.6.0",                    # Code formatting
+    "flake8>=5.0.0",                    # Code style checking
+    "pylint>=3.0.0",                    # Use a consistent pylint version
+    "mypy>=1.0.0",                      # Type checking
+    "isort>=5.10.0",                    # Import sorting
+    "build>=0.8.0",                     # Package building
+    "twine>=4.0.0",                     # Package publishing
+    "pre-commit>=3.5.0",                # Pre-commit hooks
+]
+
+# Testing dependencies
+test = [
+    "coverage>=7.0.0",                  # Code coverage measurement
+    "pytest>=8.3.5",                    # Testing framework
+    "pytest-cov>=3.0.0",                # Coverage reporting for pytest
+    "pytest-html>=3.2.0",               # For html generating
+    "pytest-timeout>=2.1.0",            # Timeout support for tests
+]
+
+# Documentation dependencies
+doc = [
+    "sphinx>=4.5.0",                    # Documentation generator
+    "sphinx-rtd-theme>=1.0.0",          # ReadTheDocs theme
+    "sphinx-autodoc-typehints>=1.18.0", # Type annotations support
+    "sphinx-design>=0.5.0",             # Markdown support
+    "myst-parser>=0.18.0",              #
+]
+
+# CI-specific dependencies that aren't included above
+ci = [
+    "anybadge>=1.10.0",                 # For generating badges in CI
+]
+
+# All-in-one convenience installation
+all = [
+    "psy-supabase[dev,test,doc,ci]",
+]
 
 [project.urls]
-repository = "https://github.com/alexey-obukhov/psy-supabase.git"
+Homepage = "https://github.com/alexey-obukhov/psy-supabase"
+Documentation = "https://psy-supabase.readthedocs.io/"
+Issues = "https://github.com/alexey-obukhov/psy-supabase/issues"
+Changelog = "https://github.com/alexey-obukhov/psy-supabase/blob/psy-supabase-pkg/CHANGELOG.md"
+
+[tool.setuptools]
+packages = ["psy_supabase"]
 
 [project.scripts]
 psy-supabase = "psy_supabase.__main__:main"
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests that take longer to run"
+]
+
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = [
+    "-v",                # verbose output
+    "--tb=short",        # shorter traceback format
+    "--strict-markers",  # raise error on unknown marks
+    "-ra",               # show extra test summary info
+    "--cov=psy_supabase",
+    "--cov-report=term-missing",
+]
+
+minversion = "6.0"
+required_plugins = ["pytest-timeout", "pytest-cov"]
+xfail_strict = true
+
 # Development tool configurations
 [tool.black]
-line-length = 88
-target-version = ["py38"]
+line-length = 120
+target-version = ["py38", "py310", "py311"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
 
 [tool.isort]
 profile = "black"
-line_length = 88
+line_length = 120
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = "test_*.py"
+[tool.pylint.format]
+max-line-length = 120

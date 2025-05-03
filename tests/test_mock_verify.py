@@ -8,7 +8,7 @@ def test_mock_db_manager_with_spy(mock_db_manager_with_spy):
         question="test_question",
         answer="test_answer",
         metadata={"test": True},
-        session_id="test_session"
+        session_id="test_session",
     )
 
     # Verify it was called

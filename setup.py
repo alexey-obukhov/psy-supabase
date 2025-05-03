@@ -1,25 +1,31 @@
 # use python setup.py sdist bdist_wheel to build the package
+""" Setup script for psy-supabase package."""
 import os
-from setuptools import setup, find_packages
+
+import spacy
+from setuptools import find_packages, setup
 from setuptools.command.install import install
 
+
 # Function to download spaCy language model during package installation
-def download_spacy_model():
+def download_spacy_model() -> None:
     """Download the spaCy English language model."""
     try:
-        import spacy
         spacy.load("en_core_web_sm")
         print("Downloaded spaCy English language model")
     except ImportError:
         print("Spacy not available, skipping model download")
         # Don't fail the build, just skip the download
-        pass
+
 
 class PostInstallCommand(install):
     """Post-installation for installation mode."""
-    def run(self):
+
+    def run(self) -> None:
+        """Run the post-installation command."""
         install.run(self)
         download_spacy_model()
+
 
 # Read README if it exists
 long_description = ""
@@ -29,7 +35,7 @@ if os.path.exists("README.md"):
 
 setup(
     name="psy-supabase",
-    version="0.1.0",  # Adjust version as needed
+    version="0.1.1",  # Adjust version as needed
     description="Psychological AI with Supabase Integration",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -49,19 +55,16 @@ setup(
         "httpx[http2]>=0.26.0,<0.28.0",
         "werkzeug==3.0.6",
         "spacy==3.7.5",
-        "school-logging @ git+https://github.com/vertok/school_logging.git@main#egg=school-logging",
-    ],
-    dependency_links=[
-        "git+https://github.com/vertok/school_logging.git@main#egg=school-logging",
+        "prismalog==0.1.1",
     ],
     entry_points={
-        'console_scripts': [
-            'psy-supabase=psy_supabase.__main__:main',
+        "console_scripts": [
+            "psy-supabase=psy_supabase.__main__:main",
         ],
     },
-    python_requires='>=3.8',
+    python_requires=">=3.8",
     cmdclass={
-        'install': PostInstallCommand,
+        "install": PostInstallCommand,
     },
     # License information
     license="MIT",

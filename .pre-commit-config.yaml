@@ -1,0 +1,54 @@
+# pre-commit run --all-files
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-toml
+    -   id: debug-statements
+    -   id: check-ast
+    -   id: check-added-large-files
+
+-   repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+    -   id: black
+        language_version: python3
+        args: [--line-length=120]
+
+-   repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+    -   id: isort
+        args: ["--profile", "black", "--line-length=120"]
+
+-   repo: https://github.com/pycqa/pylint
+    rev: v3.0.3
+    hooks:
+    -   id: pylint
+        additional_dependencies: [colorama]
+        args:
+        - --max-line-length=120
+        - --disable=C0111,C0103
+        - --ignore=tests
+
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.7.1
+    hooks:
+    -   id: mypy
+        additional_dependencies: [
+            # Only include type stubs for packages you actually use
+            "types-PyYAML>=6.0.12",
+            "types-colorama>=0.4.15",
+            "types-setuptools>=68.2.0",
+            "mypy-extensions>=1.0.0",
+        ]
+        args: [--disallow-untyped-defs, --disallow-incomplete-defs]
+        exclude: ^(tests/|docs/)
+
+-   repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.15
+    hooks:
+    -   id: validate-pyproject

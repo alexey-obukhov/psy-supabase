@@ -1,13 +1,13 @@
 """
 RAGProcessor Module
-==================
+===================
 
 This module implements a specialized Retrieval-Augmented Generation (RAG) system for psychological
 applications. It combines vector database retrieval, pain point detection, and therapeutic
 response generation for psychological support conversations.
 
 Key Components:
---------------
+---------------
 1. Vector Retrieval: Optimized pgvector similarity search with psychological knowledge base
 2. Pain Point Detection: Identifies psychological fixations and recurring concerns
 3. Therapeutic Approach Selection: Dynamically selects appropriate therapeutic approaches
@@ -17,34 +17,36 @@ Key Components:
 7. Dynamic RAG Integration: Real-time knowledge retrieval during response generation
 
 Classes:
--------
+--------
 RAGProcessor: Primary class for psychological RAG operations with specialized therapeutic features
 
 Typical Usage:
-------------
-```python
-from psy_supabase.core.database import DatabaseManager
-from psy_supabase.core.text_generator import TextGenerator
-from psy_supabase.core.rag_processor import RAGProcessor
+--------------
 
-# Create dependencies
-db_manager = DatabaseManager(supabase_url, supabase_key, "user_123")
-generator = TextGenerator(model_name="mistralai/Mistral-7B-Instruct-v0.2", device="cuda")
+.. code-block:: python
 
-# Initialize RAG processor
-rag = RAGProcessor(db_manager=db_manager, generator=generator)
+    from psy_supabase.core.database import DatabaseManager
+    from psy_supabase.core.text_generator import TextGenerator
+    from psy_supabase.core.rag_processor import RAGProcessor
 
-# Generate therapeutic response
-response = rag.generate_response(
-    user_question="I keep having the same anxious thoughts over and over",
-    session_id="therapy_session_456"
-)
+    # Create dependencies
+    db_manager = DatabaseManager(supabase_url, supabase_key, "user_123")
+    generator = TextGenerator(model_name="mistralai/Mistral-7B-Instruct-v0.2", device="cuda")
 
-# Generate response with contextual data
-context_data = rag.get_contextual_data(
-    question="How can I manage my recurring panic attacks?",
-    session_id="therapy_session_456"
-)
+    # Initialize RAG processor
+    rag = RAGProcessor(db_manager=db_manager, generator=generator)
+
+    # Generate therapeutic response
+    response = rag.generate_response(
+        user_question="I keep having the same anxious thoughts over and over",
+        session_id="therapy_session_456"
+    )
+
+    # Generate response with contextual data
+    context_data = rag.get_contextual_data(
+        question="How can I manage my recurring panic attacks?",
+        session_id="therapy_session_456"
+    )
 
 Dependencies:
 psy_supabase.core.database: Vector database operations
@@ -53,29 +55,29 @@ psy_supabase.core.dynamic_rag: Dynamic retrieval during generation
 psy_supabase.utilities.prompt_selector: Therapeutic prompt selection
 psy_supabase.utilities.embedding_utils: Vector embedding utilities
 """
-from typing import List, Dict, Any, Optional
+
 import json
 import traceback
+from typing import Any, Dict, List, Optional, Union
+
+from prismalog.log import get_logger
 from typeguard import typechecked
 
-from school_logging.log import ColoredLogger
+from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_TOPIC
 from psy_supabase.core.database import DatabaseManager
-from psy_supabase.utilities.prompt_selector import PromptSelector
-from psy_supabase.core.text_generator import TextGenerator
-from psy_supabase.utilities.safety_handler import SafetyHandler
 from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 from psy_supabase.core.model_manager import EmbeddingProviderAdapter
-from psy_supabase.utilities.utils_mapping import map_approach_to_template
-from psy_supabase.utilities.embedding_utils import format_embedding_for_db
 from psy_supabase.core.response_generator import ResponseGenerator
-from psy_supabase.rag.context_determination import (
-    determine_context,
-    create_context_from_similar_interactions
-)
-
+from psy_supabase.core.text_generator import TextGenerator
+from psy_supabase.memory.associative_memory import AssociativeMemory
+from psy_supabase.rag.context_determination import create_context_from_similar_interactions, determine_context
+from psy_supabase.utilities.embedding_utils import format_embedding_for_db
+from psy_supabase.utilities.prompt_selector import PromptSelector
+from psy_supabase.utilities.safety_handler import SafetyHandler
 
 # Set up logging
-logger = ColoredLogger(__name__)
+logger = get_logger(__name__)
+
 
 class RAGProcessor:
     """
@@ -109,7 +111,7 @@ class RAGProcessor:
     Therapeutic Approach Selection:
         Based on detected pain points and conversational context, the system selects
         appropriate therapeutic approaches:
-        1. Anxiety exploration for anxiety-related fixations
+        1. anxiety exploration for anxiety-related fixations
         2. Grief reflection for sadness and loss themes
         3. Gentle refocus for persistent thought patterns
         4. Exploratory approaches for general psychological concerns
@@ -122,18 +124,24 @@ class RAGProcessor:
         4. Threshold filtering to maintain therapeutic relevance
     """
 
-    def __init__(self, db_manager: DatabaseManager, generator: TextGenerator, intelligent_processing_enabled: bool = True):
+    def __init__(
+        self,
+        db_manager: DatabaseManager,
+        generator: TextGenerator,
+        intelligent_processing_enabled: bool = True,
+        associative_memory: Optional[AssociativeMemory] = None,
+    ):
         self.db_manager = db_manager
         self.text_generator = generator
+        self.generator = generator
         self.safety_handler = SafetyHandler()
         self.prompt_selector = PromptSelector(generator)
         self.intelligent_processing_enabled = intelligent_processing_enabled
+        self.associative_memory = associative_memory
 
-        # NEW: Initialize ResponseGenerator
+        # Initialize ResponseGenerator
         self.response_generator = ResponseGenerator(
-            text_generator=generator,
-            db_manager=db_manager,
-            prompt_selector=self.prompt_selector
+            text_generator=self.generator, db_manager=self.db_manager, prompt_selector=self.prompt_selector
         )
 
         # Use EmbeddingProviderAdapter instead
@@ -143,14 +151,31 @@ class RAGProcessor:
         self.embedding_dimension = self.embedding_provider.get_embedding_dimension()
 
         # Constants for vector retrieval optimization
-        self.SIMILARITY_THRESHOLD = 0.7       # Minimum similarity for relevant documents
-        self.MAX_KNOWLEDGE_CHARS = 500        # Max characters for knowledge context
-        self.MAX_CONVERSATION_EXCHANGES = 2   # Max conversation exchanges to include
-        self.VECTOR_CACHE_ENABLED = True      # Enable vector caching for similar questions
+        self.SIMILARITY_THRESHOLD = 0.7  # Minimum similarity for relevant documents
+        self.MAX_KNOWLEDGE_CHARS = 500  # Max characters for knowledge context
+        self.MAX_CONVERSATION_EXCHANGES = 2  # Max conversation exchanges to include
+        self.VECTOR_CACHE_ENABLED = True  # Enable vector caching for similar questions
 
     @typechecked
-    def generate_response(self, user_question, session_id="default_session", device="cuda", question_id=None):
-        """Generate a therapeutic response using Dynamic RAG with pain point detection."""
+    def generate_response(
+        self,
+        user_question: str,
+        session_id: str = "default_session",
+        device: str = "cuda",
+        question_id: Optional[Any] = 0,
+    ) -> str:
+        """Enhanced to properly connect pain point detection to template selection"""
+
+        # Create unique tracking ID for this interaction
+        tracking_id = str(question_id)
+
+        # Initialize metadata
+        metadata = {
+            "session_id": session_id,
+            "tracking_id": tracking_id,
+            "context_determination_used": True,
+        }
+
         # Handle invalid inputs
         if not self.response_generator.is_valid_input(user_question):
             return self.response_generator.get_default_response(user_question)
@@ -162,31 +187,21 @@ class RAGProcessor:
                 return toxic_result
 
             # Configure embedding provider if specified
-            if device and hasattr(self.embedding_provider, 'set_device'):
+            if device and hasattr(self.embedding_provider, "set_device"):
                 self.embedding_provider.set_device(device)
 
-            # Initialize tracking
-            tracking_id = self.response_generator.initialize_tracking(question_id)
-            metadata = {"tracking_id": tracking_id, "session_id": session_id}
-
             # Process query to get semantic meaning first
-            query_embedding = self.process_query(user_question, session_id)
+            embedding = self.process_query(user_question, session_id)
 
             # Use both context determination approaches
             # Get chronological context (most recent conversations)
             conversation_context = determine_context(
-                self.db_manager,
-                user_question,
-                session_id=session_id,
-                limit=self.MAX_CONVERSATION_EXCHANGES
+                self.db_manager, user_question, session_id=session_id, limit=self.MAX_CONVERSATION_EXCHANGES
             )
 
             # Get semantically similar interactions
             semantic_context = create_context_from_similar_interactions(
-                self.db_manager,
-                query_embedding,
-                session_id=session_id,
-                limit=3
+                self.db_manager, embedding, session_id=session_id, limit=3
             )
 
             # Combine both approaches for the richest context
@@ -202,28 +217,38 @@ class RAGProcessor:
                 context_sources.append("semantic")
 
             # Add context information to metadata
-            if not metadata:
-                metadata = {}
-
             if combined_context:
-                metadata["context_determination_used"] = True
                 metadata["context_sources"] = context_sources
                 metadata["context_length"] = len(combined_context)
                 logger.info("Using combined context determination: %d chars", len(combined_context))
 
-            # Detect pain points based on query embedding
+            # After pain point detection
             pain_point_results = self.detect_pain_points_from_embedding(
-                user_question=user_question,
-                embedding=query_embedding,
-                session_id=session_id,
-                metadata=metadata
+                user_question=user_question, embedding=embedding, session_id=session_id, metadata=metadata
             )
 
-            # Extract psychological topics
-            topics_context = self.response_generator.extract_psychological_topics(user_question)
+            # Analyze topics and emotions
+            topics_context = self.prompt_selector.analyze_question(user_question)
+
+            metadata["topics_context"] = topics_context
+            metadata["topic"] = topics_context.get("topic", DEFAULT_TOPIC)
+            metadata["emotion"] = topics_context.get("emotion", DEFAULT_EMOTION)
+
+            if pain_point_results and pain_point_results.get("pain_point_detected", False):
+                # Get approach type from pain point detection
+                approach_type = pain_point_results.get("approach_type", DEFAULT_APPROACH)
+
+                # Map approach to template using your existing utility
+                from psy_supabase.utilities.utils_mapping import map_approach_to_template
+
+                template_name = map_approach_to_template(approach_type)
+
+                # Store in metadata for use by text generator
+                metadata["template_used"] = template_name
+                metadata["approach_type"] = approach_type
 
             # Get hot topics
-            hot_topics = self._identify_hot_topics(user_question, query_embedding)
+            hot_topics = self._identify_hot_topics(user_question, embedding)
 
             # Initialize the dynamic retriever
             dynamic_retriever = self.create_dynamic_retriever(session_id=session_id)
@@ -234,29 +259,24 @@ class RAGProcessor:
                 session_id=session_id,
                 topics_context=topics_context,
                 pain_point_results=pain_point_results,
-                query_embedding=query_embedding,
+                query_embedding=embedding,
                 dynamic_retriever=dynamic_retriever,
-                hot_topics=hot_topics
+                hot_topics=hot_topics,
             )
 
             # This gives us rich context using pgvector similarity search
-            enhanced_context = self._enhance_context_with_relevant_documents(
-                user_question,
-                query_embedding,
-                session_id
-            )
+            enhanced_context = self._enhance_context_with_relevant_documents(user_question, embedding, session_id)
 
             # Add enhanced knowledge context to generation context
-            if enhanced_context.get('knowledge_context'):
-                generation_context['knowledge_context'] = enhanced_context.get('knowledge_context')
+            if enhanced_context.get("knowledge_context"):
+                generation_context["knowledge_context"] = enhanced_context.get("knowledge_context")
 
             # Get documents using existing method for relevant documents
-            relevant_documents = self.get_relevant_documents(query_embedding, top_k=5)
+            relevant_documents = self.get_relevant_documents(embedding, top_k=5)
 
             if relevant_documents:
                 generation_context = self.enhance_context_with_relevant_documents(
-                    generation_context,
-                    relevant_documents
+                    generation_context, relevant_documents
                 )
 
             # Add the combined context to the generation context
@@ -268,35 +288,53 @@ class RAGProcessor:
                 user_question=user_question,
                 session_id=session_id,
                 generation_context=generation_context,
-                pain_point_results=pain_point_results
+                pain_point_results=pain_point_results,
             )
 
+            # Determine final context using ResponseGenerator's method
+            _, updated_metadata = self.response_generator.determine_final_context(
+                user_question=user_question,
+                topics_context=topics_context,
+                pain_point_results=pain_point_results,
+                metadata=metadata,
+            )
+
+            # Use the updated metadata which now contains proper topic information
+            metadata = updated_metadata
+
             # Save interaction with metadata including context sources
+            # Convert context to string before passing to save_interaction
+            if topics_context is None:
+                context_str = "therapeutic_dialogue"
+            elif isinstance(topics_context, (list, tuple, set)):
+                # Take first item from collection if it exists, otherwise use default
+                context_str = str(next(iter(topics_context), "therapeutic_dialogue"))
+            else:
+                context_str = str(topics_context)
+
             self.db_manager.save_interaction(
                 question=user_question,
                 answer=response,
-                context=topics_context if topics_context else "",
+                context=context_str,
                 session_id=session_id,
-                metadata=metadata
+                metadata=metadata,
             )
 
             return response
 
+        # Ensure a string is always returned, even in error cases
         except Exception as e:
             logger.error("Error generating response: %s", e)
             logger.error("Traceback (most recent call last):", exc_info=True)
             return "I apologize, but I'm having trouble generating a response right now. Please try again later."
 
-    @typechecked
     def generate_simple_response(self, user_question: str) -> str:
         """Generates a simple response without any preprocessing or context."""
         return self.text_generator.generate_text(user_question)
 
-    @typechecked
-    def generate_training_examples(self,
-                                   topic_filter=None,
-                                   min_effectiveness=0.7,
-                                   limit=100) -> List[Dict]:
+    def generate_training_examples(
+        self, topic_filter: Optional[str] = None, min_effectiveness: float = 0.7, limit: int = 100
+    ) -> List[Dict]:
         """
         Generates high-quality training examples from past interactions.
 
@@ -310,9 +348,7 @@ class RAGProcessor:
         """
         # Retrieve high-quality interactions from database
         interactions = self.db_manager.get_high_quality_interactions(
-            topic_filter=topic_filter,
-            min_effectiveness=min_effectiveness,
-            limit=limit
+            topic_filter=topic_filter, min_effectiveness=min_effectiveness, limit=limit
         )
 
         # Format for training
@@ -320,33 +356,33 @@ class RAGProcessor:
         for interaction in interactions:
             try:
                 # Parse metadata
-                metadata = interaction.get('metadata', {})
+                metadata = interaction.get("metadata", {})
                 if isinstance(metadata, str):
                     metadata = json.loads(metadata)
 
                 # Extract key information
-                question = interaction.get('question', '')
-                answer = interaction.get('answer', '')
-                context = interaction.get('context', '')
-                topic = metadata.get('topic', 'General')
+                question = interaction.get("question", "")
+                answer = interaction.get("answer", "")
+                context = interaction.get("context", "")
+                topic = metadata.get("topic", "emotional_support")
 
                 # Add psychological context if available
                 psychological_context = ""
-                if metadata.get('emotional_state'):
+                if metadata.get("emotional_state"):
                     psychological_context += f"Emotional state: {metadata.get('emotional_state')}\n"
 
-                if metadata.get('recurring_themes'):
-                    themes = metadata.get('recurring_themes')
+                if metadata.get("recurring_themes"):
+                    themes = metadata.get("recurring_themes")
                     if isinstance(themes, list):
                         psychological_context += f"Recurring themes: {', '.join(themes)}\n"
 
                 # Create a formatted training example
                 example = {
-                    'question': question,
-                    'answer': answer,
-                    'context': context,
-                    'topic': topic,
-                    'psychological_context': psychological_context.strip()
+                    "question": question,
+                    "answer": answer,
+                    "context": context,
+                    "topic": topic,
+                    "psychological_context": psychological_context.strip(),
                 }
 
                 training_examples.append(example)
@@ -356,9 +392,9 @@ class RAGProcessor:
 
         return training_examples
 
-    def _build_psychological_context(self, similar_memories: List[Dict],
-                                     theme_clusters: List[Dict],
-                                     emotional_trajectory: List[Dict]) -> Dict[str, Any]:
+    def _build_psychological_context(
+        self, similar_memories: List[Dict], theme_clusters: List[Dict], emotional_trajectory: List[Dict]
+    ) -> Dict[str, Any]:
         """
         Build psychological context from vector-retrieved data.
 
@@ -370,22 +406,26 @@ class RAGProcessor:
         Returns:
             Dict with psychological context
         """
-        context = {}
+        context: Dict[str, Union[str, List[str], List[Dict[str, Any]]]] = {}
 
         # Extract emotional signals from similar memories
         if similar_memories:
             emotional_signals = []
-            recurring_topics = []
+            recurring_topics: List[str] = []
 
             for memory in similar_memories:
                 # Extract emotion signals
-                if memory.get('metadata') and isinstance(memory['metadata'], dict):
-                    emotion = memory['metadata'].get('emotional_state')
+                if memory.get("metadata") and isinstance(memory["metadata"], dict):
+                    emotion = memory["metadata"].get("emotional_state")
                     if emotion:
                         emotional_signals.append(emotion)
 
                 # Extract topics
-                topic = memory.get('topic') or (memory['metadata'].get('topic') if memory.get('metadata') and isinstance(memory['metadata'], dict) else None)
+                topic = memory.get("topic") or (
+                    memory["metadata"].get("topic")
+                    if memory.get("metadata") and isinstance(memory["metadata"], dict)
+                    else None
+                )
                 if topic:
                     recurring_topics.append(topic)
 
@@ -400,10 +440,13 @@ class RAGProcessor:
             context["theme_clusters"] = theme_clusters
 
             # Extract primary theme if available
-            primary_themes = []
+            primary_themes: List[str] = []
             for cluster in theme_clusters:
-                if cluster.get('dominant_theme'):
-                    primary_themes.append(cluster.get('dominant_theme'))
+                theme = cluster.get("dominant_theme")
+                if theme and isinstance(theme, str):
+                    primary_themes.append(theme)
+                elif theme:
+                    logger.warning("Found non-string dominant_theme in cluster: %s", type(theme))
 
             if primary_themes:
                 context["primary_themes"] = primary_themes
@@ -419,17 +462,18 @@ class RAGProcessor:
             # Detect emotional trends
             if len(emotional_trajectory) >= 2:
                 # Analyze if emotional states are improving
-                valence_scores = [entry.get('valence', 0) for entry in emotional_trajectory
-                                  if 'valence' in entry]
+                valence_scores = [entry.get("valence", 0) for entry in emotional_trajectory if "valence" in entry]
 
                 if valence_scores and len(valence_scores) >= 2:
                     # Check if valence is generally improving
                     is_improving = valence_scores[-1] > valence_scores[0]
                     context["emotional_trend"] = "improving" if is_improving else "stable_or_declining"
 
-        return context
+        return context  # Ensure context is returned
 
-    def _enhance_context_with_relevant_documents(self, user_question: str, question_embedding: List[float], session_id: str) -> Dict:
+    def _enhance_context_with_relevant_documents(
+        self, user_question: str, question_embedding: List[float], session_id: str
+    ) -> Dict:
         """
         Enhance context with only the most relevant documents while maintaining a fixed context size.
 
@@ -446,9 +490,7 @@ class RAGProcessor:
         try:
             # OPTIMIZED: Use pgvector search with threshold applied in database
             similar_docs = self.db_manager.find_similar_documents(
-                embedding=question_embedding,
-                limit=5,
-                min_similarity=self.SIMILARITY_THRESHOLD
+                embedding=question_embedding, limit=5, min_similarity=self.SIMILARITY_THRESHOLD
             )
 
             # Initialize knowledge context with fixed maximum size
@@ -462,8 +504,8 @@ class RAGProcessor:
                         # Try to parse JSON if it's a JSON string
                         try:
                             doc_dict = json.loads(doc)
-                            content = doc_dict.get('content', '')
-                            similarity = doc_dict.get('similarity', 0)
+                            content = doc_dict.get("content", "")
+                            similarity = doc_dict.get("similarity", 0)
                         except Exception as e:
                             # If not JSON, use the string as content with default similarity
                             logger.error("Error parsing JSON document: %s", e)
@@ -471,8 +513,8 @@ class RAGProcessor:
                             similarity = 0.7  # Default similarity above threshold
                     else:
                         # Normal dictionary case
-                        content = doc.get('content', '')
-                        similarity = doc.get('similarity', 0)
+                        content = doc.get("content", "")
+                        similarity = doc.get("similarity", 0)
 
                     # Database filtering should handle this, but double-check
                     if similarity >= self.SIMILARITY_THRESHOLD:
@@ -480,7 +522,7 @@ class RAGProcessor:
 
                 # Build knowledge context, keeping track of total length
                 total_length = 0
-                final_docs = []
+                final_docs: List[str] = []
 
                 for content, similarity in relevant_docs:
                     # Calculate how much this document would add
@@ -490,7 +532,7 @@ class RAGProcessor:
                     if total_length + content_length > self.MAX_KNOWLEDGE_CHARS:
                         # If this is the first document and it's too long, truncate it
                         if not final_docs:
-                            truncated = content[:self.MAX_KNOWLEDGE_CHARS] + "..."
+                            truncated = content[: self.MAX_KNOWLEDGE_CHARS] + "..."
                             final_docs.append(truncated)
                         break
 
@@ -510,12 +552,12 @@ class RAGProcessor:
                 conversation_history = self.db_manager.get_conversation_history(session_id)
 
                 if conversation_history and len(conversation_history) > 0:
-                    recent_exchanges = conversation_history[-self.MAX_CONVERSATION_EXCHANGES:]
+                    recent_exchanges = conversation_history[-self.MAX_CONVERSATION_EXCHANGES :]
 
                     conversation_parts = []
                     for exchange in recent_exchanges:
-                        q = exchange.get('question', exchange.get('question', ''))
-                        a = exchange.get('answer', exchange.get('answer', ''))
+                        q = exchange.get("question", exchange.get("question", ""))
+                        a = exchange.get("answer", exchange.get("answer", ""))
                         if q and a:
                             # Truncate if needed
                             q_short = q if len(q) < 100 else q[:97] + "..."
@@ -534,13 +576,13 @@ class RAGProcessor:
 
             # Create enhanced context dictionary with consistent size limits
             enhanced_context = {
-                'knowledge_context': knowledge_context.strip(),
-                'conversation_context': conversation_context.strip(),
-                'session_id': session_id,
-                'has_knowledge': bool(knowledge_context.strip()),
-                'has_conversation': bool(conversation_context.strip()),
-                'vector_threshold': self.SIMILARITY_THRESHOLD,  # Add threshold info for reference
-                'user_question': user_question  # Add the user's question for reference
+                "knowledge_context": knowledge_context.strip(),
+                "conversation_context": conversation_context.strip(),
+                "session_id": session_id,
+                "has_knowledge": bool(knowledge_context.strip()),
+                "has_conversation": bool(conversation_context.strip()),
+                "vector_threshold": self.SIMILARITY_THRESHOLD,
+                "user_question": user_question,
             }
 
             # Log context sizes
@@ -553,15 +595,17 @@ class RAGProcessor:
             logger.error("Error enhancing context: %s", e)
             logger.error(traceback.format_exc())
             return {
-                'knowledge_context': "",
-                'conversation_context': "",
-                'session_id': session_id,
-                'has_knowledge': False,
-                'has_conversation': False,
-                'user_question': user_question  # Include user question even in error case
+                "knowledge_context": "",
+                "conversation_context": "",
+                "session_id": session_id,
+                "has_knowledge": False,
+                "has_conversation": False,
+                "user_question": user_question,  # Include user question even in error case
             }
 
-    def enhance_context_with_relevant_documents(self, context, relevant_documents):
+    def enhance_context_with_relevant_documents(
+        self, context: Optional[Dict[str, Any]], relevant_documents: Optional[List[Dict[str, Any]]]
+    ) -> Dict[str, Any]:
         """
         Enhance generation context with relevant documents from retrieval.
 
@@ -589,8 +633,9 @@ class RAGProcessor:
 
         return enhanced_context
 
-    def _generate_pain_point_approach(self, original_question: str, current_question: str,
-                                      emotions: List[Dict], repetition_pattern: Dict) -> Dict:
+    def _generate_pain_point_approach(
+        self, original_question: str, current_question: str, emotions: List[Dict], repetition_pattern: Dict
+    ) -> Dict:
         """
         Generate appropriate therapeutic approach based on detected pain points and question evolution.
 
@@ -638,16 +683,16 @@ class RAGProcessor:
             'should_redirect': True}
         """
         # Determine if this seems to be a fixation pattern
-        is_fixation = repetition_pattern.get('is_fixation', False)
-        recurring_terms = repetition_pattern.get('recurring_terms', [])
+        is_fixation = repetition_pattern.get("is_fixation", False)
+        recurring_terms = repetition_pattern.get("recurring_terms", [])
 
         # Analyze emotional tone from emotion data
         emotional_tone = "neutral"
         if emotions:
             # Get the most common emotion
-            emotion_counter = {}
+            emotion_counter: Dict[str, int] = {}
             for e in emotions:
-                emotion = e.get('emotional_state', '').lower()
+                emotion = e.get("emotional_state", "").lower()
                 if emotion:
                     emotion_counter[emotion] = emotion_counter.get(emotion, 0) + 1
 
@@ -662,212 +707,107 @@ class RAGProcessor:
 
         # Adjust approach based on question evolution
         if is_fixation and not question_evolved:
-            if emotional_tone in ['anxious', 'worried', 'fear', 'anxiety']:
+            if emotional_tone in ["anxious", "worried", "fear", "anxiety"]:
                 approach_type = "anxiety_exploration"
-                guidance_question = f"I notice you've mentioned {', '.join(recurring_terms[:2])} several times. " \
-                                    f"These topics seem to cause you anxiety. Could you tell me what feels most " \
-                                    f"overwhelming about this situation?"
+                guidance_question = (
+                    f"I notice you've mentioned {', '.join(recurring_terms[:2])} several times. "
+                    f"These topics seem to cause you anxiety. Could you tell me what feels most "
+                    f"overwhelming about this situation?"
+                )
 
-            elif emotional_tone in ['sad', 'depressed', 'grief', 'depression']:
+            elif emotional_tone in ["sad", "depressed", "grief", "depression"]:
                 approach_type = "grief_reflection"
-                guidance_question = f"You've brought up {', '.join(recurring_terms[:2])} multiple times, and I sense " \
-                                    f"some sadness there. What feelings come up for you when you think about this?"
+                guidance_question = (
+                    f"You've brought up {', '.join(recurring_terms[:2])} multiple times, and I sense "
+                    f"some sadness there. What feelings come up for you when you think about this?"
+                )
 
             else:
                 approach_type = "gentle_refocus"
-                guidance_question = f"I've noticed we've discussed {', '.join(recurring_terms[:2])} several times. " \
-                                    f"I wonder if we could explore what makes this particularly important for you right now?"
+                guidance_question = (
+                    f"I've noticed we've discussed {', '.join(recurring_terms[:2])} several times. "
+                    f"I wonder if we could explore what makes this particularly important for you right now?"
+                )
         else:
             # Not a fixation, but still a pain point - use a lighter approach
             approach_type = "exploratory"
-            guidance_question = f"I notice that {', '.join(recurring_terms[:2]) if recurring_terms else 'this topic'} " \
-                                f"seems meaningful to you. Could you share more about how it affects you?"
+            guidance_question = (
+                f"I notice that {', '.join(recurring_terms[:2]) if recurring_terms else 'this topic'} "
+                f"seems meaningful to you. Could you share more about how it affects you?"
+            )
 
-        return {
-            'approach_type': approach_type,
-            'emotional_tone': emotional_tone,
-            'guidance_question': guidance_question,
-            'should_redirect': is_fixation,  # Redirect the conversation if we detect fixation
+        return {  # Ensure dict is returned
+            "approach_type": approach_type,
+            "emotional_tone": emotional_tone,
+            "guidance_question": guidance_question,
+            "should_redirect": is_fixation,
         }
 
     @typechecked
-    def enhance_response_with_pain_point_guidance(self, response: str, pain_point_data: Dict) -> str:
-        """
-        Enhance the therapeutic response with specialized guidance when a pain point is detected.
+    def detect_pain_points_from_embedding(
+        self, user_question: str, embedding: List[float], session_id: str, metadata: Optional[dict] = None
+    ) -> Dict[str, Any]:
+        """Detect potential pain points from question embedding with proper error handling."""
+        # Default response structure with ALL required keys
+        default_response = {
+            "pain_point_detected": False,
+            "template_used": "dynamic_rag_therapy",
+            "approach_type": DEFAULT_APPROACH,
+            "similarity": 0.0,
+            "pain_point": {},
+        }
 
-        Args:
-            response: The original response
-            pain_point_data: Pain point detection data
-
-        Returns:
-            Enhanced response with pain point guidance
-        """
-        if not pain_point_data or not pain_point_data.get('detected'):
-            return response
-
-        # Get the suggested approach
-        approach = pain_point_data.get('suggested_approach', {})
-        guidance_question = approach.get('guidance_question', '')
-
-        if not guidance_question:
-            return response
-
-        # Determine how to enhance the response based on approach type
-        approach_type = approach.get('approach_type', 'exploratory')
-
-        if approach.get('should_redirect'):
-            if approach_type == 'anxiety_exploration':
-                enhanced_response = response.rstrip() + "\n\nI notice this topic seems to cause anxiety. " + guidance_question
-            elif approach_type == 'grief_reflection':
-                enhanced_response = response.rstrip() + "\n\nI sense some sadness in this topic. " + guidance_question
-            else:
-                enhanced_response = response.rstrip() + "\n\n" + guidance_question
-        # For exploratory approaches, append the guidance more gently
-        else:
-            # Add the guidance question at the end
-            enhanced_response = response.rstrip() + "\n\n" + guidance_question
-
-        return enhanced_response
-
-    @typechecked
-    def get_contextual_data(self, question: str, session_id: str, max_context_chars: int = 1000) -> Dict:
-        """
-        Get contextualized data for a user question with database-side vector processing.
-
-        Args:
-            question: The user's question
-            session_id: Session identifier
-            max_context_chars: Maximum context length to return
-
-        Returns:
-            Dict containing knowledge and conversation context
-        """
         try:
-            # DATABASE-FIRST APPROACH:
-            # Let PostgreSQL handle the vector similarity search instead of loading everything to RAM/GPU
-
-            # 1. Generate embedding for the question using the EmbeddingProviderAdapter
-            question_embedding = self.embedding_provider.generate_embedding(question)
-            if question_embedding is None:
-                logger.warning("Could not generate embedding for question")
-                return {"knowledge_context": "", "conversation_context": ""}
-
-            # 2. Convert embedding to the format expected by find_similar_documents_via_rpc
-            # The embedding_provider returns a tensor, so we need to convert it to a list
-            if hasattr(question_embedding, 'cpu') and callable(getattr(question_embedding, 'cpu')):
-                # It's a torch tensor, convert to list
-                embedding_list = question_embedding.cpu().numpy().tolist()
-                # If it's a 2D tensor with one row, extract the row
-                if isinstance(embedding_list, list) and len(embedding_list) == 1:
-                    embedding_list = embedding_list[0]
-            else:
-                # It might already be a list or numpy array
-                embedding_list = question_embedding
-
-            # 3. Use a parameterized SQL query to find similar documents DIRECTLY in PostgreSQL
-            similar_docs = self.db_manager.find_similar_documents_via_rpc(
-                embedding=embedding_list,
-                session_id=session_id,
-                limit=3,
-                similarity_threshold=0.7
+            pain_point = self.db_manager.identify_potential_pain_points(
+                question_text=user_question, question_embedding=embedding, session_id=session_id, pain_threshold=0.85
             )
 
-            # 4. Construct knowledge context from the results PostgreSQL returns
-            knowledge_context = ""
-            if similar_docs and len(similar_docs) > 0:
-                # Only take as much as we need to stay under max_context_chars
-                remaining_chars = max_context_chars
-                for doc in similar_docs:
-                    content = doc.get("content", "")
-                    if len(content) <= remaining_chars:
-                        knowledge_context += content + "\n\n"
-                        remaining_chars -= len(content) + 2
-                    else:
-                        # Take a partial document if we're running out of space
-                        knowledge_context += content[:remaining_chars] + "..."
-                        break
+            if pain_point:
+                # Process pain point for normal case
+                result = {
+                    "pain_point_detected": pain_point.get("detected", False),
+                    "template_used": "dynamic_rag_therapy",
+                    "approach_type": DEFAULT_APPROACH,
+                    "similarity": pain_point.get("similarity", 0.0),
+                    "pain_point": pain_point,
+                }
 
-                logger.info("Knowledge context: %d chars from vector similarity search", len(knowledge_context))
+                # Add suggested approach if available
+                suggested_approach = pain_point.get("suggested_approach")
+                if (
+                    suggested_approach
+                    and isinstance(suggested_approach, dict)
+                    and "approach_type" in suggested_approach
+                ):
+                    result["approach_type"] = suggested_approach["approach_type"]
 
-            # 5. Get minimal conversation context
-            conversation_context = ""
-            conversation_history = self.db_manager.get_conversation_history(session_id)
-            if conversation_history and len(conversation_history) > 0:
-                # Only take the last 2 exchanges to limit context size
-                recent_history = conversation_history[-2:] if len(conversation_history) > 2 else conversation_history
+                # Add repetition pattern if available
+                if pain_point.get("repetition_pattern"):
+                    result["repetition_pattern"] = pain_point.get("repetition_pattern")
 
-                # Format as text, but be strict about length limits
-                for item in recent_history:
-                    q = item.get("question", "")[:150]  # Limit question length
-                    a = item.get("answer", "")[:200]    # Limit answer length
-                    if q and a:
-                        conversation_context += f"User: {q}\nAssistant: {a}\n\n"
-
-                logger.info("Conversation context: %d chars", len(conversation_context))
-
-            # 6. Ensure overall context stays within limits
-            total_context_length = len(knowledge_context) + len(conversation_context)
-            logger.info("Total prompt context: %d chars", total_context_length)
-
-            return {
-                "knowledge_context": knowledge_context,
-                "conversation_context": conversation_context
-            }
-
-        except Exception as e:
-            logger.error("Error getting contextual data: %s", e)
-            logger.error(traceback.format_exc())
-            return {"knowledge_context": "", "conversation_context": ""}
-
-    @typechecked
-    def process_query(self, user_question: str, session_id: Optional[str] = None) -> List[float]:
-        """
-        Process a user query to generate an embedding.
-        Implements caching for similar previous questions.
-
-        Args:
-            user_question: The user's question text
-            session_id: Optional session ID for cache lookup
-
-        Returns:
-            List[float]: The embedding vector
-        """
-        try:
-            # Check if we can reuse a similar question's embedding (optimization)
-            if self.VECTOR_CACHE_ENABLED and session_id:
-                cached_embedding = self.db_manager.find_similar_question_embedding(
-                    user_question,
-                    session_id=session_id,
-                    similarity_threshold=0.92  # High threshold for reuse
-                )
-
-                if cached_embedding:
-                    logger.info("Using cached embedding from similar previous question")
-                    return cached_embedding
-
-            # Generate a new embedding
-            embedding = self.embedding_provider.generate_embedding(user_question)
-
-            # Convert embedding to list format if needed
-            if hasattr(embedding, 'cpu') and callable(getattr(embedding, 'cpu')):
-                # It's a torch tensor, convert to list
-                embedding_list = embedding.cpu().numpy().tolist()
-                # If it's a 2D tensor with one row, extract the row
-                if isinstance(embedding_list, list) and len(embedding_list) == 1:
-                    embedding_list = embedding_list[0]
+                # Update metadata if provided
+                if metadata is not None and isinstance(metadata, dict):
+                    if "pain_points" not in metadata:
+                        metadata["pain_points"] = []
+                    metadata["pain_points"].append(
+                        {
+                            "question": user_question,
+                            "detected": result["pain_point_detected"],
+                            "similarity": result["similarity"],
+                        }
+                    )
+                return result
             else:
-                # It might already be a list or numpy array
-                embedding_list = embedding
-
-            return embedding_list
+                # pain_point was None
+                logger.warning("No pain point detected (None returned from DB manager)")
+                return default_response
 
         except Exception as e:
-            logger.error("Error processing query: %s", e)
+            logger.error("Error in pain point detection: %s", e)
             logger.error(traceback.format_exc())
-            # Return a zero embedding as fallback (will likely not match anything)
-            return [0.0] * self.embedding_dimension
+            return default_response
 
-    def _identify_hot_topics(self, user_question: str, query_embedding: List[float]) -> List[Dict]:
+    def _identify_hot_topics(self, user_question: str, query_embedding: List[float]) -> List[Dict[str, Any]]:
         """
         Identify hot topics in the user's question using vector similarity.
 
@@ -883,19 +823,20 @@ class RAGProcessor:
             hot_topics = []
 
             # Focus on specific psychological themes
-            themes = ["anxiety", "depression", "stress", "relationships",
-                      "trauma", "grief", "self-esteem", "identity"]
+            themes = ["anxiety", "depression", "stress", "relationships", "trauma", "grief", "self-esteem", "identity"]
 
             # Check if any of these themes are directly mentioned
             user_question_lower = user_question.lower()
 
             for theme in themes:
                 if theme in user_question_lower:
-                    hot_topics.append({
-                        "topic": theme,
-                        "relevance": 0.95,  # High relevance for direct mentions
-                        "source": "direct_mention"
-                    })
+                    hot_topics.append(
+                        {
+                            "topic": theme,
+                            "relevance": 0.95,  # High relevance for direct mentions
+                            "source": "direct_mention",
+                        }
+                    )
 
             # If we found direct mentions, return those
             if hot_topics:
@@ -935,30 +876,38 @@ class RAGProcessor:
 
                 try:
                     # Check if hot_topics table exists first
-                    check_query = "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'hot_topics');"
-                    check_result = self.db_manager.supabase.rpc('sql', {'command': check_query}).execute()
+                    check_query = (
+                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'hot_topics');"
+                    )
+                    check_result = self.db_manager.supabase.rpc("sql", {"command": check_query}).execute()
 
-                    if check_result.data and (check_result.data[0] == 't' or check_result.data[0] is True):
+                    if check_result.data and (check_result.data[0] == "t" or check_result.data[0] is True):
                         # Table exists, query it
-                        result = self.db_manager.supabase.rpc('sql', {'command': query}).execute()
+                        result = self.db_manager.supabase.rpc("sql", {"command": query}).execute()
 
                         if result.data:
                             for row in result.data:
                                 if isinstance(row, dict):
-                                    hot_topics.append({
-                                        "topic": row.get("topic", ""),
-                                        "relevance": row.get("relevance", 0),
-                                        "source": "vector_similarity"
-                                    })
+                                    hot_topics.append(
+                                        {
+                                            "topic": row.get("topic", ""),
+                                            "relevance": row.get("relevance", 0),
+                                            "source": "vector_similarity",
+                                        }
+                                    )
                                 elif isinstance(row, str):
                                     # Parse CSV-formatted response
-                                    parts = row.split(',')
+                                    parts = row.split(",")
                                     if len(parts) >= 3:
-                                        hot_topics.append({
-                                            "topic": parts[1],
-                                            "relevance": float(parts[2]) if parts[2].replace('.','',1).isdigit() else 0,
-                                            "source": "vector_similarity"
-                                        })
+                                        hot_topics.append(
+                                            {
+                                                "topic": parts[1],
+                                                "relevance": (
+                                                    float(parts[2]) if parts[2].replace(".", "", 1).isdigit() else 0
+                                                ),
+                                                "source": "vector_similarity",
+                                            }
+                                        )
                 except Exception as inner_e:
                     logger.warning("Error finding hot topics: %s", inner_e)
                     # Continue without hot topics
@@ -967,6 +916,53 @@ class RAGProcessor:
 
         except Exception as e:
             logger.error("Error identifying hot topics: %s", e)
+            return []
+
+    @typechecked
+    def get_relevant_documents(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:
+        """
+        Retrieves the most relevant documents using pgvector similarity.
+
+        OPTIMIZED: Uses direct pgvector similarity search in database instead of Python-side calculation.
+
+        Args:
+            query_embedding (List[float]): Vector embedding to find similar documents for
+            top_k (int): Maximum number of documents to return
+
+        Returns:
+            List[Dict]: List of relevant documents with similarity scores
+        """
+        try:
+            # Let pgvector handle the similarity calculation in the database
+            similar_docs = self.db_manager.find_similar_documents(
+                embedding=query_embedding,
+                limit=top_k,
+                min_similarity=self.SIMILARITY_THRESHOLD,  # Apply similarity threshold filter
+            )
+
+            # Format the results as needed
+            relevant_documents = []
+            for doc in similar_docs:
+                if isinstance(doc, dict):
+                    # Extract required fields and add to results
+                    relevant_doc = {
+                        "content": doc.get("content", ""),
+                        "similarity": doc.get("similarity", 0),
+                        "id": doc.get("id"),
+                    }
+                    relevant_documents.append(relevant_doc)
+
+                    # Log high-quality matches
+                    if doc.get("similarity", 0) > 0.8:
+                        logger.info("Found highly relevant document (similarity: %.3f)", doc.get("similarity", 0))
+            # Add debug logging to see what documents are being retrieved
+            for i, doc in enumerate(relevant_documents):
+                content_preview = doc.get("content", "")[:100] + "..." if doc.get("content") else ""
+                logger.debug("Retrieved document %d (sim: %.3f): %s", i + 1, doc.get("similarity", 0), content_preview)
+            return relevant_documents
+
+        except Exception as e:
+            logger.error("Error retrieving documents with pgvector: %s", e)
             return []
 
     @typechecked
@@ -989,17 +985,19 @@ class RAGProcessor:
                 return []
 
             # Only take the most recent exchanges to limit context size
-            recent_history = conversation_history[-limit:] if len(conversation_history) > limit else conversation_history
+            recent_history = (
+                conversation_history[-limit:] if len(conversation_history) > limit else conversation_history
+            )
 
             # Format the conversation history for the generator
             formatted_history = []
             for item in recent_history:
                 # Extract question and answer
-                q = item.get('question', item.get('question', ''))
-                a = item.get('answer', item.get('answer', ''))
+                q = item.get("question", item.get("question", ""))
+                a = item.get("answer", item.get("answer", ""))
 
                 # Include metadata if available
-                metadata = item.get('metadata', {})
+                metadata = item.get("metadata", {})
                 if isinstance(metadata, str):
                     try:
                         # Try to parse metadata if it's a string
@@ -1010,10 +1008,10 @@ class RAGProcessor:
 
                 # Create formatted entry
                 entry = {
-                    'question': q,
-                    'answer': a,
-                    'metadata': metadata,
-                    'timestamp': item.get('created_at', item.get('timestamp', ''))
+                    "question": q,
+                    "answer": a,
+                    "metadata": metadata,
+                    "timestamp": item.get("created_at", item.get("timestamp", "")),
                 }
 
                 # For psychological work, preserve the FULL text of the exchanges
@@ -1027,127 +1025,18 @@ class RAGProcessor:
             logger.error(traceback.format_exc())
             return []
 
-    @typechecked
-    def detect_pain_points_from_embedding(self, user_question: str, embedding: List[float], session_id: str, metadata: Optional[dict] = None):
-        """Detect potential pain points from question embedding with proper error handling."""
-        # Default response structure with ALL required keys
-        default_response = {
-            "pain_point_detected": False,
-            "template_used": "dynamic_rag_therapy",
-            "approach_type": "default_approach",
-            "similarity": 0.0,
-            "pain_point": {}
-        }
-
-        try:
-            # Get pain point from DB
-            pain_point = self.db_manager.identify_potential_pain_points(
-                question_text=user_question,
-                question_embedding=embedding,
-                session_id=session_id,
-                pain_threshold=0.85
-            )
-
-            # If pain_point is None, return default with safe values
-            if pain_point is None:
-                logger.warning("No pain point detected (None returned)")
-                return default_response
-
-            # Process pain point for normal case (NO MOCK DETECTION)
-            result = {
-                "pain_point_detected": pain_point.get('detected', False),
-                "template_used": "dynamic_rag_therapy",  # Default template
-                "approach_type": "default_approach",     # Always include this
-                "similarity": pain_point.get('similarity', 0.0),
-                "pain_point": pain_point
-            }
-
-            # Add suggested approach if available
-            if pain_point.get('suggested_approach'):
-                suggested = pain_point['suggested_approach']
-                if isinstance(suggested, dict) and 'approach_type' in suggested:
-                    result['approach_type'] = suggested['approach_type']
-
-            # Add repetition pattern if available
-            if pain_point.get('repetition_pattern'):
-                result['repetition_pattern'] = pain_point.get('repetition_pattern')
-
-            # Update metadata if provided
-            if metadata is not None and isinstance(metadata, dict):
-                if 'pain_points' not in metadata:
-                    metadata['pain_points'] = []
-                metadata['pain_points'].append({
-                    'question': user_question,
-                    'detected': result['pain_point_detected'],
-                    'similarity': result['similarity']
-                })
-
-            return result
-
-        except Exception as e:
-            logger.error("Error in pain point detection: %s", e)
-            logger.error(traceback.format_exc())
-            return default_response
-
-    @typechecked
-    def get_relevant_documents(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:
-        """
-        Retrieves the most relevant documents using pgvector similarity.
-
-        OPTIMIZED: Uses direct pgvector similarity search in database instead of Python-side calculation.
-
-        Args:
-            query_embedding (List[float]): Vector embedding to find similar documents for
-            top_k (int): Maximum number of documents to return
-
-        Returns:
-            List[Dict]: List of relevant documents with similarity scores
-        """
-        try:
-            # Let pgvector handle the similarity calculation in the database
-            similar_docs = self.db_manager.find_similar_documents(
-                embedding=query_embedding,
-                limit=top_k,
-                min_similarity=self.SIMILARITY_THRESHOLD  # Apply similarity threshold filter
-            )
-
-            # Format the results as needed
-            relevant_documents = []
-            for doc in similar_docs:
-                if isinstance(doc, dict):
-                    # Extract required fields and add to results
-                    relevant_doc = {
-                        'content': doc.get('content', ''),
-                        'similarity': doc.get('similarity', 0),
-                        'id': doc.get('id')
-                    }
-                    relevant_documents.append(relevant_doc)
-
-                    # Log high-quality matches
-                    if doc.get('similarity', 0) > 0.8:
-                        logger.info("Found highly relevant document (similarity: %.3f)", doc.get('similarity', 0))
-            # Add debug logging to see what documents are being retrieved
-            for i, doc in enumerate(relevant_documents):
-                content_preview = doc.get('content', '')[:100] + "..." if doc.get('content') else ""
-                logger.debug("Retrieved document %d (sim: %.3f): %s", i+1, doc.get('similarity', 0), content_preview)
-            return relevant_documents
-
-        except Exception as e:
-            logger.error("Error retrieving documents with pgvector: %s", e)
-            return []
-
-    def _log_pain_point_detection(self, user_question, pain_point, template_used):
+    def _log_pain_point_detection(self, user_question: str, pain_point: Dict, template_used: str) -> None:
         """Log pain point detection for analysis."""
         try:
             # Log structured data for later analysis
             metadata = {
-                'event_type': 'pain_point_detected',
-                'pain_point': pain_point.get('pain_point', ''),
-                'recurring_terms': pain_point.get('recurring_terms', []),
-                'count': pain_point.get('count', 0),
-                'severity': pain_point.get('severity', ''),
-                'template_used': template_used,
-                'approach': pain_point.get('approach', {}).get('name', '')
+                "event_type": "pain_point_detected",
+                "pain_point": pain_point.get("pain_point", ""),
+                "recurring_terms": pain_point.get("recurring_terms", []),
+                "count": pain_point.get("count", 0),
+                "severity": pain_point.get("severity", ""),
+                "template_used": template_used,
+                "approach": pain_point.get("approach", {}).get("name", ""),
             }
 
             # Create a special log entry in interactions table
@@ -1156,17 +1045,21 @@ class RAGProcessor:
                 question=user_question,
                 answer="Pain point detection triggered",
                 metadata=metadata,
-                session_id="default_session"  # Use consistent session ID, not None
+                session_id="default_session",  # Use consistent session ID, not None
             )
 
-            logger.info("Pain point detected: %s (count: %d, severity: %s)",
-                        pain_point.get('pain_point', 'unknown'),
-                        pain_point.get('count', 0),
-                        pain_point.get('severity', 'unknown'))
+            logger.info(
+                "Pain point detected: %s (count: %d, severity: %s)",
+                pain_point.get("pain_point", "unknown"),
+                pain_point.get("count", 0),
+                pain_point.get("severity", "unknown"),
+            )
         except Exception as e:
             logger.error("Error logging pain point detection: %s", e)
 
-    def create_dynamic_retriever(self, session_id: Optional[str] = None, rag_options: Optional[dict] = None):
+    def create_dynamic_retriever(
+        self, session_id: Optional[str] = None, rag_options: Optional[dict] = None
+    ) -> DynamicRAGRetriever:
         """
         Create a DynamicRAGRetriever with compatible parameters.
 
@@ -1179,17 +1072,150 @@ class RAGProcessor:
         """
         options = rag_options or {}
 
-        # Only pass parameters that the class accepts
-        valid_params = {
-            'db_manager': self.db_manager,
-            'session_id': session_id,
-            'persona': options.get('persona'),
-            'query_mode': options.get('query_mode'),
-            'embedding_provider': options.get('embedding_provider')
+        # Create and return the retriever by passing arguments directly
+        # using original variables and the options dictionary
+        if not hasattr(self, "_retriever_cache"):
+            self._retriever_cache: Dict[str, Any] = {}
+        cache_key = session_id or "default"
+        if cache_key not in self._retriever_cache:
+            self._retriever_cache[cache_key] = DynamicRAGRetriever(
+                db_manager=self.db_manager,
+                session_id=session_id,
+                persona=options.get("persona"),
+                query_mode=options.get("query_mode"),
+                embedding_provider=options.get("embedding_provider"),
+                rag_processor=options.get("rag_processor", self),
+            )
+        retriever = self._retriever_cache[cache_key or "default"]
+        return retriever
+
+    @typechecked
+    def process_query(self, user_question: str, session_id: str) -> List[float]:
+        """
+        Process the user query: check cache/DB for existing embedding,
+        otherwise generate a new one.
+
+        Args:
+            user_question: The raw question text from the user.
+            session_id: The current session ID.
+
+        Returns:
+            List[float]: The vector embedding of the user question.
+
+        Raises:
+            ValueError: If embedding generation fails and no existing embedding is found.
+        """
+        cache_key = f"{session_id}:{user_question}"
+        if not hasattr(self, "_query_embedding_cache"):
+            self._query_embedding_cache: Dict[str, List[float]] = {}
+        if cache_key in self._query_embedding_cache:
+            logger.debug("Returning cached embedding for query in session %s", session_id)
+            return self._query_embedding_cache[cache_key]
+
+        try:
+            logger.debug("Checking DB for existing embedding for query in session %s", session_id)
+            # find_similar_question_embedding returns Optional[List[float]]
+            existing_embedding = self.db_manager.find_similar_question_embedding(
+                question_text=user_question,
+                session_id=session_id,
+                # Ensure parameter name matches the DB method definition
+                similarity_threshold=0.98,
+            )
+
+            # Check if embedding is not None AND is a list
+            if existing_embedding is not None and isinstance(existing_embedding, list):
+                logger.debug("Found existing embedding in DB for query in session %s", session_id)
+                # Store in in-memory cache before returning
+                self._query_embedding_cache[cache_key] = existing_embedding
+                return existing_embedding  # Return the list directly
+
+            logger.debug("No existing/cached embedding found. Generating new one for session %s", session_id)
+            embedding = self.embedding_provider.generate_embedding(user_question)
+            if embedding is None:
+                logger.error("Failed to generate embedding for query in session %s", session_id)
+                raise ValueError("Embedding generation returned None")
+
+            logger.debug("Generated new embedding for query in session %s", session_id)
+            # Store in in-memory cache before returning
+            self._query_embedding_cache[cache_key] = embedding
+            return embedding
+
+        except Exception as e:
+            logger.error("Error during query processing for session %s: %s", session_id, e)
+            logger.error(traceback.format_exc())  # Log full traceback
+            # This wraps the original error (e.g., the AttributeError)
+            raise ValueError(f"Failed to process query embedding: {e}") from e
+
+    @typechecked
+    def get_contextual_data(
+        self, user_question: str, session_id: str, query_embedding: List[float], limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Retrieves and combines various contextual data sources for response generation.
+
+        Args:
+            user_question: The user's input question.
+            session_id: The current session ID.
+            query_embedding: The embedding vector for the user question.
+            limit: The maximum number of items to retrieve for each context type.
+
+        Returns:
+            A dictionary containing combined contextual data.
+        """
+        context_data: Dict[str, Union[str, List[Dict[str, Any]], List[str]]] = {
+            "conversation_context": "",
+            "knowledge_items": [],
+            "past_interactions": [],
+            "similar_memories": [],
+            "theme_clusters": [],
+            "emotional_trajectory": [],
+            "hot_topics": [],
         }
+        try:
+            retriever = DynamicRAGRetriever(db_manager=self.db_manager, session_id=session_id, rag_processor=self)
 
-        # Filter out None values
-        valid_params = {k: v for k, v in valid_params.items() if v is not None}
+            # 1. Conversation History
+            context_data["conversation_context"] = retriever.get_conversation_context(limit=limit)
 
-        # Create and return the retriever
-        return DynamicRAGRetriever(**valid_params)
+            # 2. Relevant Documents/Knowledge Items
+            knowledge_items = retriever.get_knowledge_by_query(
+                query=user_question, embedding=query_embedding, limit=limit
+            )
+            context_data["knowledge_items"] = knowledge_items
+
+            # 3. Similar Past Interactions
+            context_data["past_interactions"] = retriever.get_past_interactions(session_id=session_id, limit=limit)
+
+            # 4. Associative Memory Retrieval
+            if (
+                hasattr(self, "associative_memory")
+                and self.associative_memory
+                and getattr(self, "memory_initialized", False)
+            ):
+                context_data["similar_memories"] = self.associative_memory.retrieve_memories(user_question, top_k=limit)
+
+            # 5. Theme Clusters
+            context_data["theme_clusters"] = self.db_manager.analyze_theme_clusters(session_id, max_clusters=limit)
+
+            # 6. Emotional Trajectory
+            context_data["emotional_trajectory"] = self.db_manager.analyze_emotional_vector_trajectory(session_id)
+
+            # 7. Hot Topics (Assuming _identify_hot_topics exists)
+            if hasattr(self, "_identify_hot_topics"):
+                context_data["hot_topics"] = self._identify_hot_topics(user_question, query_embedding)
+
+            logger.debug("Retrieved contextual data for session %s", session_id)
+            return context_data
+
+        except Exception as e:
+            logger.error("Error retrieving contextual data for session %s: %s", session_id, e)
+            logger.error(traceback.format_exc())
+            return {
+                "conversation_context": "",
+                "knowledge_items": [],
+                "past_interactions": [],
+                "similar_memories": [],
+                "theme_clusters": [],
+                "emotional_trajectory": [],
+                "hot_topics": [],
+            }

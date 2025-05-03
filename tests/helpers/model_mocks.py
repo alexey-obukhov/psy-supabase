@@ -1,4 +1,5 @@
-# filepath: /home/vertok/git-projects/psy_supabase/tests/helpers/model_mocks.py
+"""Lightweight mock for TextGenerator that doesn't use GPU memory."""
+
 
 class MockTextGenerator:
     """Lightweight mock for TextGenerator that doesn't use GPU memory."""
@@ -10,7 +11,6 @@ class MockTextGenerator:
         # Simple deterministic mock response based on prompt
         if "anxiety" in prompt.lower():
             return "Response about managing anxiety..."
-        elif "depression" in prompt.lower():
+        if "depression" in prompt.lower():
             return "Response about depression support..."
-        else:
-            return "General therapeutic response..."
+        return "General therapeutic response..."

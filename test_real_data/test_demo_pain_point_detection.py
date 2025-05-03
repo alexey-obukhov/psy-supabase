@@ -14,18 +14,20 @@ Usage:
     python demo_pain_point_detection.py
 """
 
+import json
 import os
 import sys
-from typing import Dict, List, Any, Optional
-import json
 import time
+from typing import Any, Dict, List, Optional
+
 from dotenv import load_dotenv
-from school_logging.log import ColoredLogger
-from psy_supabase.utilities.utils import cleanup_memory
+from prismalog.log import get_logger
+
 from psy_supabase.utilities.common import is_github_actions
+from psy_supabase.utilities.utils import cleanup_memory
 
 # Set up logging
-logger = ColoredLogger("pain_point_demo")
+logger = get_logger(__name__)
 
 # Load environment variables
 if not is_github_actions():
@@ -33,9 +35,6 @@ if not is_github_actions():
     logger.info("Local development: Loading environment from .env file")
 else:
     logger.info("CI environment: Using GitHub secrets")
-
-# Add parent directory to path to import our modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import TEST_CONVERSATIONS from test_pain_point_detection
 from test_real_data.test_pain_point_detection import TEST_CONVERSATIONS
@@ -54,13 +53,15 @@ from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.memory.associative_memory import AssociativeMemory
 
+
 class PainPointDemo:
     """Demonstrates pain point detection using sample conversations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize components needed for pain point detection."""
         # Create a unique test user ID
         import uuid
+
         self.user_id = f"demo_user_{uuid.uuid4().hex[:8]}"
         logger.info("Using demo user ID: %s", self.user_id)
         self.session_id = "demo_session"
@@ -71,15 +72,15 @@ class PainPointDemo:
             "It sounds like this situation has been difficult for you. How has it been affecting other areas of your life?",
             "I'm hearing that this is something you've been struggling with. What have you tried so far to address it?",
             "That's a really important concern you're raising. How do you feel when you think about this issue?",
-            "Thank you for sharing that with me. It takes courage to discuss these feelings. How long have you been experiencing this?"
+            "Thank you for sharing that with me. It takes courage to discuss these feelings. How long have you been experiencing this?",
         ]
 
+        # Add assertions to satisfy mypy ---
+        assert supabase_url is not None, "Supabase URL must be set"
+        assert supabase_key is not None, "Supabase Key must be set"
+
         # Initialize database
-        self.db_manager = DatabaseManager(
-            supabase_url=supabase_url,
-            supabase_key=supabase_key,
-            user_id=self.user_id
-        )
+        self.db_manager = DatabaseManager(supabase_url=supabase_url, supabase_key=supabase_key, user_id=self.user_id)
 
         # Set up schema and tables
         logger.info("Setting up demo environment...")
@@ -93,16 +94,14 @@ class PainPointDemo:
 
         # Initialize text generator (use CPU for demo purposes)
         device = "cpu"
-        self.generator = TextGenerator(model_name="microsoft/phi-1_5", device=device)
+        self.generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=device)
 
         # Initialize associative memory
         self.associative_memory = AssociativeMemory()
 
         # Initialize RAG processor
         self.rag_processor = RAGProcessor(
-            db_manager=self.db_manager,
-            generator=self.generator,
-            intelligent_processing_enabled=True
+            db_manager=self.db_manager, generator=self.generator, intelligent_processing_enabled=True
         )
 
         # Add associative memory to RAG processor
@@ -111,7 +110,7 @@ class PainPointDemo:
         # Initialize memory with themes from test conversations
         self._initialize_memory()
 
-    def _verify_schema_exists(self):
+    def _verify_schema_exists(self) -> None:
         """Verify that the schema exists and has the required tables."""
         try:
             # Check if schema exists
@@ -122,7 +121,7 @@ class PainPointDemo:
                 WHERE schema_name = '{self.db_manager.schema_name}'
             );
             """
-            schema_response = self.db_manager.supabase.rpc('sql', {'command': schema_query}).execute()
+            schema_response = self.db_manager.supabase.rpc("sql", {"command": schema_query}).execute()
 
             schema_exists = False
             if schema_response.data and len(schema_response.data) > 0:
@@ -130,7 +129,7 @@ class PainPointDemo:
                     schema_exists = next(iter(schema_response.data[0].values()))
                 else:
                     # Handle character-by-character response
-                    schema_exists = ''.join(schema_response.data).lower() == 'true'
+                    schema_exists = "".join(schema_response.data).lower() == "true"
 
             if not schema_exists:
                 logger.error("Schema %s does not exist!", self.db_manager.schema_name)
@@ -145,14 +144,14 @@ class PainPointDemo:
                 AND table_name = 'interactions'
             );
             """
-            table_response = self.db_manager.supabase.rpc('sql', {'command': table_query}).execute()
+            table_response = self.db_manager.supabase.rpc("sql", {"command": table_query}).execute()
 
             table_exists = False
             if table_response.data and len(table_response.data) > 0:
                 if isinstance(table_response.data[0], dict):
                     table_exists = next(iter(table_response.data[0].values()))
                 else:
-                    table_exists = ''.join(table_response.data).lower() == 'true'
+                    table_exists = "".join(table_response.data).lower() == "true"
 
             if not table_exists:
                 logger.error("Table interactions does not exist in schema %s!", self.db_manager.schema_name)
@@ -160,9 +159,10 @@ class PainPointDemo:
         except Exception as e:
             logger.error("Error verifying schema: %s", e)
             import traceback
+
             logger.error(traceback.format_exc())
 
-    def _initialize_memory(self):
+    def _initialize_memory(self) -> None:
         """Initialize associative memory with themes from test conversations."""
         logger.info("Initializing associative memory with conversation themes")
 
@@ -183,7 +183,7 @@ class PainPointDemo:
 
         logger.info("Initialized memory with %d entries", len(self.associative_memory.memories))
 
-    def add_conversations_to_database(self, conversation):
+    def add_conversations_to_database(self, conversation: Dict[str, Any]) -> int:
         """Add conversations from TEST_CONVERSATIONS to the database."""
         name = conversation["name"]
         session_id = conversation.get("session_id")
@@ -232,7 +232,7 @@ class PainPointDemo:
                 """
 
                 # Execute the SQL
-                response = self.db_manager.supabase.rpc('sql', {'command': sql}).execute()
+                response = self.db_manager.supabase.rpc("sql", {"command": sql}).execute()
 
                 if response.data and len(response.data) > 0:
                     added_count += 1
@@ -264,11 +264,7 @@ class PainPointDemo:
         added_count = self.add_conversations_to_database(conversation)
         if added_count == 0:
             logger.error("Failed to add any interactions to the database!")
-            return {
-                "name": name,
-                "session_id": session_id,
-                "error": "Failed to add interactions to database"
-            }
+            return {"name": name, "session_id": session_id, "error": "Failed to add interactions to database"}
 
         # Wait a moment to ensure database operations complete
         time.sleep(1)
@@ -277,7 +273,7 @@ class PainPointDemo:
             "name": name,
             "session_id": session_id,
             "exchanges": [],
-            "pain_points_detected": 0,
+            "pain_point_detected": 0,
             "first_detection_at": None,
             "detected_themes": set(),
             "detected_approaches": set(),
@@ -294,7 +290,7 @@ class PainPointDemo:
                 all_questions = []
                 for i, item in enumerate(conversations_list):
                     if isinstance(item, dict):
-                        question = item.get('question', '')
+                        question = item.get("question", "")
                         if question:
                             all_questions.append(question)
 
@@ -317,14 +313,15 @@ class PainPointDemo:
                         "question": question,
                         "answer": self.mock_responses[i % len(self.mock_responses)],
                         "pain_point_detected": any(theme in question.lower() for theme in expected_themes),
-                        "recurring_themes": [theme for theme in results["detected_themes"]
-                                            if theme.lower() in question.lower()]
+                        "recurring_themes": [
+                            theme for theme in results["detected_themes"] if theme.lower() in question.lower()
+                        ],
                     }
                     results["exchanges"].append(exchange)
 
                     # Count pain points
                     if exchange["pain_point_detected"]:
-                        results["pain_points_detected"] += 1
+                        results["pain_point_detected"] += 1
                         if results["first_detection_at"] is None:
                             results["first_detection_at"] = i + 1
             else:
@@ -334,6 +331,7 @@ class PainPointDemo:
         except Exception as e:
             logger.error("Error processing conversation: %s", e)
             import traceback
+
             logger.error(traceback.format_exc())
             results["error"] = str(e)
 
@@ -343,30 +341,30 @@ class PainPointDemo:
         """Detect themes from a list of questions."""
         # Define common psychological themes and their keyword patterns
         theme_keywords = {
-            'anxiety': ['anxiety', 'anxious', 'worry', 'nervous', 'panic', 'stress', 'fear'],
-            'depression': ['depression', 'depressed', 'sad', 'hopeless', 'unmotivated', 'tired'],
-            'trauma': ['trauma', 'traumatic', 'abuse', 'ptsd', 'shock', 'flashback'],
-            'relationship': ['relationship', 'marriage', 'partner', 'spouse', 'boyfriend', 'girlfriend'],
-            'family': ['family', 'parent', 'child', 'mother', 'father', 'sibling'],
-            'work': ['job', 'career', 'work', 'workplace', 'boss', 'coworker'],
-            'self-esteem': ['confidence', 'self-esteem', 'worth', 'value', 'inadequate', 'failure'],
-            'identity': ['identity', 'who I am', 'self', 'meaning', 'purpose'],
-            'grief': ['grief', 'loss', 'death', 'died', 'bereavement'],
-            'addiction': ['addiction', 'substance', 'alcohol', 'drug', 'smoking'],
-            'anger': ['anger', 'angry', 'rage', 'frustration', 'irritable'],
-            'trust': ['trust', 'betrayal', 'suspicious', 'faith'],
-            'guilt': ['guilt', 'shame', 'regret', 'remorse', 'blame'],
-            'criticism': ['criticism', 'criticized', 'judged', 'humiliation'],
-            'rejection': ['rejection', 'rejected', 'abandoned', 'unwanted', 'excluded'],
-            'inadequacy': ['inadequate', 'not good enough', 'incompetent', 'failure'],
-            'jealousy': ['jealousy', 'jealous', 'envy', 'possessive'],
-            'loneliness': ['lonely', 'alone', 'isolated', 'connection'],
-            'workplace': ['workplace', 'boss', 'colleague', 'job', 'career', 'work'],
-            'insecurity': ['insecur', 'doubt', 'confidence', 'uncertain', 'hesitant', 'unsure']
+            "anxiety": ["anxiety", "anxious", "worry", "nervous", "panic", "stress", "fear"],
+            "depression": ["depression", "depressed", "sad", "hopeless", "unmotivated", "tired"],
+            "trauma": ["trauma", "traumatic", "abuse", "ptsd", "shock", "flashback"],
+            "relationship": ["relationship", "marriage", "partner", "spouse", "boyfriend", "girlfriend"],
+            "family": ["family", "parent", "child", "mother", "father", "sibling"],
+            "work": ["job", "career", "work", "workplace", "boss", "coworker"],
+            "self-esteem": ["confidence", "self-esteem", "worth", "value", "inadequate", "failure"],
+            "identity": ["identity", "who I am", "self", "meaning", "purpose"],
+            "grief": ["grief", "loss", "death", "died", "bereavement"],
+            "addiction": ["addiction", "substance", "alcohol", "drug", "smoking"],
+            "anger": ["anger", "angry", "rage", "frustration", "irritable"],
+            "trust": ["trust", "betrayal", "suspicious", "faith"],
+            "guilt": ["guilt", "shame", "regret", "remorse", "blame"],
+            "criticism": ["criticism", "criticized", "judged", "humiliation"],
+            "rejection": ["rejection", "rejected", "abandoned", "unwanted", "excluded"],
+            "inadequacy": ["inadequate", "not good enough", "incompetent", "failure"],
+            "jealousy": ["jealousy", "jealous", "envy", "possessive"],
+            "loneliness": ["lonely", "alone", "isolated", "connection"],
+            "workplace": ["workplace", "boss", "colleague", "job", "career", "work"],
+            "insecurity": ["insecur", "doubt", "confidence", "uncertain", "hesitant", "unsure"],
         }
 
         # Count theme occurrences
-        theme_counts = {}
+        theme_counts: Dict[str, int] = {}
         for question in questions:
             question_lower = question.lower()
             for theme, keywords in theme_keywords.items():
@@ -388,14 +386,14 @@ class PainPointDemo:
             results: Results dictionary from run_conversation()
         """
         if "error" in results:
-            logger.error("Error in results: %s", results['error'])
+            logger.error("Error in results: %s", results["error"])
             return
 
-        logger.info("\n=== Results for %s ===", results['name'])
+        logger.info("\n=== Results for %s ===", results["name"])
 
         # Basic statistics
         total_questions = len(results.get("exchanges", []))
-        pain_points = results.get("pain_points_detected", 0)
+        pain_points = results.get("pain_point_detected", 0)
         detection_rate = (pain_points / total_questions) * 100 if total_questions > 0 else 0
 
         logger.info("Questions processed: %d", total_questions)
@@ -403,7 +401,7 @@ class PainPointDemo:
         logger.info(f"Detection rate: {detection_rate:.2f}%")
 
         if results.get("first_detection_at"):
-            logger.info("First detected at question #%s", results['first_detection_at'])
+            logger.info("First detected at question #%s", results["first_detection_at"])
 
         # Compare with expected themes
         expected_themes = set(results.get("expected_themes", []))
@@ -419,13 +417,13 @@ class PainPointDemo:
 
             match_rate = (len(matches) / len(norm_expected)) * 100 if norm_expected else 0
             logger.info(f"\nTheme detection rate: {match_rate:.2f}%")
-            logger.info("Expected themes: %s", ', '.join(expected_themes))
-            logger.info("Detected themes: %s", ', '.join(detected_themes))
+            logger.info("Expected themes: %s", ", ".join(expected_themes))
+            logger.info("Detected themes: %s", ", ".join(detected_themes))
 
             if matches:
-                logger.info("Matched themes: %s", ', '.join(matches))
+                logger.info("Matched themes: %s", ", ".join(matches))
             if misses:
-                logger.info("Missed themes: %s", ', '.join(misses))
+                logger.info("Missed themes: %s", ", ".join(misses))
 
     def run_all_conversations(self) -> List[Dict[str, Any]]:
         """
@@ -458,6 +456,7 @@ class PainPointDemo:
         except Exception as e:
             logger.error("Error dropping schema: %s", e)
 
+
 def main() -> None:
     """Main function to demonstrate pain point detection."""
     logger.info("Starting pain point detection demonstration")
@@ -487,10 +486,12 @@ def main() -> None:
     except Exception as e:
         logger.error("Error in demonstration: %s", e)
         import traceback
+
         logger.error(traceback.format_exc())
     finally:
-        if 'demo' in locals():
+        if "demo" in locals():
             demo.cleanup()
+
 
 if __name__ == "__main__":
     main()

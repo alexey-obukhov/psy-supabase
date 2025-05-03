@@ -1,5 +1,7 @@
-import pytest
+""" Tests for DynamicRAGRetriever functionality and template selection."""
+
 from unittest.mock import create_autospec
+
 
 def test_with_autospec_mock():
     """Test using autospec to create a more conformant mock."""
@@ -17,16 +19,14 @@ def test_with_autospec_mock():
     mock_generator.generate_text.return_value = "Test response"
 
     # Create RAGProcessor with these mocks
-    processor = RAGProcessor(
-        db_manager=mock_db,
-        generator=mock_generator
-    )
+    processor = RAGProcessor(db_manager=mock_db, generator=mock_generator)
 
     # Override toxicity check
     processor.check_toxicity = lambda text: {"is_toxic": False, "score": 0.1}
 
     # Add a minimal prompt selector
     from unittest.mock import MagicMock
+
     processor.prompt_selector = MagicMock()
     processor.prompt_selector.analyze_question.return_value = {"topic": "test"}
     processor.prompt_selector.determine_topic.return_value = "test_topic"

@@ -1,17 +1,20 @@
 import unittest
 import uuid
-import torch
+from unittest.mock import MagicMock, patch
+
 import numpy as np
-from unittest.mock import patch, MagicMock
-from tests.helpers.database_test_base import DatabaseTestBase
+import torch
+
+from psy_supabase.core.database import DatabaseManager
+from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
+from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.response_generator import ResponseGenerator
-from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
-from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.text_generator import TextGenerator
-from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
+from tests.conftest import DEFAULT_APPROACH
+from tests.helpers.database_test_base import DatabaseTestBase
 
 
 class TestContextReuse(DatabaseTestBase):
@@ -29,13 +32,10 @@ class TestContextReuse(DatabaseTestBase):
 
         # Create mock PromptSelector
         self.prompt_selector = MagicMock(spec=PromptSelector)
-        self.prompt_selector.analyze_question.return_value = {
-            "topic": "anxiety",
-            "emotion": "fear"
-        }
+        self.prompt_selector.analyze_question.return_value = {"topic": "anxiety", "emotion": "fear"}
         self.prompt_selector.generate_category_info.return_value = {
-            "Affirmation and Reassurance": 0.8,
-            "Information": 0.6
+            "affirmation_reassurance": 0.8,
+            "information": 0.6,
         }
 
         # Create mock TextGenerator
@@ -43,23 +43,14 @@ class TestContextReuse(DatabaseTestBase):
         self.text_generator.prompt_selector = self.prompt_selector
 
         # Initialize processors
-        self.rag_processor = RAGProcessor(
-            self.db_manager,
-            self.text_generator
-        )
+        self.rag_processor = RAGProcessor(self.db_manager, self.text_generator)
 
         self.response_generator = ResponseGenerator(
-            text_generator=self.text_generator,
-            db_manager=self.db_manager,
-            prompt_selector=self.prompt_selector
+            text_generator=self.text_generator, db_manager=self.db_manager, prompt_selector=self.prompt_selector
         )
 
         # Create a dynamic retriever
-        self.dynamic_retriever = DynamicRAGRetriever(
-            self.db_manager,
-            self.test_session_id,
-            prompt_selector=self.prompt_selector
-        )
+        self.dynamic_retriever = DynamicRAGRetriever(db_manager=self.db_manager, session_id=self.test_session_id)
 
     def tearDown(self):
         """Clean up resources."""
@@ -68,7 +59,7 @@ class TestContextReuse(DatabaseTestBase):
     def test_embedding_reuse_in_pipeline(self):
         """Test that embeddings are properly reused throughout the RAG pipeline."""
         # 1. First, we patch the embedding provider to return a known value
-        with patch('psy_supabase.core.model_manager.get_embedding_provider') as mock_get_embedding_provider:
+        with patch("psy_supabase.core.model_manager.get_embedding_provider") as mock_get_embedding_provider:
             # Configure mock embedding provider
             mock_provider = MagicMock()
             mock_provider.generate_embedding.return_value = [0.1] * 768
@@ -94,18 +85,28 @@ class TestContextReuse(DatabaseTestBase):
                 "topic": "anxiety",
                 "emotion": "fear",
                 "extracted_topics": ["anxiety"],
-                "detected_topic": "anxiety",
-                "category_info": {
-                    "Affirmation and Reassurance": 0.8,
-                    "Information": 0.6
-                }
+                "category_info": {"affirmation_reassurance": 0.8, "information": 0.6},
             }
 
+            pain_point_results = {"pain_point": "stress", "pain_point_detected": True}
 
-            pain_point_results = {
-                "pain_point": "stress",
-                "pain_point_detected": True  # Add this key
-            }
+            # Add safety check before accessing pain_point_results
+            if isinstance(pain_point_results, str):
+                # Convert string to dict if it's a string (possibly from JSON)
+                try:
+                    import json
+
+                    pain_point_results = json.loads(pain_point_results)
+                except json.JSONDecodeError:
+                    # If it can't be parsed as JSON, create a basic dict
+                    pain_point_results = {"pain_point": pain_point_results, "pain_point_detected": True}
+
+            # Now safely get the approach_type
+            approach_type = (
+                pain_point_results.get("approach_type", DEFAULT_APPROACH)
+                if isinstance(pain_point_results, dict)
+                else DEFAULT_APPROACH
+            )
 
             hot_topics = []
 
@@ -114,8 +115,13 @@ class TestContextReuse(DatabaseTestBase):
 
             # Build the context
             context = self.response_generator.build_generation_context(
-                query_text, self.test_session_id, topics_context, pain_point_results,
-                query_embedding, self.dynamic_retriever, hot_topics
+                query_text,
+                self.test_session_id,
+                topics_context,
+                pain_point_results,
+                query_embedding,
+                self.dynamic_retriever,
+                hot_topics,
             )
 
             # Verify embedding was included in context
@@ -124,8 +130,9 @@ class TestContextReuse(DatabaseTestBase):
 
             # 4. Setup a tracking mock for the TextGenerator
             generate_calls = []
+
             def tracking_generate(*args, **kwargs):
-                context_arg = kwargs.get('context', {})
+                context_arg = kwargs.get("context", {})
                 if context_arg and "query_embedding" in context_arg:
                     generate_calls.append(context_arg.get("query_embedding"))
                 return "Sample response"
@@ -134,15 +141,12 @@ class TestContextReuse(DatabaseTestBase):
 
             # 5. Now generate a response using the context
             # Use the method that actually exists in ResponseGenerator
-            pain_point_results = {
-                "pain_point": "stress",
-                "pain_point_detected": True
-            }
+            pain_point_results = {"pain_point": "stress", "pain_point_detected": True}
 
-            approach_type = pain_point_results.get("approach_type", "default_approach")
+            approach_type = pain_point_results.get("approach_type", DEFAULT_APPROACH)
 
             # Select template based on approach
-            template = map_approach_to_template(approach_type)
+            template = "dynamic_rag_therapy"  # Default template
 
             # Then call the ResponseGenerator method
             response = self.response_generator.generate_response_with_template(
@@ -161,10 +165,7 @@ class TestContextReuse(DatabaseTestBase):
             self.assertIsNotNone(generate_calls[0])  # The embedding should not be None
 
             # Verify the same embedding was used
-            np.testing.assert_array_equal(
-                np.array(generate_calls[0]),
-                np.array(query_embedding)
-            )
+            np.testing.assert_array_equal(np.array(generate_calls[0]), np.array(query_embedding))
 
     def test_dict_context_in_save_interaction(self):
         """Test that dictionary context is properly handled when saving interactions."""
@@ -172,7 +173,7 @@ class TestContextReuse(DatabaseTestBase):
         complex_context = {
             "topics": ["anxiety", "depression"],
             "metadata": {"source": "user_query", "timestamp": "2025-04-07"},
-            "embedding": [0.1, 0.2, 0.3]  # Sample embedding values
+            "embedding": [0.1, 0.2, 0.3],  # Sample embedding values
         }
 
         # Try to save an interaction with the dictionary context
@@ -181,7 +182,7 @@ class TestContextReuse(DatabaseTestBase):
                 question="How can I manage my anxiety?",
                 answer="Practice deep breathing techniques and mindfulness.",
                 session_id=self.test_session_id,
-                context=complex_context  # Pass dict as context
+                context=complex_context,  # Pass dict as context
             )
 
             # Verify it was saved
@@ -195,7 +196,7 @@ class TestContextReuse(DatabaseTestBase):
         """Test context reuse with a real embedding to ensure BatchEncoding handling."""
         # This test uses real embeddings, not mocks
 
-        with patch('psy_supabase.core.model_manager.get_embedding_provider') as mock_get_provider:
+        with patch("psy_supabase.core.model_manager.get_embedding_provider") as mock_get_provider:
             # Configure mock provider
             mock_provider = MagicMock()
             mock_provider.generate_embedding.return_value = [0.1] * 768
@@ -217,7 +218,7 @@ class TestContextReuse(DatabaseTestBase):
                 "extracted_topics": ["anxiety"],
                 "use_dynamic_retrieval": True,
                 "dynamic_retriever": self.dynamic_retriever,
-                "session_id": self.test_session_id
+                "session_id": self.test_session_id,
             }
 
             # Save interaction with context
@@ -226,7 +227,7 @@ class TestContextReuse(DatabaseTestBase):
                     question=query_text,
                     answer="A sample therapeutic response",
                     session_id=self.test_session_id,
-                    context=context  # Complex dictionary context
+                    context=context,  # Complex dictionary context
                 )
 
                 self.assertIsNotNone(interaction_id)
@@ -241,7 +242,7 @@ class TestContextReuse(DatabaseTestBase):
         query_embedding = [0.1] * 768
 
         # Create a mock of response_generator.build_generation_context to see what's passed
-        with patch.object(self.response_generator, 'build_generation_context') as mock_build_context:
+        with patch.object(self.response_generator, "build_generation_context") as mock_build_context:
             # Set a return value for the mock
             mock_build_context.return_value = {
                 "query": query_text,
@@ -249,28 +250,25 @@ class TestContextReuse(DatabaseTestBase):
                 "query_embedding": query_embedding,
                 # Add other expected keys in the result
                 "topics_context": {},
-                "pain_point": None
+                "pain_point": None,
             }
 
             # Test cases for different pain points
             pain_point_test_cases = [
                 # No pain point detected
                 {
-                    "pain_point_results": {
-                        "pain_point_detected": False,
-                        "approach_type": "Supportive_Listening"
-                    },
-                    "expected_template": "Empathy and Validation"
+                    "pain_point_results": {"pain_point_detected": False, "approach_type": "supportive_listening"},
+                    "expected_template": "empathy_validation",
                 },
-                # Anxiety detected
+                # anxiety detected
                 {
                     "pain_point_results": {
                         "pain_point": "anxiety",
                         "pain_point_detected": True,
-                        "approach_type": "CBT"
+                        "approach_type": "cbt",
                     },
-                    "expected_template": "Cognitive Behavioral Therapy (CBT)"
-                }
+                    "expected_template": "cognitive_behavioral_therapy",
+                },
             ]
 
             # Test each pain point case with a fresh mock
@@ -288,13 +286,13 @@ class TestContextReuse(DatabaseTestBase):
                     topics_context={
                         "topic": "stress",
                         "extracted_topics": ["stress"],
-                        "detected_topic": "stress",
-                        "category_info": {}
+                        "topic": "stress",
+                        "category_info": {},
                     },
                     pain_point_results=pain_point_results,
                     query_embedding=query_embedding,
                     dynamic_retriever=self.dynamic_retriever,
-                    hot_topics=[]
+                    hot_topics=[],
                 )
 
                 # Verify build_generation_context was called
@@ -310,45 +308,41 @@ class TestContextReuse(DatabaseTestBase):
         # Mock relevant documents
         relevant_docs = [
             {
-                "content": "Anxiety is a normal response to stress that can be helpful in some situations.",
+                "content": "anxiety is a normal response to stress that can be helpful in some situations.",
                 "relevance": 0.92,
-                "metadata": {"source": "psychology_article.txt"}
+                "metadata": {"source": "psychology_article.txt"},
             },
             {
                 "content": "Deep breathing techniques can help reduce anxiety symptoms by activating the parasympathetic nervous system.",
                 "relevance": 0.87,
-                "metadata": {"source": "coping_strategies.txt"}
-            }
+                "metadata": {"source": "coping_strategies.txt"},
+            },
         ]
 
         # Base context
         context = {
             "query": "How can I manage anxiety?",
             "session_id": self.test_session_id,
-            "query_embedding": [0.1] * 768
+            "query_embedding": [0.1] * 768,
         }
 
         # Patch get_relevant_documents
-        with patch.object(self.rag_processor, 'get_relevant_documents', return_value=relevant_docs):
+        with patch.object(self.rag_processor, "get_relevant_documents", return_value=relevant_docs):
             # Create a mock query embedding
             query_embedding = [0.1] * 768
 
             # Test the enhance method directly
-            enhanced_context = self.rag_processor.enhance_context_with_relevant_documents(
-                context, relevant_docs
-            )
+            enhanced_context = self.rag_processor.enhance_context_with_relevant_documents(context, relevant_docs)
 
             # Verify document content was properly included
             self.assertIn("relevant_documents", enhanced_context)
             self.assertEqual(len(enhanced_context["relevant_documents"]), 2)
-            self.assertIn("Anxiety is a normal response", enhanced_context["relevant_documents"][0])
+            self.assertIn("anxiety is a normal response", enhanced_context["relevant_documents"][0])
             self.assertIn("Deep breathing techniques", enhanced_context["relevant_documents"][1])
 
             # Test with empty documents
             empty_context = context.copy()
-            enhanced_empty = self.rag_processor.enhance_context_with_relevant_documents(
-                empty_context, []
-            )
+            enhanced_empty = self.rag_processor.enhance_context_with_relevant_documents(empty_context, [])
             self.assertIn("relevant_documents", enhanced_empty)
             self.assertEqual(enhanced_empty["relevant_documents"], [])
 
@@ -364,14 +358,14 @@ class TestContextReuse(DatabaseTestBase):
                 "psychological_insights": {
                     "primary_concern": "anxiety management",
                     "underlying_factors": ["stress", "uncertainty"],
-                    "cognitive_patterns": ["catastrophizing", "overgeneralization"]
-                }
+                    "cognitive_patterns": ["catastrophizing", "overgeneralization"],
+                },
             },
             "conversation_context": "User previously mentioned feeling overwhelmed at work.",
             "relevant_documents": [
                 "Regular exercise can help reduce anxiety symptoms.",
-                "Cognitive restructuring involves identifying and challenging negative thought patterns."
-            ]
+                "Cognitive restructuring involves identifying and challenging negative thought patterns.",
+            ],
         }
 
         # Mock the text generator to verify it receives the complex context intact
@@ -380,12 +374,12 @@ class TestContextReuse(DatabaseTestBase):
         )
 
         # Generate response
-        pain_point_results = {"pain_point": "anxiety", "pain_point_detected": True, "approach_type": "CBT"}
+        pain_point_results = {"pain_point": "anxiety", "pain_point_detected": True, "approach_type": "cbt"}
         response = self.response_generator.generate_response_with_template(
             user_question="How can I manage anxiety?",
             session_id=self.test_session_id,
             generation_context=complex_context,
-            pain_point_results=pain_point_results
+            pain_point_results=pain_point_results,
         )
 
         # Verify the text generator was called with the complex context intact
@@ -393,7 +387,7 @@ class TestContextReuse(DatabaseTestBase):
         self.assertIsNotNone(call_args)
 
         # Get the context that was passed to the text generator
-        passed_context = call_args[1].get('context')
+        passed_context = call_args[1].get("context")
         self.assertIsNotNone(passed_context)
 
         # Verify key elements of the complex context were preserved
@@ -422,7 +416,7 @@ class TestContextReuse(DatabaseTestBase):
             "session_id": self.test_session_id,
             "query_embedding": query_embedding,
             "dynamic_retriever": dynamic_retriever,
-            "use_dynamic_retrieval": True  # CRITICAL - make sure this is True
+            "use_dynamic_retrieval": True,
         }
 
         # Since we know ResponseGenerator relies on this flag, let's check it's using it
@@ -431,18 +425,14 @@ class TestContextReuse(DatabaseTestBase):
         )
 
         # Generate response with explicit pain_point_results
-        pain_point_results = {
-            "pain_point": "anxiety",
-            "pain_point_detected": True,
-            "approach_type": "CBT"
-        }
+        pain_point_results = {"pain_point": "anxiety", "pain_point_detected": True, "approach_type": "cbt"}
 
         # Call the method being tested
         response = self.response_generator.generate_response_with_template(
             user_question=query_text,
             session_id=self.test_session_id,
             generation_context=context,
-            pain_point_results=pain_point_results
+            pain_point_results=pain_point_results,
         )
 
         # Verify the dynamic retriever was called
@@ -455,21 +445,21 @@ class TestContextReuse(DatabaseTestBase):
             # Empty context
             {
                 "context": {},
-                "pain_point_results": {"pain_point_detected": False, "approach_type": "Supportive_Listening"},
-                "should_succeed": True
+                "pain_point_results": {"pain_point_detected": False, "approach_type": "supportive_listening"},
+                "should_succeed": True,
             },
             # Minimal required context
             {
                 "context": {"query": "Help me", "session_id": self.test_session_id},
                 "pain_point_results": {"pain_point_detected": False},
-                "should_succeed": True
+                "should_succeed": True,
             },
             # Missing query
             {
                 "context": {"session_id": self.test_session_id},
                 "pain_point_results": {"pain_point_detected": False},
-                "should_succeed": True  # Should still work with defaults
-            }
+                "should_succeed": True,  # Should still work with defaults
+            },
         ]
 
         # Setup text generator mock
@@ -484,7 +474,7 @@ class TestContextReuse(DatabaseTestBase):
                     user_question=test_case["context"].get("query", "Default question"),
                     session_id=test_case["context"].get("session_id", self.test_session_id),
                     generation_context=test_case["context"],
-                    pain_point_results=test_case["pain_point_results"]
+                    pain_point_results=test_case["pain_point_results"],
                 )
 
                 if not test_case["should_succeed"]:
@@ -497,3 +487,78 @@ class TestContextReuse(DatabaseTestBase):
             except Exception as e:
                 if test_case["should_succeed"]:
                     self.fail(f"Test case {i} failed unexpectedly: {e}")
+
+    def test_approach_type_and_template_selection(self):
+        """Test that different approach_types are correctly mapped to templates and used."""
+        query_text = "I've been feeling very anxious lately."
+        query_embedding = [0.1] * 768
+
+        # Define test cases for different therapeutic approaches
+        approach_test_cases = [
+            # Standard psychotherapy approaches
+            {"approach_type": "cbt", "expected_template": "cognitive_behavioral_therapy"},
+            {"approach_type": "dbt", "expected_template": "dialectical_behavior_therapy"},
+            {"approach_type": "act", "expected_template": "acceptance_commitment_therapy"},
+            # Specific therapeutic focuses
+            {"approach_type": "trauma_informed", "expected_template": "trauma"},
+            # {"approach_type": "mindfulness", "expected_template": "mindfulness_therapy"},
+            {"approach_type": "supportive_listening", "expected_template": "empathy_validation"},
+            # Edge cases
+            {"approach_type": None, "expected_template": "empathy_validation"},  # Default
+            {"approach_type": "unknown_approach", "expected_template": "empathy_validation"},  # Fallback
+        ]
+
+        # Mock the text generator
+        self.text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(
+            return_value="A therapeutic response"
+        )
+
+        # For each approach type
+        for test_case in approach_test_cases:
+            approach_type = test_case["approach_type"]
+            expected_template = test_case["expected_template"]
+
+            # 1. First verify the mapping function works correctly
+            actual_template = map_approach_to_template(approach_type)
+            self.assertEqual(
+                actual_template,
+                expected_template,
+                f"map_approach_to_template({approach_type}) should return {expected_template}",
+            )
+
+            # 2. Create a context with this approach type
+            pain_point_results = {"pain_point": "anxiety", "pain_point_detected": True, "approach_type": approach_type}
+
+            context = {
+                "query": query_text,
+                "session_id": self.test_session_id,
+                "query_embedding": query_embedding,
+                "topics_context": {
+                    "topic": "anxiety",
+                    "emotion": "anxiety",
+                    "extracted_topics": ["anxiety"],
+                },
+            }
+
+            # 3. Generate a response with this context and pain point info
+            response = self.response_generator.generate_response_with_template(
+                user_question=query_text,
+                session_id=self.test_session_id,
+                generation_context=context,
+                pain_point_results=pain_point_results,
+            )
+
+            # 4. Verify the text generator was called with the expected template
+            call_args = self.text_generator.generate_therapeutic_response_with_dynamic_retrieval.call_args
+            self.assertIsNotNone(call_args)
+
+            # The template should be passed as a parameter to generate_therapeutic_response_with_dynamic_retrieval
+            passed_template = call_args[1].get("template_name")
+            self.assertEqual(
+                passed_template,
+                expected_template,
+                f"For approach_type={approach_type}, template should be {expected_template}",
+            )
+
+            # Reset mock for next iteration
+            self.text_generator.generate_therapeutic_response_with_dynamic_retrieval.reset_mock()

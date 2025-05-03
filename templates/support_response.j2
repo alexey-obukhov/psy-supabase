@@ -1,5 +1,5 @@
 {# EMOTIONAL SUPPORT TEMPLATE WITH ENHANCED CONTROLS #}
-<|system|>
+<|im_start|>system
 You are SupportAI, a compassionate emotional support assistant. Follow these ABSOLUTE RULES:
 1. NEVER generate educational content with titles, chapters, or numbered sections
 2. NEVER write code examples, programming solutions, or technical explanations
@@ -20,9 +20,9 @@ CONVERSATION HISTORY:
 {% if detected_emotions %}
 DETECTED EMOTIONS: {{ detected_emotions|join(", ") }}
 {% endif %}
-</|system|>
+<|im_end|>
 
-<|assistant|>
+<|im_start|>assistant
 {% if user_question %}
   {% if user_question|length < 5 or any(char in user_question for char in "+-=[]{};:',.<>/?\\") %}
     I notice you're reaching out. This is a safe space to express yourself at your own pace. I'm here whenever you're ready to share more.
@@ -44,4 +44,4 @@ DETECTED EMOTIONS: {{ detected_emotions|join(", ") }}
 {% else %}
   I'm here to provide support and a space where you can express what's on your mind. What would be helpful to talk about today?
 {% endif %}
-</|assistant|>
+<|im_end|>

@@ -1,12 +1,8 @@
+""" Tests for DynamicRAGRetriever functionality and template selection."""
+
+import os
 import unittest
 from unittest.mock import MagicMock, patch
-import os
-import sys
-from pathlib import Path
-
-# Add project root to path to import modules properly
-project_root = Path(__file__).parent.parent.absolute()
-sys.path.append(str(project_root))
 
 from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 from psy_supabase.utilities.common import get_project_root
@@ -33,11 +29,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         self.logger.debug("Configured mock embedding vector with 384 dimensions")
 
         # Setup mock for detect_pain_points method
-        mock_pain_points = {
-            "name": "anxiety",
-            "confidence": 0.8,
-            "keywords": ["anxiety", "worry", "stress"]
-        }
+        mock_pain_points = {"name": "anxiety", "confidence": 0.8, "keywords": ["anxiety", "worry", "stress"]}
         self.mock_db.detect_pain_points = MagicMock(return_value=mock_pain_points)
 
         # Setup mock for other methods used in tests
@@ -61,62 +53,42 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         else:
             self.logger.debug("Templates directory found at %s", self.templates_dir)
 
-
     def test_template_existence(self):
         """Verify that essential templates exist in the templates directory."""
-        essential_templates = [
-            "dynamic_rag_therapy.j2",
-            "basic_answer.j2",
-            "crisis_support.j2",
-            "fallback.j2"
-        ]
+        essential_templates = ["dynamic_rag_therapy.j2", "basic_answer.j2", "crisis_support.j2", "fallback.j2"]
 
         for template_name in essential_templates:
             template_path = os.path.join(self.templates_dir, template_name)
-            self.assertTrue(
-                os.path.exists(template_path),
-                f"Essential template missing: {template_name}"
-            )
+            self.assertTrue(os.path.exists(template_path), f"Essential template missing: {template_name}")
 
             # Validate template contains user question reference - handle different formats
-            with open(template_path, 'r', encoding='utf-8') as f:
+            with open(template_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
                 # Look for any variant of user_question in the template
-                user_question_found = any([
-                    "user_question" in content,
-                    "{{ user_question }}" in content,
-                    "{{user_question}}" in content,
-                    '"{{ user_question }}"' in content
-                ])
-
-                self.assertTrue(
-                    user_question_found,
-                    f"Template {template_name} missing user_question placeholder"
+                user_question_found = any(
+                    [
+                        "user_question" in content,
+                        "{{ user_question }}" in content,
+                        "{{ user_question }}" in content,
+                        '"{{ user_question }}"' in content,
+                    ]
                 )
+
+                self.assertTrue(user_question_found, f"Template {template_name} missing user_question placeholder")
 
     def test_get_knowledge_by_query(self):
         """Test retrieving knowledge relevant to a query."""
         # Setup mock responses for similar interactions
         self.mock_db.find_similar_interactions_by_embedding.return_value = [
-            {
-                'interaction_id': '1',
-                'question': 'Test question 1?',
-                'answer': 'Answer 1 content',
-                'similarity': 0.85
-            },
-            {
-                'interaction_id': '2',
-                'question': 'Test question 2?',
-                'answer': 'Answer 2 content',
-                'similarity': 0.75
-            }
+            {"interaction_id": "1", "question": "Test question 1?", "answer": "Answer 1 content", "similarity": 0.85},
+            {"interaction_id": "2", "question": "Test question 2?", "answer": "Answer 2 content", "similarity": 0.75},
         ]
 
         result = self.retriever.get_knowledge_by_query("test query")
 
-        self.assertIn('Answer 1 content', result)
-        self.assertIn('Answer 2 content', result)
+        self.assertIn("Answer 1 content", result)
+        self.assertIn("Answer 2 content", result)
 
         # Check that both answers are included
         expected_content = "Answer 1 content\n\nAnswer 2 content"
@@ -148,14 +120,14 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
             "interaction_id": 1,
             "question": "How can I manage anxiety?",
             "answer": "Cached content about anxiety management",
-            "similarity": 0.8
+            "similarity": 0.8,
         }
 
         mock_interaction2 = {
             "interaction_id": 2,
             "question": "How can I cope with depression?",
             "answer": "Content about depression management",
-            "similarity": 0.8
+            "similarity": 0.8,
         }
 
         # Reset mocks before test
@@ -180,22 +152,23 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
 
         # Second call with same query should use cache - no new DB calls
         result2 = self.retriever.get_knowledge_by_query("anxiety")
-        self.assertEqual(self.mock_db.find_similar_interactions_by_embedding.call_count, 1,
-                        "Cache should prevent a second DB call")
-        self.assertEqual(self.mock_db.create_embedding.call_count, 1,
-                        "Cache should prevent a second embedding creation")
-        self.assertIn("Cached content about anxiety management", result2,
-                    "Cached result should match first result")
+        self.assertEqual(
+            self.mock_db.find_similar_interactions_by_embedding.call_count, 1, "Cache should prevent a second DB call"
+        )
+        self.assertEqual(
+            self.mock_db.create_embedding.call_count, 1, "Cache should prevent a second embedding creation"
+        )
+        self.assertIn("Cached content about anxiety management", result2, "Cached result should match first result")
 
         # Verify same result is returned (indicating cache was used)
         self.assertEqual(result1, result2, "Cached result should be identical to original")
 
         # Different query should hit database again
         result3 = self.retriever.get_knowledge_by_query("depression")
-        self.assertEqual(self.mock_db.find_similar_interactions_by_embedding.call_count, 2,
-                        "New query should trigger new DB call")
-        self.assertEqual(self.mock_db.create_embedding.call_count, 2,
-                        "New query should trigger new embedding creation")
+        self.assertEqual(
+            self.mock_db.find_similar_interactions_by_embedding.call_count, 2, "New query should trigger new DB call"
+        )
+        self.assertEqual(self.mock_db.create_embedding.call_count, 2, "New query should trigger new embedding creation")
         self.assertIn("Content about depression management", result3)
         self.assertNotEqual(result1, result3, "Different query should return different result")
 
@@ -204,23 +177,23 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         # Setup mock responses for different similarity scores
         self.mock_db.find_similar_interactions_by_embedding.return_value = [
             {
-                'interaction_id': '1',
-                'question': 'Question with high similarity',
-                'answer': 'High similarity content',
-                'similarity': 0.9
+                "interaction_id": "1",
+                "question": "Question with high similarity",
+                "answer": "High similarity content",
+                "similarity": 0.9,
             },
             {
-                'interaction_id': '2',
-                'question': 'Question with medium similarity',
-                'answer': 'Medium similarity content',
-                'similarity': 0.75
+                "interaction_id": "2",
+                "question": "Question with medium similarity",
+                "answer": "Medium similarity content",
+                "similarity": 0.75,
             },
             {
-                'interaction_id': '3',
-                'question': 'Question with low similarity',
-                'answer': 'Low similarity content',
-                'similarity': 0.6
-            }
+                "interaction_id": "3",
+                "question": "Question with low similarity",
+                "answer": "Low similarity content",
+                "similarity": 0.6,
+            },
         ]
 
         result = self.retriever.get_knowledge_by_query("test query")
@@ -233,7 +206,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         answer_positions = [
             result.find("High similarity content"),
             result.find("Medium similarity content"),
-            result.find("Low similarity content")
+            result.find("Low similarity content"),
         ]
         # Each position should be greater than the previous
         self.assertTrue(answer_positions[0] < answer_positions[1])
@@ -282,7 +255,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
             {
                 "question": "I feel anxious about my exam",
                 "answer": "That's normal, let's discuss coping strategies.",
-                "created_at": "2023-01-01T12:00:00"
+                "created_at": "2023-01-01T12:00:00",
             }
         ]
 
@@ -296,7 +269,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
                 "question": "How do I manage exam anxiety?",
                 "answer": "Exam anxiety is common and can be managed with breathing techniques.",
                 "similarity": 0.9,
-                "metadata": {"topics": ["anxiety", "exams", "coping"]}
+                "metadata": {"topics": ["anxiety", "exams", "coping"]},
             }
         ]
 
@@ -304,7 +277,7 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         interactions = self.retriever.get_past_interactions(session_id=self.session_id)
 
         # Should have the test question
-        self.assertIn("I feel anxious about my exam", interactions[0]['question'])
+        self.assertIn("I feel anxious about my exam", interactions[0]["question"])
 
         # Now get knowledge
         knowledge = self.retriever.get_knowledge_by_query("How to manage exam anxiety?")
@@ -316,17 +289,12 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         """Test detection of pain points."""
         # Setup mock pain points
         mock_pain_points = {
-            "pain_points": [
-                {
-                    "recurring_terms": ["anxiety", "worry", "stress"],
-                    "count": 3
-                }
-            ],
+            "pain_points": [{"recurring_terms": ["anxiety", "worry", "stress"], "count": 3}],
             "severity": "moderate",
-            "first_detected_at": "2025-03-30T12:00:00Z"
+            "first_detected_at": "2025-03-30T12:00:00Z",
         }
         self.mock_db.detect_pain_points.return_value = mock_pain_points
-        self.mock_db.get_recommended_therapeutic_approach.return_value = "CBT"
+        self.mock_db.get_recommended_therapeutic_approach.return_value = "cbt"
 
         # Call the method
         result = self.retriever.get_pain_point()
@@ -338,9 +306,9 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         # Check result
         self.assertEqual(result["pain_point"], "anxiety")
         self.assertEqual(result["severity"], "moderate")
-        self.assertEqual(result["approach"], "CBT")
+        self.assertEqual(result["approach"], "cbt")
 
-    @patch('psy_supabase.core.text_generator.TextGenerator.generate_therapeutic_response_with_dynamic_retrieval')
+    @patch("psy_supabase.core.text_generator.TextGenerator.generate_therapeutic_response_with_dynamic_retrieval")
     def test_template_selection_with_anxiety(self, mock_generate):
         """Test that anxiety topics select the appropriate template."""
         # This test requires integration with TextGenerator
@@ -352,13 +320,10 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         # Simulate the prompt selection that would happen in generate_therapeutic_response_with_dynamic_retrieval
         prompt_selector = MagicMock()
         prompt_selector.analyze_question.return_value = {"topic": "anxiety", "emotion": "nervous"}
-        prompt_selector.generate_category_info.return_value = {"Anxiety Support": 0.85}
+        prompt_selector.generate_category_info.return_value = {"anxiety Support": 0.85}
 
         # Verify template selection would be correct
-        self.assertEqual(
-            list(prompt_selector.generate_category_info.return_value.keys())[0],
-            "Anxiety Support"
-        )
+        self.assertEqual(list(prompt_selector.generate_category_info.return_value.keys())[0], "anxiety Support")
 
     def run_diagnostics(self, error=None):
         """Run diagnostics when a test fails."""
@@ -375,7 +340,10 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         # Add specialized mock checks for this test class
         if has_mock_db:
             self.logger.info("create_embedding call count: %d", self.mock_db.create_embedding.call_count)
-            self.logger.info("find_similar_interactions_by_embedding call count: %d", self.mock_db.find_similar_interactions_by_embedding.call_count)
+            self.logger.info(
+                "find_similar_interactions_by_embedding call count: %d",
+                self.mock_db.find_similar_interactions_by_embedding.call_count,
+            )
 
         # Add DynamicRAG-specific diagnostics
         self.logger.info("=== DynamicRAG-Specific Diagnostics ===")
@@ -384,15 +352,20 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
 
         # Check mock call counts
         self.logger.info("create_embedding call count: %s", self.mock_db.create_embedding.call_count)
-        self.logger.info("find_similar_interactions_by_embedding call count: %d", self.mock_db.find_similar_interactions_by_embedding.call_count)
+        self.logger.info(
+            "find_similar_interactions_by_embedding call count: %d",
+            self.mock_db.find_similar_interactions_by_embedding.call_count,
+        )
 
         # Display template information
         if os.path.exists(self.templates_dir):
             template_files = os.listdir(self.templates_dir)
-            self.logger.info("Available templates (%s): %d", len(template_files), ', '.join(template_files))
+            self.logger.info("Available templates (%s): %d", len(template_files), ", ".join(template_files))
 
         # Examine the RAG processor configuration
-        self.logger.info("DynamicRAGRetriever associative memory initialized: %s", hasattr(self.retriever, 'associative_memory'))
+        self.logger.info(
+            "DynamicRAGRetriever associative memory initialized: %s", hasattr(self.retriever, "associative_memory")
+        )
 
     def tearDown(self):
         """DynamicRAG-specific tearDown with more detailed diagnostics."""
@@ -411,5 +384,6 @@ class TestDynamicRAGRetriever(DatabaseTestBase):
         # Then call parent tearDown which will run basic diagnostics
         super().tearDown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

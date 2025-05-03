@@ -1,7 +1,7 @@
-import unittest
-from unittest.mock import MagicMock, patch
 import sys
+import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.absolute()
@@ -31,7 +31,7 @@ class TestDynamicRAGEdgeCases(unittest.TestCase):
         self.mock_db.find_similar_interactions_by_embedding.side_effect = Exception("Database connection failure")
 
         # Temporarily disable logging during this test
-        with patch('logging.Logger.error') as mock_log:
+        with patch("logging.Logger.error") as mock_log:
             # Call the method
             result = self.retriever.get_knowledge_by_query("test query")
 
@@ -67,8 +67,11 @@ class TestDynamicRAGEdgeCases(unittest.TestCase):
         # Should indicate no valid query - the actual message may be either empty string or a specific message
         # Let's check for either possibility
         acceptable_responses = ["", "Failed to generate embedding for query", "No valid query provided."]
-        self.assertIn(result, acceptable_responses,
-                     f"Expected empty input to return one of {acceptable_responses}, but got '{result}'")
+        self.assertIn(
+            result,
+            acceptable_responses,
+            f"Expected empty input to return one of {acceptable_responses}, but got '{result}'",
+        )
 
         # For empty input, embedding creation should be skipped or return None
         if self.mock_db.create_embedding.called:
@@ -106,11 +109,11 @@ class TestDynamicRAGIntegration(unittest.TestCase):
         self.mock_db.create_embedding.return_value = [0.1] * 384
 
         # Initial document
-        test_doc = {"content": "Anxiety coping strategies", "similarity": 0.9}
+        test_doc = {"content": "anxiety coping strategies", "similarity": 0.9}
         self.mock_db.find_similar_documents_via_rpc.return_value = [test_doc]
 
         # Make a bunch of queries to fill the cache
-        queries = [f"Anxiety query {i}" for i in range(10)]
+        queries = [f"anxiety query {i}" for i in range(10)]
         for query in queries:
             self.retriever.get_knowledge_by_query(query)
 
@@ -124,5 +127,5 @@ class TestDynamicRAGIntegration(unittest.TestCase):
         self.assertEqual(len(self.retriever.query_cache), 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

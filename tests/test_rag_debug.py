@@ -2,6 +2,7 @@
 
 import traceback
 from unittest.mock import MagicMock
+
 from tests.helpers.database_test_base import DatabaseTestBase, get_optimal_device_for_testing
 
 
@@ -27,8 +28,7 @@ class TestRAGProcessorSaveInteraction(DatabaseTestBase):
 
         # Create a processor with our test setup
         self.processor = RAGProcessor(
-            db_manager=self.db_manager,  # Use the one from DatabaseTestBase
-            generator=self.mock_generator
+            db_manager=self.db_manager, generator=self.mock_generator  # Use the one from DatabaseTestBase
         )
 
         # Simplify the execution path as much as possible
@@ -49,6 +49,7 @@ class TestRAGProcessorSaveInteraction(DatabaseTestBase):
 
             # Inject a wrapper around save_interaction to see if it's called
             original_save = self.db_manager.save_interaction
+
             def debug_save(*args, **kwargs):
                 self.logger.info("--- SAVE_INTERACTION CALLED ---")
                 self.logger.info(f"Args: {args}")
@@ -64,6 +65,7 @@ class TestRAGProcessorSaveInteraction(DatabaseTestBase):
 
         # Add a debug wrapper around generate_response to catch exceptions
         original_generate = self.processor.generate_response
+
         def debug_generate(*args, **kwargs):
             self.logger.info("--- GENERATE RESPONSE CALLED ---")
             self.logger.info(f"Args: {args}")
@@ -86,10 +88,7 @@ class TestRAGProcessorSaveInteraction(DatabaseTestBase):
         self.logger.info("--- STARTING TEST ---")
 
         # Actually generate a response using our test session ID from parent class
-        response = self.processor.generate_response(
-            "Test question",
-            session_id=self.test_session_id
-        )
+        response = self.processor.generate_response("Test question", session_id=self.test_session_id)
 
         self.logger.info("--- TEST COMPLETE ---")
         self.logger.info(f"Response: {response[:50]}...")
@@ -113,7 +112,7 @@ class TestRAGProcessorSaveInteraction(DatabaseTestBase):
     def tearDown(self):
         """Clean up resources after test."""
         # Add any special cleanup for this test
-        if hasattr(self, 'processor') and self.processor:
+        if hasattr(self, "processor") and self.processor:
             # Clean up processor resources if needed
             pass
 
@@ -124,4 +123,5 @@ class TestRAGProcessorSaveInteraction(DatabaseTestBase):
 if __name__ == "__main__":
     # This allows running just this test file directly
     import unittest
+
     unittest.main()

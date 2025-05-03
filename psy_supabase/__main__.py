@@ -3,30 +3,44 @@
 Entry point for the psy-supabase package.
 """
 import os
-import sys
 
-def main():
+from prismalog.config import LoggingConfig
+from prismalog.log import get_logger
+
+config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+LoggingConfig.initialize(config_file=config_path)
+
+logger = get_logger(__name__)
+
+
+def main() -> None:
     """Run the application."""
+    logger.info("Application entry point executing...")  # Example log
     try:
+        # Import the main application logic *after* logging is configured
         from . import main as main_module
 
+        logger.debug("Imported main application module.")
+
         # If main has a run function, use it
-        if hasattr(main_module, 'run'):
+        if hasattr(main_module, "run"):
+            logger.info("Found run() function in main module. Executing...")
             main_module.run()
         # Otherwise, look for app and run it
-        elif hasattr(main_module, 'app'):
-            main_module.app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5008)))
+        elif hasattr(main_module, "app"):
+            logger.info("Found app object in main module. Running app...")
+            # Consider getting host/port from config instead of env vars directly here
+            host = os.environ.get("HOST", "0.0.0.0")
+            port = int(os.environ.get("PORT", 5008))
+            logger.info(f"Running Flask/FastAPI app on {host}:{port}")
+            main_module.app.run(host=host, port=port)
         else:
-            print("Error: Could not find a run() function or app object in main.py")
-            sys.exit(1)
+            logger.critical("Could not find a run() function or app object in main.py")
     except ImportError as e:
-        print(f"Error: Could not import main module: {e}")
-        print(f"Current directory: {os.getcwd()}")
-        print(f"Python path: {sys.path}")
-        sys.exit(1)
+        logger.critical(f"Could not import main module: {e}", exc_info=True)
     except Exception as e:
-        print(f"Error running application: {e}")
-        sys.exit(1)
+        logger.critical(f"Error running application: {e}", exc_info=True)
+
 
 # The __name__ == "__main__" check is needed for when running as a module
 if __name__ == "__main__":

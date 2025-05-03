@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 
+
 def test_direct_mock():
     """Test that a direct mock works correctly."""
     # Create a mock

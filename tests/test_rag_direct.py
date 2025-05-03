@@ -1,7 +1,8 @@
 def test_rag_direct_save():
     """Test RAGProcessor directly saves to the database."""
-    from psy_supabase.core.rag_processor import RAGProcessor
     from unittest.mock import MagicMock, patch
+
+    from psy_supabase.core.rag_processor import RAGProcessor
 
     # Create mocks with clear return values
     mock_db = MagicMock()
@@ -9,7 +10,7 @@ def test_rag_direct_save():
     mock_generator.generate_text.return_value = "This is a test response"
 
     # Set up processor
-    with patch('psy_supabase.core.rag_processor.PromptSelector') as mock_selector_cls:
+    with patch("psy_supabase.core.rag_processor.PromptSelector") as mock_selector_cls:
         # Create a mock for the prompt selector instance
         mock_selector = MagicMock()
         mock_selector_cls.return_value = mock_selector

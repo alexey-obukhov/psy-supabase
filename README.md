@@ -1,4 +1,4 @@
-# Psy Supabase
+# Psy-Supabase
 
 [![PsySupabase CI](https://github.com/alexey-obukhov/psy-supabase/actions/workflows/psy_supabase_ci.yml/badge.svg)](https://github.com/alexey-obukhov/psy-supabase/actions/workflows/psy_supabase_ci.yml)
 [![Python 3.8 | 3.10](https://img.shields.io/badge/python-3.8%20%7C%203.10-blue)](https://www.python.org/downloads/)
@@ -42,7 +42,7 @@ This innovation represents a significant step forward in therapeutic chatbots be
 
 My technical infrastructure has been enhanced with:
 
-1. **CustomLogger Integration**: Replaced standard logging with own colorful, more readable ColoredLogger system
+1. **CustomLogger Integration**: Replaced standard logging with own colorful, more readable prismalog system
 
 2. **Memory Optimization**: Added GPU memory management to gracefully handle CUDA out-of-memory scenarios with automatic CPU fallback
 
@@ -93,7 +93,7 @@ By continuing to refine these capabilities, I'm building an AI therapeutic assis
 
 # psy-supabase
 
-This project uses the [microsoft/phi-1_5](https://huggingface.co/microsoft/phi-1_5) model.
+This project uses the [rasyosef/Phi-1_5-Instruct-v0.1](https://huggingface.co/rasyosef/Phi-1_5-Instruct-v0.1) model.
 
 The code I have written for this project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 

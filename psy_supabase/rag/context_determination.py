@@ -23,21 +23,25 @@ This context-aware approach allows the system to:
 - Better understand user intent by considering conversation history
 """
 
-import logging
-from typing import List, Dict, Any, Optional, TYPE_CHECKING
 import traceback
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from prismalog.log import get_logger
 from typeguard import typechecked
 
-from psy_supabase.utilities.vector_utils import find_similar_interactions
 from psy_supabase.core.model_manager import get_embedding_provider
+from psy_supabase.utilities.vector_utils import find_similar_interactions
 
 if TYPE_CHECKING:
     from psy_supabase.core.database import DatabaseManager
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
-def determine_context(db_manager, user_input: str, session_id: str = None, limit: int = 5) -> str:
+
+def determine_context(
+    db_manager: "DatabaseManager", user_input: str, session_id: Optional[str] = None, limit: int = 5
+) -> str:
     """
     Determine relevant context for RAG based on user input and past interactions.
 
@@ -62,16 +66,19 @@ def determine_context(db_manager, user_input: str, session_id: str = None, limit
     try:
         # Get embedding provider
         provider = get_embedding_provider()
+        if not provider:
+            logger.error("Failed to get embedding provider in determine_context.")
+            return ""
 
         # Generate embedding for user input
         embedding = provider.generate_embedding(user_input)
+        if not embedding:
+            logger.error("Failed to generate embedding for user input in determine_context.")
+            return ""
 
         # Get context from similar interactions
         context = create_context_from_similar_interactions(
-            db_manager=db_manager,
-            embedding=embedding,
-            session_id=session_id,
-            limit=limit
+            db_manager=db_manager, embedding=embedding, session_id=session_id, limit=limit
         )
 
         return context
@@ -80,7 +87,10 @@ def determine_context(db_manager, user_input: str, session_id: str = None, limit
         logger.error(traceback.format_exc())
         return ""
 
-def extract_relevant_interactions(db_manager, embedding, session_id=None, limit=5):
+
+def extract_relevant_interactions(
+    db_manager: "DatabaseManager", embedding: List[float], session_id: Optional[str] = None, limit: int = 5
+) -> List[Dict[str, Any]]:
     """
     Extract relevant past interactions based on semantic similarity.
 
@@ -106,12 +116,12 @@ def extract_relevant_interactions(db_manager, embedding, session_id=None, limit=
     """
     try:
         # Use vector_utils to find similar interactions
-        interactions = find_similar_interactions(
+        interactions: List[Dict[str, Any]] = find_similar_interactions(
             db_manager=db_manager,
             embedding=embedding,
             session_id=session_id,
             limit=limit,
-            threshold=0.6  # Lower threshold for more potential matches
+            threshold=0.6,  # Lower threshold for more potential matches
         )
 
         return interactions
@@ -119,6 +129,7 @@ def extract_relevant_interactions(db_manager, embedding, session_id=None, limit=
         logger.error("Error extracting relevant interactions: %s", e)
         logger.error(traceback.format_exc())
         return []
+
 
 def format_interactions_as_context(interactions: List[Dict[str, Any]]) -> str:
     """
@@ -145,12 +156,12 @@ def format_interactions_as_context(interactions: List[Dict[str, Any]]) -> str:
     if not interactions:
         return ""
 
-    context_parts = []
+    context_parts: List[str] = []
 
     for i, interaction in enumerate(interactions):
-        # Extract fields
-        question = interaction.get('question', '')
-        answer = interaction.get('answer', '')
+        # Extract fields safely
+        question = interaction.get("question", "")
+        answer = interaction.get("answer", "")
 
         if not question and not answer:
             continue
@@ -159,17 +170,15 @@ def format_interactions_as_context(interactions: List[Dict[str, Any]]) -> str:
         context_part = f"Interaction {i+1}:\nQuestion: {question}\nAnswer: {answer}"
         context_parts.append(context_part)
 
-    # Join all context parts
     context = "\n\n".join(context_parts)
 
     return context
 
+
 @typechecked
 def create_context_from_similar_interactions(
-    db_manager: 'DatabaseManager',
-    embedding: List[float],
-    session_id: Optional[str] = None,
-    limit: int = 5) -> str:
+    db_manager: "DatabaseManager", embedding: List[float], session_id: Optional[str] = None, limit: int = 5
+) -> str:
     """
     Create a complete context string from semantically similar past interactions.
 
@@ -190,10 +199,7 @@ def create_context_from_similar_interactions(
     """
     # Get similar interactions
     interactions = extract_relevant_interactions(
-        db_manager=db_manager,
-        embedding=embedding,
-        session_id=session_id,
-        limit=limit
+        db_manager=db_manager, embedding=embedding, session_id=session_id, limit=limit
     )
 
     # Format as context

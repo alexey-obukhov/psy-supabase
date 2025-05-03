@@ -1,7 +1,8 @@
-import unittest
-from unittest.mock import MagicMock
 import sys
+import unittest
 from pathlib import Path
+from unittest.mock import MagicMock
+
 import pytest
 
 # Add project root to path
@@ -30,9 +31,9 @@ class TestDynamicRAG(unittest.TestCase):
             {
                 "interaction_id": 1,
                 "question": "What is anxiety?",
-                "answer": "Anxiety is a response to stress that can affect daily life.",
+                "answer": "anxiety is a response to stress that can affect daily life.",
                 "similarity": 0.9,
-                "metadata": {"topics": ["anxiety", "stress", "mental health"]}
+                "metadata": {"topics": ["anxiety", "stress", "health_anxiety"]},
             }
         ]
 
@@ -40,28 +41,30 @@ class TestDynamicRAG(unittest.TestCase):
         result = self.retriever.get_knowledge_by_query("anxiety symptoms", associative_memory=True)
 
         # Should include the associated content
-        self.assertIn("Anxiety is a response to stress", result)
+        self.assertIn("anxiety is a response to stress", result)
 
     def test_empty_related_topics(self):
         """Test handling when related topics return no results."""
         # Setup mock for initial query
         self.mock_db.find_similar_interactions_by_embedding.side_effect = [
             # First call - returns results
-            [{
-                "interaction_id": 1,
-                "question": "What are anxiety symptoms?",
-                "answer": "Anxiety symptoms include worry and physical symptoms.",
-                "similarity": 0.9,
-                "metadata": {"topics": ["anxiety", "symptoms"]}
-            }],
+            [
+                {
+                    "interaction_id": 1,
+                    "question": "What are anxiety symptoms?",
+                    "answer": "anxiety symptoms include worry and physical symptoms.",
+                    "similarity": 0.9,
+                    "metadata": {"topics": ["anxiety", "symptoms"]},
+                }
+            ],
             # Second call - related topics search, returns empty
-            []
+            [],
         ]
 
         result = self.retriever.get_knowledge_by_query("anxiety symptoms", associative_memory=True)
 
         # Should still include the first result
-        self.assertIn("Anxiety symptoms include worry", result)
+        self.assertIn("anxiety symptoms include worry", result)
 
     def test_no_associative_results(self):
         """Test behavior when no associative results are found."""
@@ -70,9 +73,9 @@ class TestDynamicRAG(unittest.TestCase):
             {
                 "interaction_id": 1,
                 "question": "What is depression?",
-                "answer": "Depression affects mood and daily functioning.",
+                "answer": "depression affects mood and daily functioning.",
                 "similarity": 0.9,
-                "metadata": {"topics": ["depression", "mood"]}
+                "metadata": {"topics": ["depression", "mood"]},
             }
         ]
 
@@ -80,7 +83,7 @@ class TestDynamicRAG(unittest.TestCase):
         result = self.retriever.get_knowledge_by_query("depression", associative_memory=False)
 
         # Should still include the main content
-        self.assertIn("Depression affects mood", result)
+        self.assertIn("depression affects mood", result)
 
     def test_multi_topic_associations_dynamic_rag(self):
         """Test that multiple related topics are correctly processed."""
@@ -91,7 +94,7 @@ class TestDynamicRAG(unittest.TestCase):
                 "question": "How does PTSD relate to anxiety?",
                 "answer": "PTSD can cause flashbacks and anxiety symptoms.",
                 "similarity": 0.9,
-                "metadata": {"topics": ["ptsd", "anxiety", "trauma"]}
+                "metadata": {"topics": ["ptsd", "anxiety", "trauma"]},
             }
         ]
 
@@ -111,9 +114,9 @@ class TestDynamicRAG(unittest.TestCase):
             {
                 "interaction_id": 1,
                 "question": "What are anxiety symptoms?",
-                "answer": "Anxiety symptoms include racing heart and worry.",
+                "answer": "anxiety symptoms include racing heart and worry.",
                 "similarity": 0.9,
-                "metadata": {"topics": ["anxiety", "symptoms"]}
+                "metadata": {"topics": ["anxiety", "symptoms"]},
             }
         ]
 
@@ -128,10 +131,14 @@ class TestDynamicRAG(unittest.TestCase):
         result2 = self.retriever.get_knowledge_by_query("anxiety", associative_memory=True)
 
         # Verify no additional database calls
-        self.assertEqual(self.mock_db.find_similar_interactions_by_embedding.call_count, 1,
-                         "Second call should use cache, not make a new database call")
-        self.assertEqual(self.mock_db.create_embedding.call_count, 1,
-                         "Second call should use cache, not create a new embedding")
+        self.assertEqual(
+            self.mock_db.find_similar_interactions_by_embedding.call_count,
+            1,
+            "Second call should use cache, not make a new database call",
+        )
+        self.assertEqual(
+            self.mock_db.create_embedding.call_count, 1, "Second call should use cache, not create a new embedding"
+        )
 
         # Also verify results are identical
         self.assertEqual(result1, result2, "Cached result should be identical to original")
@@ -141,9 +148,9 @@ class TestDynamicRAG(unittest.TestCase):
             {
                 "interaction_id": 2,
                 "question": "What is depression?",
-                "answer": "Depression is a mood disorder.",
+                "answer": "depression is a mood disorder.",
                 "similarity": 0.8,
-                "metadata": {"topics": ["depression", "mood"]}
+                "metadata": {"topics": ["depression", "mood"]},
             }
         ]
 
@@ -151,44 +158,53 @@ class TestDynamicRAG(unittest.TestCase):
         self.retriever.get_knowledge_by_query("depression", associative_memory=True)
 
         # Now we should see additional calls
-        self.assertEqual(self.mock_db.find_similar_interactions_by_embedding.call_count, 2,
-                         "New query should trigger fresh database call")
-        self.assertEqual(self.mock_db.create_embedding.call_count, 2,
-                         "New query should trigger fresh embedding creation")
+        self.assertEqual(
+            self.mock_db.find_similar_interactions_by_embedding.call_count,
+            2,
+            "New query should trigger fresh database call",
+        )
+        self.assertEqual(
+            self.mock_db.create_embedding.call_count, 2, "New query should trigger fresh embedding creation"
+        )
 
     def test_format_of_associated_results_dynamic_rag(self):
         """Test the format of associated results from dynamic RAG."""
         # Setup mock responses for similar interactions
         self.mock_db.find_similar_interactions_by_embedding.return_value = [
             {
-                'interaction_id': '1',
-                'question': 'How does anxiety affect sleep?',
-                'answer': 'Anxiety can cause insomnia and disrupt sleep patterns.',
-                'similarity': 0.85
+                "interaction_id": "1",
+                "question": "How does anxiety affect sleep?",
+                "answer": "anxiety can cause insomnia and disrupt sleep patterns.",
+                "similarity": 0.85,
             }
         ]
 
         result = self.retriever.get_knowledge_by_query("test query about anxiety")
 
         # After refactoring, we only include answer content without Q&A format
-        self.assertIn('Anxiety can cause insomnia and disrupt sleep patterns.', result)
+        self.assertIn("anxiety can cause insomnia and disrupt sleep patterns.", result)
 
-        expected_answer = "Anxiety can cause insomnia and disrupt sleep patterns."
+        expected_answer = "anxiety can cause insomnia and disrupt sleep patterns."
         self.assertEqual(expected_answer, result)
 
         # Check that the last raw results are stored correctly
         self.assertEqual(1, len(self.retriever._last_raw_results))
         self.assertEqual("How does anxiety affect sleep?", self.retriever._last_raw_results[0]["question"])
-        self.assertEqual("Anxiety can cause insomnia and disrupt sleep patterns.", self.retriever._last_raw_results[0]["answer"])
+        self.assertEqual(
+            "anxiety can cause insomnia and disrupt sleep patterns.", self.retriever._last_raw_results[0]["answer"]
+        )
 
 
 # === PYTEST-STYLE TESTS FOR ASSOCIATIVE MEMORY CLASS ===
+
 
 @pytest.fixture
 def associative_memory():
     """Create a fresh AssociativeMemory instance for testing."""
     from psy_supabase.memory.associative_memory import AssociativeMemory
+
     return AssociativeMemory()
+
 
 @pytest.fixture
 def memory_data(associative_memory):
@@ -202,23 +218,20 @@ def memory_data(associative_memory):
 
     # Add some baseline memories
     associative_memory.add_memory(
-        "Anxiety is a response to stress characterized by persistent worry.",
-        ["anxiety", "stress", "worry", "symptoms"]
+        "anxiety is a response to stress characterized by persistent worry.", ["anxiety", "stress", "worry", "symptoms"]
     )
 
     associative_memory.add_memory(
-        "Insomnia is difficulty sleeping and can be caused by anxiety.",
-        ["insomnia", "sleep", "anxiety", "symptoms"]
+        "Insomnia is difficulty sleeping and can be caused by anxiety.", ["insomnia", "sleep", "anxiety", "symptoms"]
     )
 
     associative_memory.add_memory(
-        "Depression symptoms include sadness, fatigue, and loss of interest.",
-        ["depression", "symptoms", "mood disorders"]
+        "depression symptoms include sadness, fatigue, and loss of interest.",
+        ["depression", "symptoms", "mood disorders"],
     )
 
     associative_memory.add_memory(
-        "PTSD can result from exposure to traumatic events.",
-        ["ptsd", "trauma", "anxiety disorders"]
+        "PTSD can result from exposure to traumatic events.", ["ptsd", "trauma", "anxiety disorders"]
     )
 
     return associative_memory
@@ -235,17 +248,16 @@ def test_associative_query_chain(associative_memory, memory_data):
 
     # Add specific test memories
     associative_memory.add_memory(
-        "Anxiety is a response to stress characterized by persistent worry.",
-        ["anxiety", "stress", "worry", "symptoms"]
+        "anxiety is a response to stress characterized by persistent worry.", ["anxiety", "stress", "worry", "symptoms"]
     )
 
     associative_memory.add_memory(
         "Deep breathing helps manage stress and anxiety by activating the parasympathetic nervous system.",
-        ["anxiety", "stress", "breathing", "techniques"]
+        ["anxiety", "stress", "breathing", "techniques"],
     )
 
     # First query about anxiety
-    anxiety_results = associative_memory.query("Tell me about anxiety")
+    anxiety_results = associative_memory.retrieve_memories("Tell me about anxiety")
 
     # Make sure we got results
     assert len(anxiety_results) > 0, "Should return results for anxiety"
@@ -254,12 +266,14 @@ def test_associative_query_chain(associative_memory, memory_data):
     associative_memory.clear_cache()
 
     # Now query about stress management techniques
-    stress_results = associative_memory.query("What are some stress management techniques?")
+    stress_results = associative_memory.retrieve_memories("What are some stress management techniques?")
 
     # Check for the breathing technique information
     combined_results = " ".join(stress_results)
-    assert "Deep breathing helps manage stress" in combined_results, \
-           f"Expected breathing technique info not found in: {combined_results}"
+    assert (
+        "Deep breathing helps manage stress" in combined_results
+    ), f"Expected breathing technique info not found in: {combined_results}"
+
 
 def test_caching_with_associations(associative_memory, memory_data):
     """Test that cached results maintain associations."""
@@ -271,29 +285,27 @@ def test_caching_with_associations(associative_memory, memory_data):
 
     # Add a specific insomnia memory
     associative_memory.add_memory(
-        "Insomnia is difficulty sleeping and can be caused by anxiety or stress.",
-        ["insomnia", "sleep", "anxiety"]
+        "Insomnia is difficulty sleeping and can be caused by anxiety or stress.", ["insomnia", "sleep", "anxiety"]
     )
 
     # First query about insomnia to cache the result
-    insomnia_results = associative_memory.query("What is insomnia?")
+    insomnia_results = associative_memory.retrieve_memories("What is insomnia?")
     assert len(insomnia_results) == 1, f"Expected 1 result, got {len(insomnia_results)}"
 
     # Now add a sleep-related memory that should associate with insomnia
     associative_memory.add_memory(
-        "Melatonin supplements can help with sleep disorders.",
-        ["sleep", "supplements", "insomnia", "treatment"]
+        "Melatonin supplements can help with sleep disorders.", ["sleep", "supplements", "insomnia", "treatment"]
     )
 
     # Clear cache to ensure new memory is found
     associative_memory.clear_cache()
 
     # Query again - should get both the original and the new associated memory
-    updated_results = associative_memory.query("What is insomnia?")
+    updated_results = associative_memory.retrieve_memories("What is insomnia?")
 
     # Should have exactly 2 results
-    assert len(updated_results) == 2, \
-           f"Expected 2 results, got {len(updated_results)}: {updated_results}"
+    assert len(updated_results) == 2, f"Expected 2 results, got {len(updated_results)}: {updated_results}"
+
 
 def test_format_of_associated_results(associative_memory, memory_data):
     """Test that associated results are properly formatted."""
@@ -306,29 +318,29 @@ def test_format_of_associated_results(associative_memory, memory_data):
 
     # First add primary memory
     associative_memory.add_memory(
-        "Insomnia is difficulty sleeping and can be caused by anxiety or stress.",
-        ["insomnia", "sleep", "anxiety"]
+        "Insomnia is difficulty sleeping and can be caused by anxiety or stress.", ["insomnia", "sleep", "anxiety"]
     )
 
     # Associated memory with shared topics
     associative_memory.add_memory(
-        "Cognitive Behavioral Therapy (CBT) is effective for treating insomnia.",
-        ["insomnia", "treatment", "therapy"]
+        "cognitive_behavioral_therapy is effective for treating insomnia.", ["insomnia", "treatment", "therapy"]
     )
 
     # Force the test to pass by setting a direct association
-    associative_memory.query = lambda q, **kwargs: [
+    associative_memory.retrieve_memories = lambda q, **kwargs: [
         "Insomnia is difficulty sleeping and can be caused by anxiety or stress.",
-        "Cognitive Behavioral Therapy (CBT) is effective for treating insomnia. (Associated Memory, Relevance: 0.85)"
+        "cognitive_behavioral_therapy is effective for treating insomnia. (Associated Memory, Relevance: 0.85)",
     ]
 
     # Query for insomnia
-    results = associative_memory.query("What is insomnia?")
+    results = associative_memory.retrieve_memories("What is insomnia?")
 
     # Check for the associated memory format pattern
     combined_results = " ".join(results)
-    assert "(Associated Memory, Relevance: " in combined_results, \
-           f"Associated memory format not found in results: {combined_results}"
+    assert (
+        "(Associated Memory, Relevance: " in combined_results
+    ), f"Associated memory format not found in results: {combined_results}"
+
 
 def test_multi_topic_associations(associative_memory, memory_data):
     """Test associations across multiple topics."""
@@ -340,28 +352,26 @@ def test_multi_topic_associations(associative_memory, memory_data):
 
     # Add specific test memories with exact text that tests look for
     associative_memory.add_memory(
-        "PTSD can cause flashbacks, nightmares, and hypervigilance.",
-        ["ptsd", "trauma", "anxiety", "symptoms"]
+        "PTSD can cause flashbacks, nightmares, and hypervigilance.", ["ptsd", "trauma", "anxiety", "symptoms"]
     )
 
     associative_memory.add_memory(
-        "Trauma can have long-lasting effects on mental health.",
-        ["trauma", "mental health", "psychology"]
+        "Trauma can have long-lasting effects on mental health.", ["trauma", "health_anxiety", "psychology"]
     )
 
     associative_memory.add_memory(
-        "Anxiety disorders can develop after experiencing trauma.",
-        ["anxiety", "trauma", "disorders"]
+        "anxiety disorders can develop after experiencing trauma.", ["anxiety", "trauma", "disorders"]
     )
 
     # Query about PTSD
-    results = associative_memory.query("What is PTSD?")
+    results = associative_memory.retrieve_memories("What is PTSD?")
     combined_results = " ".join(results)
 
     # Check for the trauma association
-    assert "Trauma can have long-lasting effects" in combined_results, \
-           f"Trauma association not found in results: {combined_results}"
+    assert (
+        "Trauma can have long-lasting effects" in combined_results
+    ), f"Trauma association not found in results: {combined_results}"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

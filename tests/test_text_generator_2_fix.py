@@ -1,5 +1,9 @@
+"""Test suite for the TextGenerator fixed issue."""
+
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 
 @pytest.fixture
 def mock_generator():
@@ -9,12 +13,15 @@ def mock_generator():
 
     # Define test-specific responses
     mock.token_count_test_response = "Generated specific output for a long prompt."
-    mock.conversation_history_test_response = "Previous question: How can I improve my relationship? Here's my response..."
+    mock.conversation_history_test_response = (
+        "Previous question: How can I improve my relationship? Here's my response..."
+    )
     mock.error_test_response = "I apologise, but I'm having trouble processing your question."
 
     return mock
 
-@patch('psy_supabase.core.text_generator.TextGenerator', autospec=True)
+
+@patch("psy_supabase.core.text_generator.TextGenerator", autospec=True)
 def test_token_count_checking_and_truncation(mock_text_gen_class, mock_generator):
     """Test that long prompts are properly truncated."""
     # Configure the mock class to return our mock instance
@@ -23,6 +30,7 @@ def test_token_count_checking_and_truncation(mock_text_gen_class, mock_generator
 
     # Create an instance - this will use our mocked class
     from psy_supabase.core.text_generator import TextGenerator
+
     generator = TextGenerator("test-model", "cpu")
 
     # Call the method
@@ -34,7 +42,8 @@ def test_token_count_checking_and_truncation(mock_text_gen_class, mock_generator
     # Verify
     assert response == mock_generator.token_count_test_response
 
-@patch('psy_supabase.core.text_generator.TextGenerator', autospec=True)
+
+@patch("psy_supabase.core.text_generator.TextGenerator", autospec=True)
 def test_conversation_history_integration(mock_text_gen_class, mock_generator):
     """Test that conversation history is integrated correctly."""
     # Get the instance returned by the constructor
@@ -42,10 +51,12 @@ def test_conversation_history_integration(mock_text_gen_class, mock_generator):
 
     # Configure the mock method to accept any arguments and return our response
     from unittest.mock import ANY
+
     instance.generate_text = MagicMock(return_value=mock_generator.conversation_history_test_response)
 
     # Create an instance - this will use our patched constructor
     from psy_supabase.core.text_generator import TextGenerator
+
     generator = TextGenerator("test-model", "cpu")
 
     # Call with conversation history
@@ -56,9 +67,10 @@ def test_conversation_history_integration(mock_text_gen_class, mock_generator):
     print(f"Actual response: {response}")
 
     # Verify
-    assert 'Previous question: How can I improve my relationship?' in response
+    assert "Previous question: How can I improve my relationship?" in response
 
-@patch('psy_supabase.core.text_generator.TextGenerator', autospec=True)
+
+@patch("psy_supabase.core.text_generator.TextGenerator", autospec=True)
 def test_error_handling(mock_text_gen_class, mock_generator):
     """Test error handling in the generator."""
     # Configure the mock class to return our mock instance
@@ -67,6 +79,7 @@ def test_error_handling(mock_text_gen_class, mock_generator):
 
     # Create an instance
     from psy_supabase.core.text_generator import TextGenerator
+
     generator = TextGenerator("test-model", "cpu")
 
     # Call method that should trigger error handling

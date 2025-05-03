@@ -1,0 +1,5 @@
+"""Configuration file for the psy_supabase programm."""
+DEFAULT_TOPIC = "supportive_listening"
+DEFAULT_EMOTION = "concern"
+DEFAULT_APPROACH = "empathy_validation"
+DEFAULT_THEME = "general_support"

@@ -1,6 +1,6 @@
-# Testing the PSY Supabase System
+# Testing the Psy-Supabase System
 
-This document explains how to run and maintain tests for the PSY Supabase system.
+This document explains how to run and maintain tests for the Psy-Supabase system.
 
 ## Running Tests
 
@@ -9,7 +9,7 @@ This document explains how to run and maintain tests for the PSY Supabase system
 python -m pytest
 
 # Run specific test files
-python -m pytest [test_rag_processor.py](http://_vscodecontentref_/1)
+python -m pytest test_rag_processor.py
 
 # Run with verbose output
 python -m pytest -v
@@ -57,7 +57,7 @@ Tests for system safety and reliability:
 
 ### Fixtures
 
-Our tests use comprehensive fixtures defined in `conftest.py`:
+Tests use comprehensive fixtures defined in `conftest.py`:
 
 - `TEST_USER_ID`, `TEST_SCHEMA`, `TEST_SESSION_ID` - Standard IDs for testing
 - `TEST_URL`, `TEST_KEY` - API endpoint constants
@@ -113,4 +113,4 @@ def test_new_feature(self, rag_processor):
 
 ## Code Coverage Goals
 
-By maintaining comprehensive test coverage, we ensure the system provides reliable, psychologically-informed support while maintaining technical excellence.
+By maintaining comprehensive test coverage, it ensures the system provides reliable, psychologically-informed support while maintaining technical excellence.

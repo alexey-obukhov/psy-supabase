@@ -1,23 +1,26 @@
+import gc
+import os
+from unittest.mock import patch
+
 import pytest
 import torch
-import gc
-from psy_supabase.utilities.utils import cleanup_memory
-from psy_supabase.core.text_generator import TextGenerator
+from prismalog.log import get_logger
+
 from psy_supabase.core.rag_processor import RAGProcessor
+from psy_supabase.core.text_generator import TextGenerator
+from psy_supabase.utilities.utils import cleanup_memory
 from tests.conftest import SUPPORTIVE_TERMS
-from unittest.mock import patch
-import logging
-import os
 
 # Check if running in GitHub Actions
-RUNNING_IN_GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS') == 'true'
+RUNNING_IN_GITHUB_ACTIONS = os.environ.get("GITHUB_ACTIONS") == "true"
 
 # Check if CUDA is available
 CUDA_AVAILABLE = torch.cuda.is_available()
 # Determine device to use
 DEVICE = "cpu" if RUNNING_IN_GITHUB_ACTIONS else ("cuda" if CUDA_AVAILABLE else "cpu")
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
 
 @pytest.fixture(autouse=True)
 def cleanup_gpu_memory():
@@ -33,6 +36,7 @@ def cleanup_gpu_memory():
 
     # Call the enhanced cleanup function with force_cuda_cleanup=True
     cleanup_memory(force_cuda_cleanup=True)
+
 
 @pytest.fixture
 def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
@@ -57,17 +61,10 @@ def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
             logger.info("Created mock TextGenerator for GitHub Actions")
         else:
             # Use real TextGenerator with appropriate device
-            text_generator = TextGenerator(
-                model_name="microsoft/phi-1_5",
-                device=DEVICE,
-                quantize=False
-            )
+            text_generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=DEVICE, quantize=False)
 
         # Create the RAG processor with mock dependencies
-        rag_processor = RAGProcessor(
-            db_manager=mock_db_manager,
-            generator=text_generator
-        )
+        rag_processor = RAGProcessor(db_manager=mock_db_manager, generator=text_generator)
 
         # Add the dynamic retriever mock to ensure query_knowledge works
         rag_processor.dynamic_retriever = mock_dynamic_retriever
@@ -79,17 +76,21 @@ def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
         logger.info("Cleaning up TextGenerator resources...")
 
         # Release model resources if possible
-        if 'text_generator' in locals() and not RUNNING_IN_GITHUB_ACTIONS:
-            if hasattr(text_generator, 'model'):
+        if "text_generator" in locals() and not RUNNING_IN_GITHUB_ACTIONS:
+            if hasattr(text_generator, "model"):
                 del text_generator.model
             del text_generator
 
         # Force garbage collection
         gc.collect()
 
+
+@pytest.mark.slow
 class TestResponseQuality:
     """Test suite focused on ensuring high-quality responses."""
+
     cleanup_memory()
+
     def test_response_does_not_contain_illustration_paragraph(self, setup_response_generator):
         """Ensure responses don't contain 'Illustration paragraph' pattern."""
         rag_processor = setup_response_generator
@@ -103,11 +104,10 @@ This part should remain in the final output and provide enough length to pass th
 This is quality therapeutic content about depression that should be preserved."""
 
         # Patch the method that generates text
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=problematic_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=problematic_response):
             # Generate a response
             response = rag_processor.generate_response(
-                "I am feeling sad and don't know what to do please help me",
-                session_id="test_response_quality"
+                "I am feeling sad and don't know what to do please help me", session_id="test_response_quality"
             )
 
             # Debug output for troubleshooting
@@ -129,17 +129,16 @@ This is quality therapeutic content about depression that should be preserved.""
         rag_processor = setup_response_generator
 
         # Mock the generate_text method with a response that will survive cleaning
-        mock_response = """I understand you're feeling down. Depression can be challenging to navigate, and your feelings are valid.
+        mock_response = """I understand you're feeling down. depression can be challenging to navigate, and your feelings are valid.
 
 There are several approaches that might help, including talking to a therapist or exploring self-care activities that bring you joy.
 
 Would you like to discuss some strategies that could help with your feelings of sadness?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             # Use a depression-related question
             response = rag_processor.generate_response(
-                "I've been feeling really down lately and can't find motivation",
-                session_id="test_response_quality"
+                "I've been feeling really down lately and can't find motivation", session_id="test_response_quality"
             )
 
             # Debug output
@@ -148,8 +147,14 @@ Would you like to discuss some strategies that could help with your feelings of 
 
             # Should contain empathetic/therapeutic language
             therapeutic_phrases = [
-                "understand", "feel", "depression", "support",
-                "help", "therapy", "emotion", "difficult"
+                "understand",
+                "feel",
+                "depression",
+                "support",
+                "help",
+                "therapy",
+                "emotion",
+                "difficult",
             ]
 
             # At least some therapeutic content should be present
@@ -177,7 +182,7 @@ Would you like to discuss some strategies that could help with your feelings of 
             context = {
                 "dynamic_retriever": mock_dynamic_retriever,
                 "extracted_topics": ["depression"],
-                "use_dynamic_retrieval": True
+                "use_dynamic_retrieval": True,
             }
 
             # This should now work without subscripting errors
@@ -186,28 +191,30 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         except Exception as e:
             pytest.fail(f"Dynamic retrieval failed: {e}")
+
     def test_response_handles_depression_topic(self, setup_response_generator):
         """Test that depression-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
 
-        mock_response = """I understand you're feeling down. Depression can be challenging to navigate, and your feelings are valid.
+        mock_response = """I understand you're feeling down. depression can be challenging to navigate, and your feelings are valid.
 
         There are several approaches that might help, including talking to a therapist or exploring self-care activities that bring you joy.
 
         Would you like to discuss some strategies that could help with your feelings of sadness?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I've been feeling really down lately and can't find motivation",
-                session_id="test_depression"
+                "I've been feeling really down lately and can't find motivation", session_id="test_depression"
             )
 
-            print(f"Depression response: {response}")
+            print(f"depression response: {response}")
 
             # Verify response quality
             assert "depression" in response.lower(), "Response should mention depression"
             assert len(response) > 100, "Response should have substantial content"
-            assert "therapist" in response.lower() or "self-care" in response.lower(), "Response should include coping strategies"
+            assert (
+                "therapist" in response.lower() or "self-care" in response.lower()
+            ), "Response should include coping strategies"
 
     def test_response_handles_stress_topic(self, setup_response_generator):
         """Test that stress-related queries receive appropriate responses."""
@@ -219,10 +226,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to explore some specific techniques that might help you cope with stress?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm overwhelmed with work and personal life",
-                session_id="test_stress"
+                "I'm overwhelmed with work and personal life", session_id="test_stress"
             )
 
             print(f"Stress response: {response}")
@@ -230,7 +236,9 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "stress" in response.lower(), "Response should mention stress"
             assert len(response) > 100, "Response should have substantial content"
-            assert "mindfulness" in response.lower() or "exercise" in response.lower(), "Response should include coping strategies"
+            assert (
+                "mindfulness" in response.lower() or "exercise" in response.lower()
+            ), "Response should include coping strategies"
 
     def test_response_handles_burnout_topic(self, setup_response_generator):
         """Test that burnout-related queries receive appropriate responses."""
@@ -242,10 +250,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to discuss some strategies that might help you recover from burnout?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm exhausted and can't keep up with everything",
-                session_id="test_burnout"
+                "I'm exhausted and can't keep up with everything", session_id="test_burnout"
             )
 
             print(f"Burnout response: {response}")
@@ -253,7 +260,10 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "burnout" in response.lower(), "Response should mention burnout"
             assert len(response) > 100, "Response should have substantial content"
-            assert "breaks" in response.lower() or "boundaries" in response.lower(), "Response should include coping strategies"
+            assert (
+                "breaks" in response.lower() or "boundaries" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_stigma_topic(self, setup_response_generator):
         """Test that stigma-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
@@ -262,10 +272,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Education and open conversations can help reduce stigma. Would you like to discuss how to approach this topic with others?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm worried about what others will think if I seek help for my mental health",
-                session_id="test_stigma"
+                "I'm worried about what others will think if I seek help for my mental health", session_id="test_stigma"
             )
 
             print(f"Stigma response: {response}")
@@ -273,7 +282,10 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "stigma" in response.lower(), "Response should mention stigma"
             assert len(response) > 100, "Response should have substantial content"
-            assert "strength" in response.lower() or "education" in response.lower(), "Response should include coping strategies"
+            assert (
+                "strength" in response.lower() or "education" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_coping_topic(self, setup_response_generator):
         """Test that coping-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
@@ -282,10 +294,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to explore some specific coping strategies that might work for you?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "What are some good ways to cope with stress?",
-                session_id="test_coping"
+                "What are some good ways to cope with stress?", session_id="test_coping"
             )
 
             print(f"Coping response: {response}")
@@ -293,7 +304,10 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "coping" in response.lower(), "Response should mention coping"
             assert len(response) > 100, "Response should have substantial content"
-            assert "mindfulness" in response.lower() or "journaling" in response.lower(), "Response should include coping strategies"
+            assert (
+                "mindfulness" in response.lower() or "journaling" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_support_topic(self, setup_response_generator):
         """Test that support-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
@@ -302,10 +316,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to discuss how to build or strengthen your support network?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I feel alone and need someone to talk to",
-                session_id="test_support"
+                "I feel alone and need someone to talk to", session_id="test_support"
             )
 
             print(f"Support response: {response}")
@@ -313,7 +326,10 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "support" in response.lower(), "Response should mention support"
             assert len(response) > 100, "Response should have substantial content"
-            assert "network" in response.lower() or "system" in response.lower(), "Response should include coping strategies"
+            assert (
+                "network" in response.lower() or "system" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_therapy_topic(self, setup_response_generator):
         """Test that therapy-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
@@ -322,10 +338,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to discuss different types of therapy or how to find a therapist?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm considering therapy but don't know where to start",
-                session_id="test_therapy"
+                "I'm considering therapy but don't know where to start", session_id="test_therapy"
             )
 
             print(f"Therapy response: {response}")
@@ -333,27 +348,32 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "therapy" in response.lower(), "Response should mention therapy"
             assert len(response) > 100, "Response should have substantial content"
-            assert "therapist" in response.lower() or "types of therapy" in response.lower(), "Response should include coping strategies"
+            assert (
+                "therapist" in response.lower() or "types of therapy" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_mindfulness_topic(self, setup_response_generator):
         """Test that mindfulness-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
 
-        mock_response = """Mindfulness is a powerful tool for managing stress and anxiety. It involves being present in the moment and accepting your thoughts and feelings without judgment.
+        mock_response = """mindfulness is a powerful tool for managing stress and anxiety. It involves being present in the moment and accepting your thoughts and feelings without judgment.
 
         Would you like to explore some mindfulness exercises or techniques?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm interested in mindfulness but don't know how to start",
-                session_id="test_mindfulness"
+                "I'm interested in mindfulness but don't know how to start", session_id="test_mindfulness"
             )
 
-            print(f"Mindfulness response: {response}")
+            print(f"mindfulness response: {response}")
 
             # Verify response quality
             assert "mindfulness" in response.lower(), "Response should mention mindfulness"
             assert len(response) > 100, "Response should have substantial content"
-            assert "exercises" in response.lower() or "techniques" in response.lower(), "Response should include coping strategies"
+            assert (
+                "exercises" in response.lower() or "techniques" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_communication_topic(self, setup_response_generator):
         """Test that communication-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
@@ -362,10 +382,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to discuss some strategies for improving communication with others?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I struggle to communicate my feelings to others",
-                session_id="test_communication"
+                "I struggle to communicate my feelings to others", session_id="test_communication"
             )
 
             print(f"Communication response: {response}")
@@ -373,7 +392,10 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "communication" in response.lower(), "Response should mention communication"
             assert len(response) > 100, "Response should have substantial content"
-            assert "listening" in response.lower() or "strategies" in response.lower(), "Response should include coping strategies"
+            assert (
+                "listening" in response.lower() or "strategies" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_addiction_topic(self, setup_response_generator):
         """Test that addiction-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
@@ -382,10 +404,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to discuss some resources or strategies for managing addiction?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm struggling with addiction and need help",
-                session_id="test_addiction"
+                "I'm struggling with addiction and need help", session_id="test_addiction"
             )
 
             print(f"Addiction response: {response}")
@@ -393,7 +414,10 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "addiction" in response.lower(), "Response should mention addiction"
             assert len(response) > 100, "Response should have substantial content"
-            assert "resources" in response.lower() or "strategies" in response.lower(), "Response should include coping strategies"
+            assert (
+                "resources" in response.lower() or "strategies" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_suicidal_thoughts_topic(self, setup_response_generator):
         """Test that suicidal thoughts-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
@@ -402,10 +426,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         You are not alone, and there are people who care about you and want to help. Please consider reaching out for support."""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm having thoughts of hurting myself",
-                session_id="test_suicidal_thoughts"
+                "I'm having thoughts of hurting myself", session_id="test_suicidal_thoughts"
             )
 
             print(f"Suicidal thoughts response: {response}")
@@ -424,10 +447,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to discuss some techniques for coping with anger, such as deep breathing or physical activity?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm really angry and don't know how to deal with it",
-                session_id="test_anger"
+                "I'm really angry and don't know how to deal with it", session_id="test_anger"
             )
 
             print(f"Anger response: {response}")
@@ -435,11 +457,13 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "anger" in response.lower(), "Response should mention anger"
             assert len(response) > 100, "Response should have substantial content"
-            assert "deep breathing" in response.lower() or "physical activity" in response.lower(), "Response should include coping strategies"
+            assert (
+                "deep breathing" in response.lower() or "physical activity" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_grief_topic(self, setup_response_generator):
         """Test that grief-related queries receive appropriate responses."""
         rag_processor = setup_response_generator
-
 
     def test_response_handles_anxiety_topic(self, setup_response_generator):
         """Test that anxiety-related queries receive appropriate responses."""
@@ -447,22 +471,23 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         mock_response = """I understand you're experiencing anxiety. Many people struggle with anxiety, and it can be overwhelming.
 
-        Anxiety often manifests as both physical sensations (like rapid heartbeat or shallow breathing) and racing thoughts about potential threats or dangers.
+        anxiety often manifests as both physical sensations (like rapid heartbeat or shallow breathing) and racing thoughts about potential threats or dangers.
 
         Some strategies that may help include deep breathing exercises, grounding techniques, and gradually facing situations that trigger anxiety with proper support."""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm constantly anxious and worried about everything",
-                session_id="test_anxiety"
+                "I'm constantly anxious and worried about everything", session_id="test_anxiety"
             )
 
-            print(f"Anxiety response: {response}")
+            print(f"anxiety response: {response}")
 
             # Verify response quality
             assert "anxiety" in response.lower(), "Response should mention anxiety"
             assert len(response) > 100, "Response should have substantial content"
-            assert "deep breathing" in response.lower() or "grounding" in response.lower(), "Response should include coping strategies"
+            assert (
+                "deep breathing" in response.lower() or "grounding" in response.lower()
+            ), "Response should include coping strategies"
 
     def test_response_handles_trauma_topic(self, setup_response_generator):
         """Test that trauma-related queries receive sensitive responses."""
@@ -474,10 +499,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         In the meantime, focusing on safety and self-care is important. Would you like to discuss some grounding techniques that might help when difficult memories arise?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I experienced a traumatic event and can't stop thinking about it",
-                session_id="test_trauma"
+                "I experienced a traumatic event and can't stop thinking about it", session_id="test_trauma"
             )
 
             print(f"Trauma response: {response}")
@@ -485,7 +509,9 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify trauma-appropriate response
             assert "sorry" in response.lower() or "understand" in response.lower(), "Response should show empathy"
             assert "trauma" in response.lower(), "Response should acknowledge trauma"
-            assert "therapist" in response.lower() or "support" in response.lower(), "Response should mention professional support"
+            assert (
+                "therapist" in response.lower() or "support" in response.lower()
+            ), "Response should mention professional support"
 
     def test_response_handles_empty_input(self, setup_response_generator):
         """Test that empty inputs are handled gracefully."""
@@ -530,7 +556,6 @@ Would you like to discuss some strategies that could help with your feelings of 
         response = rag_processor.generate_response(long_input, session_id="test_long")
         print(f"Long input response: {response}")
 
-
         has_supportive_language = any(term in response.lower() for term in SUPPORTIVE_TERMS)
         # Should provide a helpful, non-error response
         assert response, "Response should not be empty"
@@ -568,10 +593,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to explore some specific strategies for managing both stress and anxiety?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm feeling really stressed and anxious about everything",
-                session_id="test_multiple_topics"
+                "I'm feeling really stressed and anxious about everything", session_id="test_multiple_topics"
             )
 
             print(f"Multiple topics response: {response}")
@@ -580,7 +604,10 @@ Would you like to discuss some strategies that could help with your feelings of 
             assert "stress" in response.lower(), "Response should mention stress"
             assert "anxiety" in response.lower(), "Response should mention anxiety"
             assert len(response) > 100, "Response should have substantial content"
-            assert "deep breathing" in response.lower() or "mindfulness" in response.lower(), "Response should include coping strategies"
+            assert (
+                "deep breathing" in response.lower() or "mindfulness" in response.lower()
+            ), "Response should include coping strategies"
+
     def test_response_handles_cultural_sensitivity(self, setup_response_generator):
         """Test that responses are culturally sensitive and appropriate."""
         rag_processor = setup_response_generator
@@ -589,10 +616,10 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to discuss how cultural factors may influence your feelings or coping strategies?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
                 "I'm feeling overwhelmed and want to talk about my cultural background",
-                session_id="test_cultural_sensitivity"
+                session_id="test_cultural_sensitivity",
             )
 
             print(f"Cultural sensitivity response: {response}")
@@ -600,10 +627,13 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "cultural" in response.lower(), "Response should mention cultural sensitivity"
             assert len(response) > 100, "Response should have substantial content"
-            assert "sensitivity" in response.lower() or "respect" in response.lower(), "Response should include culturally sensitive language"
+            assert (
+                "sensitivity" in response.lower() or "respect" in response.lower()
+            ), "Response should include culturally sensitive language"
             # Check for any problematic patterns
             assert "error" not in response.lower(), "Response should not contain error messages"
             assert "invalid" not in response.lower(), "Response should not mention invalid input"
+
     def test_response_handles_mental_health_resources(self, setup_response_generator):
         """Test that responses provide information about mental health resources."""
         rag_processor = setup_response_generator
@@ -612,10 +642,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Would you like to discuss some specific resources that might be helpful for you?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm looking for mental health resources",
-                session_id="test_resources"
+                "I'm looking for mental health resources", session_id="test_resources"
             )
 
             print(f"Mental health resources response: {response}")
@@ -623,7 +652,9 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "resources" in response.lower(), "Response should mention mental health resources"
             assert len(response) > 100, "Response should have substantial content"
-            assert "therapy" in response.lower() or "support groups" in response.lower(), "Response should include coping strategies"
+            assert (
+                "therapy" in response.lower() or "support groups" in response.lower()
+            ), "Response should include coping strategies"
             # Check for any problematic patterns
             assert "error" not in response.lower(), "Response should not contain error messages"
             assert "invalid" not in response.lower(), "Response should not mention invalid input"
@@ -636,10 +667,9 @@ Would you like to discuss some strategies that could help with your feelings of 
 
         Your safety is the most important thing. Would you like help finding resources for urgent support?"""
 
-        with patch.object(rag_processor.text_generator, 'generate_text', return_value=mock_response):
+        with patch.object(rag_processor.text_generator, "generate_text", return_value=mock_response):
             response = rag_processor.generate_response(
-                "I'm in crisis and need urgent help",
-                session_id="test_urgent_support"
+                "I'm in crisis and need urgent help", session_id="test_urgent_support"
             )
 
             print(f"Urgent support response: {response}")
@@ -647,7 +677,9 @@ Would you like to discuss some strategies that could help with your feelings of 
             # Verify response quality
             assert "urgent" in response.lower(), "Response should mention urgent support"
             assert len(response) > 100, "Response should have substantial content"
-            assert "crisis" in response.lower() or "hotline" in response.lower(), "Response should include coping strategies"
+            assert (
+                "crisis" in response.lower() or "hotline" in response.lower()
+            ), "Response should include coping strategies"
             # Check for any problematic patterns
             assert "error" not in response.lower(), "Response should not contain error messages"
             assert "invalid" not in response.lower(), "Response should not mention invalid input"

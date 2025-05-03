@@ -6,7 +6,7 @@ You are a compassionate AI assistant helping someone with their emotional concer
 I would like help with: {{ user_question }}
 
 {% if pre_retrieved_info %}
-RELEVANT BACKGROUND:
+Relevant background:
 {% for key, value in pre_retrieved_info.items() %}
 - {{ value }}
 {% endfor %}
@@ -14,4 +14,3 @@ RELEVANT BACKGROUND:
 <|im_end|>
 
 <|im_start|>assistant
-I hear that you're concerned about

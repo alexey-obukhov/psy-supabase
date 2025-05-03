@@ -1,10 +1,13 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 
 def test_rag_processor_consistent_pattern():
     """Test pattern that can be adapted for all RAGProcessor tests."""
-    from psy_supabase.core.rag_processor import RAGProcessor
     from unittest.mock import MagicMock
+
+    from psy_supabase.core.rag_processor import RAGProcessor
 
     # Create fresh mocks
     mock_db = MagicMock()
@@ -14,21 +17,14 @@ def test_rag_processor_consistent_pattern():
     mock_text_gen.generate_text.return_value = response_str
 
     # Create processor
-    processor = RAGProcessor(
-        db_manager=mock_db,
-        generator=mock_text_gen
-    )
+    processor = RAGProcessor(db_manager=mock_db, generator=mock_text_gen)
 
     # Essential configurations
     processor.check_toxicity = lambda text: {"is_toxic": False, "score": 0.1}
 
     # Setup prompt selector
     mock_selector = MagicMock()
-    mock_selector.analyze_question.return_value = {
-        'topic': 'test',
-        'emotion': 'neutral',
-        'confidence': 0.9
-    }
+    mock_selector.analyze_question.return_value = {"topic": "test", "emotion": "neutral", "confidence": 0.9}
     mock_selector.generate_category_info.return_value = {"Test": 0.9}
     mock_selector.determine_topic.return_value = "test_topic"
     processor.prompt_selector = mock_selector

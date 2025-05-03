@@ -33,7 +33,7 @@ Dependencies:
 - `psy_supabase.core.database.DatabaseManager`: Manages database operations for storing and retrieving interactions.
 - `psy_supabase.core.rag_processor.RAGProcessor`: Handles response generation and pain point detection.
 - `psy_supabase.core.text_generator.TextGenerator`: Generates therapeutic responses for user queries.
-- `school_logging.log.ColoredLogger`: Provides enhanced logging for debugging and monitoring.
+- `prismalog.log.ColoredLogger`: Provides enhanced logging for debugging and monitoring.
 
 Usage:
     # Run the pain point detection tests
@@ -46,25 +46,28 @@ Usage:
     # Total pain points detected: #
     # Overall detection rate: #
 """
+
 import os
 import sys
 import uuid
-from school_logging.log import ColoredLogger
 from collections import Counter
-from typing import List, Dict, Any, Optional, Set
-import json
-# import multiprocessing as mp
-from psy_supabase.utilities.common import is_github_actions
-from psy_supabase.utilities.utils import cleanup_memory
-from psy_supabase.utilities.stop_words import stop_words
+from logging import Logger
+from typing import Any, Dict, List, Optional, Set
+
+from prismalog.log import get_logger
+
 from psy_supabase.memory.associative_memory import AssociativeMemory
+from psy_supabase.utilities.common import is_github_actions
+from psy_supabase.utilities.stop_words import stop_words
+from psy_supabase.utilities.utils import cleanup_memory
 
 # Set up logging
-logger: ColoredLogger = ColoredLogger("pain_point_detection_test")
+logger: Logger = get_logger(__name__)
 
 # Conditionally import dotenv
 if not is_github_actions():
     from dotenv import load_dotenv
+
     load_dotenv()  # Load environment variables from .env file
     logger.info("Local development: Loading environment from .env file")
 else:
@@ -91,7 +94,7 @@ from psy_supabase.core.text_generator import TextGenerator
 # Expanded TEST_CONVERSATIONS with more variations and session management
 TEST_CONVERSATIONS: List[Dict[str, Any]] = [
     {
-        "name": "Workplace Trauma Pattern",
+        "name": "workplace_trauma Pattern",
         "session_id": "workplace_trauma_session",
         "questions": [
             # Original questions
@@ -99,19 +102,18 @@ TEST_CONVERSATIONS: List[Dict[str, Any]] = [
             "Why do I always feel so nervous before team meetings? I'm prepared but still worry about being called out.",
             "Should I start looking for another job? I'm tired of feeling inadequate every day in this place.",
             "How do I stop obsessing over every email my supervisor sends? I keep looking for hidden criticisms.",
-
             # Additional variations to strengthen the pattern
             "Yesterday during our department meeting, my manager pointed out my mistake in front of the whole team.",
             "My heart races whenever my boss schedules a one-on-one meeting with no agenda.",
             "I feel like I'm walking on eggshells in my workplace, constantly afraid of making a mistake.",
             "I overanalyze everything I say in work meetings because I'm afraid of sounding incompetent.",
             "Sometimes I rehearse what I'll say in meetings for hours beforehand.",
-            "My colleagues seem so confident while presenting their ideas, but I always feel judged."
+            "My colleagues seem so confident while presenting their ideas, but I always feel judged.",
         ],
         "expected_pain_point": {
             "themes": ["workplace", "criticism", "anxiety", "humiliation", "inadequacy"],
-            "approach_types": ["subtle", "gentle", "direct", "cognitive_behavioral"]
-        }
+            "approach_types": ["subtle", "gentle", "direct", "cognitive_behavioral"],
+        },
     },
     {
         "name": "Relationship Insecurity Pattern",
@@ -122,22 +124,21 @@ TEST_CONVERSATIONS: List[Dict[str, Any]] = [
             "Is it normal to check your partner's phone when they're sleeping?",
             "I can't stop thinking about who my partner might be talking to when we're apart.",
             "Sometimes I make up excuses to call my partner just to check where they are.",
-
             # Additional variations
             "When my boyfriend gets a text message, I feel anxious until I know who it's from.",
             "I found myself looking through my girlfriend's social media followers yesterday.",
             "Do most people worry about their partner cheating as much as I do?",
             "I feel physically sick when my partner goes out without me.",
             "Yesterday I drove by my partner's workplace to make sure their car was there.",
-            "I hate that I feel so jealous all the time, but I can't seem to control it."
+            "I hate that I feel so jealous all the time, but I can't seem to control it.",
         ],
         "expected_pain_point": {
             "themes": ["jealousy", "insecurity", "trust", "relationship", "anxiety"],
-            "approach_types": ["gentle", "direct", "compassionate", "psychodynamic"]
-        }
+            "approach_types": ["gentle", "direct", "compassionate", "psychodynamic"],
+        },
     },
     {
-        "name": "Family Dynamics Conflict",
+        "name": "family_dynamics Conflict",
         "session_id": "family_dynamics_session",
         "questions": [
             # Original questions
@@ -145,21 +146,21 @@ TEST_CONVERSATIONS: List[Dict[str, Any]] = [
             "I dread family gatherings because I always feel like an outsider.",
             "Why do I still seek my parents' approval even though I'm in my 30s?",
             "I find myself acting like a teenager again whenever I visit my childhood home.",
-
             # Additional variations
             "Last week at dinner, my mom praised my brother for a promotion but barely acknowledged my new job.",
             "Whenever I disagree with my father, he brings up mistakes I made years ago.",
             "I spend hours preparing for family visits, but still feel ignored when I'm there.",
             "My siblings all seem to have inside jokes that I'm not part of.",
             "I notice I become very quiet and withdrawn around my family, unlike how I am with friends.",
-            "Why do I care so much about what my parents think when they've never really understood me?"
+            "Why do I care so much about what my parents think when they've never really understood me?",
         ],
         "expected_pain_point": {
             "themes": ["family", "rejection", "childhood", "approval", "favoritism"],
-            "approach_types": ["psychodynamic", "insight_oriented", "compassionate"]
-        }
-    }
+            "approach_types": ["psychodynamic", "insight_oriented", "compassionate"],
+        },
+    },
 ]
+
 
 class PainPointDetectionTester:
     """Tests the pain point detection capabilities of the RAG system."""
@@ -180,28 +181,28 @@ class PainPointDetectionTester:
         # Create a unique schema name for testing based on the user ID
         self.test_session_id = f"test_pain_point_{uuid.uuid4().hex[:10]}"
 
+        # Add assertions to satisfy mypy
+        assert supabase_url is not None, "Supabase URL must be set"
+        assert supabase_key is not None, "Supabase Key must be set"
+
         # Initialize database manager with Supabase credentials and test user
         self.db_manager = DatabaseManager(
-            supabase_url=supabase_url,
-            supabase_key=supabase_key,
-            user_id=self.test_user_id
+            supabase_url=supabase_url, supabase_key=supabase_key, user_id=self.test_user_id
         )
 
         # Initialize associative memory
         self.associative_memory = AssociativeMemory()
         logger.info("Initialized associative memory for theme detection")
 
-        self.generator = TextGenerator(model_name="microsoft/phi-1_5", device=device)
+        self.generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=device)
 
         # Initialize RAG processor with the test schema
         self.rag_processor = RAGProcessor(
-            db_manager=self.db_manager,
-            generator=self.generator,
-            intelligent_processing_enabled=True
+            db_manager=self.db_manager, generator=self.generator, intelligent_processing_enabled=True
         )
 
         # Add associative memory to the RAG processor
-        if hasattr(self.rag_processor, 'dynamic_retriever'):
+        if hasattr(self.rag_processor, "dynamic_retriever"):
             # If DynamicRAG is already integrated with AssociativeMemory
             logger.info("DynamicRAG already has AssociativeMemory integration")
         else:
@@ -215,7 +216,7 @@ class PainPointDetectionTester:
         # Set up test environment
         self._setup_test_environment()
 
-    def _initialize_memory_with_themes(self):
+    def _initialize_memory_with_themes(self) -> None:
         """Initialize associative memory with test themes for better detection."""
         logger.info("Initializing associative memory with test themes")
 
@@ -258,7 +259,7 @@ class PainPointDetectionTester:
         from collections import Counter
 
         # Remove punctuation and convert to lowercase
-        text = re.sub(r'[^\w\s]', '', text.lower())
+        text = re.sub(r"[^\w\s]", "", text.lower())
 
         words = [word for word in text.split() if word not in stop_words and len(word) > 3]
 
@@ -273,18 +274,12 @@ class PainPointDetectionTester:
         # Initialize the database schema for testing
         self.db_manager.create_user_schema_sync()
 
-        # Initialize knowledge base
-        self.db_manager.initialize_knowledge_base(self.test_session_id)
-
-        # Ensure vector indexes for proper pgvector functionality
-        self.db_manager.ensure_vector_indexes(self.test_session_id)
-
         # Initialize associative memory with test themes
         self._initialize_memory_with_themes()
 
         logger.info("Test environment setup complete")
 
-    def diagnose_database_issues(self):
+    def diagnose_database_issues(self) -> Dict[str, Any]:
         """Diagnose common database issues affecting tests."""
         try:
             logger.info("\n=== Database Diagnostics ===")
@@ -302,15 +297,15 @@ class PainPointDetectionTester:
                 table_name, ordinal_position;
             """
 
-            column_result = self.db_manager.supabase.rpc('sql', {'command': column_query}).execute()
+            column_result = self.db_manager.supabase.rpc("sql", {"command": column_query}).execute()
 
             # Process results as JSON string to avoid parsing issues
-            if hasattr(column_result, 'model_dump_json') and callable(column_result.model_dump_json):
+            if hasattr(column_result, "model_dump_json") and callable(column_result.model_dump_json):
                 logger.info("Raw column query response: %s", column_result.model_dump_json())
 
             # Get interaction table columns directly
             logger.info("=== Table Schema Information ===")
-            tables = ['interactions', 'interaction_embeddings']
+            tables = ["interactions", "interaction_embeddings"]
 
             for table in tables:
                 # Separate query for each table to avoid string aggregation
@@ -324,15 +319,15 @@ class PainPointDetectionTester:
 
                 try:
                     # Execute as separate SQL query
-                    table_result = self.db_manager.supabase.rpc('sql', {'command': table_query}).execute()
+                    table_result = self.db_manager.supabase.rpc("sql", {"command": table_query}).execute()
 
                     logger.info("Table: %s", table)
-                    if hasattr(table_result, 'data') and table_result.data:
+                    if hasattr(table_result, "data") and table_result.data:
                         for item in table_result.data:
                             if isinstance(item, dict):
-                                col_name = item.get('column_name', '')
-                                data_type = item.get('data_type', '')
-                                nullable = item.get('is_nullable', '')
+                                col_name = item.get("column_name", "")
+                                data_type = item.get("data_type", "")
+                                nullable = item.get("is_nullable", "")
                                 logger.info("  - %s (%s, nullable: %s)", col_name, data_type, nullable)
                 except Exception as e:
                     logger.error("Error getting schema for table %s: %s", table, e)
@@ -341,7 +336,7 @@ class PainPointDetectionTester:
             for table in tables:
                 count_query = f"SELECT COUNT(*) FROM {self.db_manager.schema_name}.{table};"
                 try:
-                    count_result = self.db_manager.supabase.rpc('sql', {'command': count_query}).execute()
+                    count_result = self.db_manager.supabase.rpc("sql", {"command": count_query}).execute()
                     count = "Unknown"
                     if count_result.data and len(count_result.data) > 0:
                         if isinstance(count_result.data[0], dict):
@@ -357,16 +352,17 @@ class PainPointDetectionTester:
         except Exception as e:
             logger.error("Error in database diagnostics: %s", e)
             import traceback
+
             logger.error(traceback.format_exc())
             return {"error": str(e)}
 
-    def direct_table_check(self):
+    def direct_table_check(self) -> bool:
         """Run a direct SQL check to get table structure information"""
         try:
             logger.info("\n=== Direct Table Structure Check ===")
 
             # Use a much simpler approach that will work even if responses are returned character-by-character
-            for table_name in ['interactions', 'interaction_embeddings']:
+            for table_name in ["interactions", "interaction_embeddings"]:
                 logger.info("\n=== STRUCTURE FOR TABLE: %s ===", table_name)
 
                 # Run individual queries for each piece of information we need
@@ -379,7 +375,7 @@ class PainPointDetectionTester:
                     AND table_name = '{table_name}'
                 );
                 """
-                exists_response = self.db_manager.supabase.rpc('sql', {'command': exists_query}).execute()
+                exists_response = self.db_manager.supabase.rpc("sql", {"command": exists_query}).execute()
                 table_exists = False
 
                 # Parse response - handle both object and character formats
@@ -388,11 +384,11 @@ class PainPointDetectionTester:
                         table_exists = list(exists_response.data[0].values())[0]
                     elif all(isinstance(c, str) and len(c) == 1 for c in exists_response.data):
                         # If character-by-character (likely "true" or "false")
-                        joined = ''.join(exists_response.data).lower()
-                        table_exists = joined in ('true', 't', '1')
+                        joined = "".join(exists_response.data).lower()
+                        table_exists = joined in ("true", "t", "1")
                     else:
                         # Try to interpret as boolean
-                        table_exists = exists_response.data[0] in (True, 'true', 't', '1')
+                        table_exists = exists_response.data[0] in (True, "true", "t", "1")
 
                 logger.info("Table exists: %s", table_exists)
 
@@ -404,7 +400,7 @@ class PainPointDetectionTester:
                 count_query = f"""
                 SELECT COUNT(*) FROM {self.db_manager.schema_name}.{table_name};
                 """
-                count_response = self.db_manager.supabase.rpc('sql', {'command': count_query}).execute()
+                count_response = self.db_manager.supabase.rpc("sql", {"command": count_query}).execute()
                 row_count = 0
 
                 # Parse response
@@ -413,7 +409,7 @@ class PainPointDetectionTester:
                         row_count = list(count_response.data[0].values())[0]
                     elif all(isinstance(c, str) and len(c) == 1 for c in count_response.data):
                         # If it's character-by-character
-                        joined = ''.join(count_response.data)
+                        joined = "".join(count_response.data)
                         row_count = int(joined) if joined.isdigit() else 0
                     else:
                         # Try direct conversion
@@ -435,7 +431,7 @@ class PainPointDetectionTester:
                 ORDER BY ordinal_position;
                 """
 
-                columns_response = self.db_manager.supabase.rpc('sql', {'command': columns_query}).execute()
+                columns_response = self.db_manager.supabase.rpc("sql", {"command": columns_query}).execute()
 
                 # Process column names
                 if columns_response.data:
@@ -448,8 +444,8 @@ class PainPointDetectionTester:
 
                     # Process different response formats
                     for item in columns_response.data:
-                        if isinstance(item, dict) and 'column_name' in item:
-                            column_names.append(item['column_name'])
+                        if isinstance(item, dict) and "column_name" in item:
+                            column_names.append(item["column_name"])
                         elif isinstance(item, str):
                             # If already a string and not a single character
                             if len(item) > 1:
@@ -460,12 +456,13 @@ class PainPointDetectionTester:
                         # Might be getting character-by-character response
                         if all(isinstance(c, str) and len(c) == 1 for c in columns_response.data):
                             # Guess at breaks - this is very imprecise
-                            full_string = ''.join(columns_response.data)
+                            full_string = "".join(columns_response.data)
 
                             # Try to detect column names by common patterns
                             # This is extremely fragile but might help with debugging
                             import re
-                            potential_columns = re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)', full_string)
+
+                            potential_columns = re.findall(r"([a-zA-Z_][a-zA-Z0-9_]*)", full_string)
                             if potential_columns:
                                 column_names = potential_columns
 
@@ -494,24 +491,24 @@ class PainPointDetectionTester:
                     AND tc.table_name = '{table_name}';
                 """
 
-                pk_response = self.db_manager.supabase.rpc('sql', {'command': pk_query}).execute()
+                pk_response = self.db_manager.supabase.rpc("sql", {"command": pk_query}).execute()
 
                 # Process primary key
                 primary_key = None
                 if pk_response.data:
-                    if isinstance(pk_response.data[0], dict) and 'column_name' in pk_response.data[0]:
-                        primary_key = pk_response.data[0]['column_name']
+                    if isinstance(pk_response.data[0], dict) and "column_name" in pk_response.data[0]:
+                        primary_key = pk_response.data[0]["column_name"]
                     elif isinstance(pk_response.data[0], str) and len(pk_response.data[0]) > 1:
                         primary_key = pk_response.data[0]
                     elif all(isinstance(c, str) and len(c) == 1 for c in pk_response.data):
                         # If it's character-by-character
-                        primary_key = ''.join(pk_response.data)
+                        primary_key = "".join(pk_response.data)
 
                 logger.info("Primary key: %s", primary_key)
 
                 # 5. Manual information based on expected schema
                 logger.info("Expected schema:")
-                if table_name == 'interactions':
+                if table_name == "interactions":
                     logger.info("  - interaction_id: ID column (primary key)")
                     logger.info("  - question: Text content of user question")
                     logger.info("  - answer: Text content of AI response")
@@ -519,7 +516,7 @@ class PainPointDetectionTester:
                     logger.info("  - metadata: JSON metadata")
                     logger.info("  - session_id: Session identifier")
                     logger.info("  - created_at: Timestamp")
-                elif table_name == 'interaction_embeddings':
+                elif table_name == "interaction_embeddings":
                     logger.info("  - id: ID column (primary key)")
                     logger.info("  - interaction_id: Foreign key to interactions.interaction_id")
                     logger.info("  - embedding: Vector embedding")
@@ -530,6 +527,7 @@ class PainPointDetectionTester:
         except Exception as e:
             logger.error("Error in direct table check: %s", e)
             import traceback
+
             logger.error(traceback.format_exc())
             return False
 
@@ -538,7 +536,7 @@ class PainPointDetectionTester:
         logger.info("Cleaning up test environment...")
         cleanup_memory()
 
-    def analyze_conversation_topics(self, session_id: str = None) -> List[Dict[str, Any]]:
+    def analyze_conversation_topics(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Analyze topics in the test conversation using pgvector clustering.
 
@@ -554,21 +552,14 @@ class PainPointDetectionTester:
         try:
             # Call the pgvector-powered topic analysis function via RPC
             response = self.db_manager.supabase.rpc(
-                'analyze_conversation_topics',
-                {
-                    'p_schema_name': self.db_manager.schema_name,
-                    'p_session_id': session_id,
-                    'p_min_count': 1
-                }
+                "analyze_conversation_topics",
+                {"p_schema_name": self.db_manager.schema_name, "p_session_id": session_id, "p_min_count": 1},
             ).execute()
 
             if response.data:
                 topics = []
                 for item in response.data:
-                    topics.append({
-                        "topic": item.get('topic', 'Unknown topic'),
-                        "frequency": item.get('frequency', 0)
-                    })
+                    topics.append({"topic": item.get("topic", "Unknown topic"), "frequency": item.get("frequency", 0)})
                 logger.info("Topic analysis found %d topics", len(topics))
                 return topics
             else:
@@ -578,6 +569,7 @@ class PainPointDetectionTester:
         except Exception as e:
             logger.error("Error analysing topics: %s", e)
             return [{"topic": f"Error: {str(e)}", "frequency": 0}]
+
 
 def analyze_test_results(results: List[Dict[str, Any]]) -> None:
     """
@@ -591,7 +583,7 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
 
     # Overall statistics
     total_exchanges: int = sum(len(r["exchanges"]) for r in results)
-    total_detected: int = sum(r["pain_points_detected"] for r in results)
+    total_detected: int = sum(r["pain_point_detected"] for r in results)
     detection_rate: float = (total_detected / total_exchanges) * 100 if total_exchanges > 0 else 0
 
     logger.info("Total exchanges: %d", total_exchanges)
@@ -601,9 +593,11 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
     # Analyze each conversation
     logger.info("\nDetailed results by conversation:")
     for i, result in enumerate(results):
-        logger.info("\n%s:", result['name'])
-        logger.info(f"  Detection rate: {(result['pain_points_detected'] / len(result['exchanges'])) * 100:.2f}%")
-        logger.info("  First detected at: Question #%s", result['first_detection_at'] if result['first_detection_at'] else 'N/A')
+        logger.info("\n%s:", result["name"])
+        logger.info(f"  Detection rate: {(result['pain_point_detected'] / len(result['exchanges'])) * 100:.2f}%")
+        logger.info(
+            "  First detected at: Question #%s", result["first_detection_at"] if result["first_detection_at"] else "N/A"
+        )
 
         # Analyze approach types detected
         all_approach_types: List[str] = []
@@ -614,30 +608,39 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
         # Analyze approach types
         if all_approach_types:
             approach_type_counts: Counter = Counter(all_approach_types)
-            logger.info(f"  Detected approach types: {', '.join([f'{t}({c})' for t, c in approach_type_counts.most_common()])}")
+            logger.info(
+                f"  Detected approach types: {', '.join([f'{t}({c})' for t, c in approach_type_counts.most_common()])}"
+            )
 
             # Check against expected approach types if defined in test case
             if i < len(TEST_CONVERSATIONS):
                 expected_conversation: Dict[str, Any] = TEST_CONVERSATIONS[i]
-                if "expected_pain_point" in expected_conversation and "approach_types" in expected_conversation["expected_pain_point"]:
+                if (
+                    "expected_pain_point" in expected_conversation
+                    and "approach_types" in expected_conversation["expected_pain_point"]
+                ):
                     expected_types: Set[str] = set(expected_conversation["expected_pain_point"]["approach_types"])
                     detected_types: Set[str] = set(all_approach_types)
 
                     # Normalize approach types for comparison (convert to lowercase, replace underscores with spaces)
-                    normalized_expected: Set[str] = {t.lower().replace('_', ' ') for t in expected_types}
-                    normalized_detected: Set[str] = {(t.lower().replace('_', ' ') if t else "") for t in detected_types}
+                    normalized_expected: Set[str] = {t.lower() for t in expected_types}
+                    normalized_detected: Set[str] = {(t.lower() if t else "") for t in detected_types}
 
                     # Find matches and misses
                     matches: Set[str] = normalized_expected.intersection(normalized_detected)
                     misses: Set[str] = normalized_expected - normalized_detected
 
                     # Report matches and misses
-                    match_percentage: float = (len(matches) / len(normalized_expected)) * 100 if normalized_expected else 0
-                    logger.info(f"  Approach type match: {match_percentage:.2f}% ({len(matches)}/{len(normalized_expected)})")
+                    match_percentage: float = (
+                        (len(matches) / len(normalized_expected)) * 100 if normalized_expected else 0
+                    )
+                    logger.info(
+                        f"  Approach type match: {match_percentage:.2f}% ({len(matches)}/{len(normalized_expected)})"
+                    )
                     if matches:
-                        logger.info("    Matched types: %s", ', '.join(matches))
+                        logger.info("    Matched types: %s", ", ".join(matches))
                     if misses:
-                        logger.info("    Missed types: %s", ', '.join(misses))
+                        logger.info("    Missed types: %s", ", ".join(misses))
 
         # Analyze themes detected
         all_themes: List[str] = []
@@ -655,19 +658,23 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
 
         # Add vector-based topic analysis results
         if "vector_topics" in result and result["vector_topics"]:
-            meaningful_topics = [t for t in result["vector_topics"]
-                               if not t["topic"].startswith("Error") and
-                               not t["topic"].startswith("No ")]
+            meaningful_topics = [
+                t
+                for t in result["vector_topics"]
+                if not t["topic"].startswith("Error") and not t["topic"].startswith("No ")
+            ]
 
             if meaningful_topics:
                 logger.info("  Vector-based topic analysis:")
                 for topic in sorted(meaningful_topics, key=lambda x: x["frequency"], reverse=True):
-                    logger.info("    - %s (frequency: %s)", topic['topic'], topic['frequency'])
+                    logger.info("    - %s (frequency: %s)", topic["topic"], topic["frequency"])
 
                 # Compare with expected themes
                 if i < len(TEST_CONVERSATIONS):
-                    expected_conversation: Dict[str, Any] = TEST_CONVERSATIONS[i]
-                    if "expected_pain_point" in expected_conversation and "themes" in expected_conversation["expected_pain_point"]:
+                    if (
+                        "expected_pain_point" in expected_conversation
+                        and "themes" in expected_conversation["expected_pain_point"]
+                    ):
                         expected_themes: Set[str] = set(expected_conversation["expected_pain_point"]["themes"])
                         detected_topics: Set[str] = set(t["topic"].lower() for t in meaningful_topics)
 
@@ -682,13 +689,16 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                         misses = expected_themes - matches
 
                         match_percentage = (len(matches) / len(expected_themes)) * 100 if expected_themes else 0
-                        logger.info(f"  Vector topic match: {match_percentage:.2f}% ({len(matches)}/{len(expected_themes)})")
+                        logger.info(
+                            f"  Vector topic match: {match_percentage:.2f}% ({len(matches)}/{len(expected_themes)})"
+                        )
                         if matches:
-                            logger.info("    Matched themes: %s", ', '.join(matches))
+                            logger.info("    Matched themes: %s", ", ".join(matches))
                         if misses:
-                            logger.info("    Missed themes: %s", ', '.join(misses))
+                            logger.info("    Missed themes: %s", ", ".join(misses))
             else:
                 logger.info("  Vector-based topic analysis: No significant topics identified")
+
 
 def main() -> None:
     """Run the pain point detection database diagnostics."""
@@ -713,8 +723,10 @@ def main() -> None:
     except Exception as e:
         logger.error("Error running diagnostics: %s", e)
         import traceback
+
         logger.error(traceback.format_exc())
 
+
 if __name__ == "__main__":
-    logger = ColoredLogger("psy_supabase")
+    logger = get_logger(__name__)
     main()

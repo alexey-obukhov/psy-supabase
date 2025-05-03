@@ -6,9 +6,15 @@ test/logging/*
 logging/
 nltk_data/
 tests/nltk_data/
+test_results/
 
 # Supabase login data
 .env
+
+# Virtual environment
+venv/
+.venv/
+.venv-*
 
 # Python packaging
 psy_supabase.egg-info/*

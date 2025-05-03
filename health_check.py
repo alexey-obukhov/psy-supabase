@@ -1,21 +1,29 @@
-from school_logging.log import ColoredLogger
+import os
+import sys
+
+from prismalog.config import LoggingConfig
+from prismalog.log import get_logger
+
+from psy_supabase.core.database import DatabaseManager
+from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
-from psy_supabase.core.database import DatabaseManager
 from psy_supabase.utilities.common import is_github_actions
-import os
 
-# Configure logging
-logger = ColoredLogger(__name__)
+config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+LoggingConfig.initialize(config_file=config_path)
 
+logger = get_logger(__name__)
 if not is_github_actions():
     from dotenv import load_dotenv
+
     load_dotenv()  # Load environment variables from .env file
     logger.info("Local development: Loading environment from .env file")
 else:
     logger.info("CI environment: Using GitHub secrets")
 
-def main():
+
+def main() -> bool:
     """Run a health check on the main components."""
     try:
         logger.info("Starting health check...")
@@ -23,8 +31,7 @@ def main():
         # Initialize with minimal dependencies for testing
         logger.info("Initializing text generator...")
         generator = TextGenerator(
-            model_name=os.getenv("MODEL_NAME", "microsoft/phi-1_5"),
-            device=os.getenv("DEVICE", "cpu")
+            model_name=os.getenv("MODEL_NAME", "rasyosef/Phi-1_5-Instruct-v0.1"), device=os.getenv("DEVICE", "cpu")
         )
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_KEY")
@@ -45,8 +52,6 @@ def main():
         logger.info("Testing RAG processor with sample question...")
         test_question = "How can I manage everyday anxiety?"
 
-        # Use the proper method to generate embeddings
-        from psy_supabase.core.model_manager import get_embedding_provider
         embedding_provider = get_embedding_provider()
         test_embedding = embedding_provider.generate_embedding(test_question)
         logger.info("Generated test embedding with length %d", len(test_embedding))
@@ -57,10 +62,13 @@ def main():
         logger.info("Sample response: %s...", response[:100])
 
         logger.info("Cleaning up")
-        cleanup_query = """
+        cleanup_query = (
+            """
         DROP SCHEMA IF EXISTS "%s" CASCADE;
-        """ % db_manager.schema_name
-        db_manager.supabase.rpc('sql', {'command': cleanup_query}).execute()
+        """
+            % db_manager.schema_name
+        )
+        db_manager.supabase.rpc("sql", {"command": cleanup_query}).execute()
         logger.info("Schema %s dropped", db_manager.schema_name)
         logger.info("Health check completed successfully!")
         return True
@@ -68,6 +76,7 @@ def main():
         logger.error("Health check failed: %s", e, exc_info=True)
         return False
 
+
 if __name__ == "__main__":
     success = main()
-    exit(0 if success else 1)
+    sys.exit(0 if success else 1)

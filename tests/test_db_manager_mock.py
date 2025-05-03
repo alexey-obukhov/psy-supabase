@@ -13,13 +13,9 @@ def test_db_manager_mock_save_interaction():
     # Create a save_interaction implementation
     def save_interaction_impl(context, question, answer, metadata=None, session_id=None):
         """Implementation that tracks save_interaction calls."""
-        mock_db._saved_interactions.append({
-            'context': context,
-            'question': question,
-            'answer': answer,
-            'metadata': metadata,
-            'session_id': session_id
-        })
+        mock_db._saved_interactions.append(
+            {"context": context, "question": question, "answer": answer, "metadata": metadata, "session_id": session_id}
+        )
 
         mock_db._last_context = context
         mock_db._last_metadata = metadata
@@ -34,7 +30,7 @@ def test_db_manager_mock_save_interaction():
         question="test_question",
         answer="test_answer",
         metadata={"test": "metadata"},
-        session_id="test_session"
+        session_id="test_session",
     )
 
     # Verify it worked

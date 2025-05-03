@@ -1,24 +1,24 @@
 import os
 import sys
-import uuid
 import time
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime
 
-# Add project root to Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from prismalog.log import get_logger
 
 from psy_supabase.core.database import DatabaseManager
-from school_logging.log import ColoredLogger
 
 # Set up logger
-logger = ColoredLogger(__name__)
+logger = get_logger(__name__)
 
 # Load environment variables for Supabase credentials
 from dotenv import load_dotenv
+
 load_dotenv()
 
-supabase_url = os.getenv('SUPABASE_URL')
-supabase_key = os.getenv('SUPABASE_KEY')
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_KEY")
+
 
 class TestDatabaseFunctions:
     """Test class for database functions, particularly those involving session_id."""
@@ -35,9 +35,7 @@ class TestDatabaseFunctions:
 
             # Initialize database manager with test user
             self.db_manager = DatabaseManager(
-                supabase_url=supabase_url,
-                supabase_key=supabase_key,
-                user_id=self.test_user_id
+                supabase_url=supabase_url, supabase_key=supabase_key, user_id=self.test_user_id
             )
 
             # Ensure schema exists
@@ -53,7 +51,7 @@ class TestDatabaseFunctions:
                 WHERE schema_name = '{self.db_manager.schema_name}'
             );
             """
-            check_response = self.db_manager.supabase.rpc('sql', {'command': check_query}).execute()
+            check_response = self.db_manager.supabase.rpc("sql", {"command": check_query}).execute()
             logger.info("Schema exists check: %s", check_response.data)
 
             # Add a small delay to ensure schema creation completes
@@ -67,6 +65,7 @@ class TestDatabaseFunctions:
         except Exception as e:
             logger.error("Setup error: %s", e)
             import traceback
+
             logger.error(traceback.format_exc())
             raise
 
@@ -93,7 +92,7 @@ class TestDatabaseFunctions:
         - Problems with the session_id column not being created
         - Incorrect metadata handling related to session_id
         - Data integrity issues between save and retrieve operations
-        """        # Log for debugging
+        """  # Log for debugging
         logger.info("Ensuring tables exist before saving interaction")
         self.db_manager.ensure_schema_exists()
 
@@ -102,15 +101,15 @@ class TestDatabaseFunctions:
         logger.info("Attempting to save interaction with session_id: %s", session_id)
 
         # Add an interaction with this session ID
-        result = self.db_manager.add_interaction({
-            'question': "This is a test question for retrieving by session ID",
-            'answer': "This is a test answer for retrieving by session ID",
-            'context': "Test context",
-            'metadata': {
-                'test_type': 'session_retrieval',
-                'timestamp': datetime.now().isoformat()
-            }
-        }, session_id=session_id)
+        result = self.db_manager.add_interaction(
+            {
+                "question": "This is a test question for retrieving by session ID",
+                "answer": "This is a test answer for retrieving by session ID",
+                "context": "Test context",
+                "metadata": {"test_type": "session_retrieval", "timestamp": datetime.now().isoformat()},
+            },
+            session_id=session_id,
+        )
 
         # Verify save operation succeeded
         assert result, f"Failed to save interaction with session ID {session_id}"
@@ -126,7 +125,7 @@ class TestDatabaseFunctions:
         # Verify the saved question is found
         found = False
         for item in history:
-            if "test question for retrieving by session ID" in item.get('question', ''):
+            if "test question for retrieving by session ID" in item.get("question", ""):
                 found = True
                 break
 
@@ -143,11 +142,7 @@ class TestDatabaseFunctions:
 
             # Save each interaction
             self.db_manager.save_interaction(
-                context=context,
-                question=question,
-                answer=answer,
-                metadata=metadata,
-                session_id=self.test_session_id
+                context=context, question=question, answer=answer, metadata=metadata, session_id=self.test_session_id
             )
 
         # Wait for embeddings to be processed
@@ -171,9 +166,9 @@ class TestDatabaseFunctions:
         if len(results) > 0:
             # Check that results contain metadata
             for result in results:
-                assert 'metadata' in result, "Result is missing metadata field"
-                assert isinstance(result['metadata'], dict), "Metadata should be a dictionary"
-                assert result['metadata'].get('session_id') == self.test_session_id, "Session ID mismatch in results"
+                assert "metadata" in result, "Result is missing metadata field"
+                assert isinstance(result["metadata"], dict), "Metadata should be a dictionary"
+                assert result["metadata"].get("session_id") == self.test_session_id, "Session ID mismatch in results"
 
         logger.info("Found %s similar documents with session ID", len(results))
 
@@ -182,31 +177,28 @@ class TestDatabaseFunctions:
         from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 
         # Create a RAG retriever with the test session
-        rag_retriever = DynamicRAGRetriever(
-            db_manager=self.db_manager,
-            session_id=self.test_session_id
-        )
+        rag_retriever = DynamicRAGRetriever(db_manager=self.db_manager, session_id=self.test_session_id)
 
         # Add some test interactions
         questions = [
             "I'm feeling anxious about my upcoming presentation",
             "My anxiety seems to get worse when I have to speak in public",
-            "I've been practicing deep breathing to manage anxiety"
+            "I've been practicing deep breathing to manage anxiety",
         ]
 
         answers = [
             "It's normal to feel anxious about presentations. Have you tried any relaxation techniques?",
             "Public speaking anxiety is very common. Can you tell me more about what specifically worries you?",
-            "Deep breathing is an excellent technique. How has it been working for you?"
+            "Deep breathing is an excellent technique. How has it been working for you?",
         ]
 
         for q, a in zip(questions, answers):
             self.db_manager.save_interaction(
-                context="Anxiety discussion",
+                context="anxiety discussion",
                 question=q,
                 answer=a,
                 metadata={"topic": "anxiety"},
-                session_id=self.test_session_id
+                session_id=self.test_session_id,
             )
 
         # Wait for processing
@@ -231,9 +223,9 @@ class TestDatabaseFunctions:
         logger.info("Cleaning up test data for user %s", self.test_user_id)
         # Optional: Delete test schema to clean up
         try:
-            self.db_manager.supabase.rpc('sql', {
-                'command': f'DROP SCHEMA IF EXISTS "{self.db_manager.schema_name}" CASCADE;'
-            }).execute()
+            self.db_manager.supabase.rpc(
+                "sql", {"command": f'DROP SCHEMA IF EXISTS "{self.db_manager.schema_name}" CASCADE;'}
+            ).execute()
             logger.info("Dropped test schema %s", self.db_manager.schema_name)
         except Exception as e:
             logger.error("Error cleaning up: %s", e)
@@ -264,6 +256,7 @@ def run_tests():
     except Exception as e:
         print(f"❌ Error running tests: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         print("\nCleaning up...")

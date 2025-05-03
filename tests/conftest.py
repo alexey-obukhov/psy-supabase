@@ -1,5 +1,7 @@
+# pylint: disable=redefined-outer-name, redefined-outer-name, import-outside-toplevel, unused-argument
+
 """
-Test Configuration and Fixtures for the Psy Supabase Package.
+Test Configuration and Fixtures for the Psy-Supabase Package.
 
 This module contains shared pytest fixtures and test configuration that are automatically
 discovered and used by pytest. Configuration includes:
@@ -11,14 +13,28 @@ discovered and used by pytest. Configuration includes:
 
 All test modules will automatically have access to these fixtures without explicit imports.
 """
-import os
-import torch
-from unittest.mock import Mock, MagicMock, patch
-import pytest
-import logging
+
+import gc
 import json
+import logging
+import os
 from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
+
 import nltk
+import pytest
+import torch
+from prismalog.log import get_logger
+
+from psy_supabase.config import (  # pylint: disable=unused-import
+    DEFAULT_APPROACH,
+    DEFAULT_EMOTION,
+    DEFAULT_THEME,
+    DEFAULT_TOPIC,
+)
+
+logger = get_logger(__name__)
+
 
 # Ensure NLTK data is downloaded for text processing
 def download_nltk_data():
@@ -33,22 +49,23 @@ def download_nltk_data():
 
     # List of required NLTK packages
     required_packages = [
-        'punkt',           # Sentence tokenization
-        'stopwords',       # Common words to filter
-        'wordnet',         # Lexical database
-        'vader_lexicon',   # Sentiment analysis
-        'averaged_perceptron_tagger',  # Part-of-speech tagging
-        'omw',             # Open Multilingual Wordnet
-        'punkt_tab'        # Required for text2emotion
+        "punkt",  # Sentence tokenization
+        "stopwords",  # Common words to filter
+        "wordnet",  # Lexical database
+        "vader_lexicon",  # Sentiment analysis
+        "averaged_perceptron_tagger",  # Part-of-speech tagging
+        "omw",  # Open Multilingual Wordnet
+        "punkt_tab",  # Required for text2emotion
     ]
 
     # Download each package if not already present
     for package in required_packages:
         try:
-            nltk.data.find(f'tokenizers/{package}')
+            nltk.data.find(f"tokenizers/{package}")
         except LookupError:
             print(f"Downloading NLTK data package: {package}")
             nltk.download(package, download_dir=nltk_data_dir, quiet=True)
+
 
 # Run the download function at module import time
 download_nltk_data()
@@ -62,44 +79,49 @@ TEST_KEY = "fake-api-key"
 
 # Commonly used terms for identifying supportive language
 SUPPORTIVE_TERMS: List[str] = [
-    "help", "support", "understand", "listen", "hear",
-    "validat", "care", "concern", "empath", "compassion",
-    "acknowledge", "comfort", "reassure", "encourage",
-    "validate", "recognise", "relate", "connect",
-    "sympath", "feel", "emotion", "experienc"]
+    "help",
+    "support",
+    "understand",
+    "listen",
+    "hear",
+    "validat",
+    "care",
+    "concern",
+    "empath",
+    "compassion",
+    "acknowledge",
+    "comfort",
+    "reassure",
+    "encourage",
+    "validate",
+    "recognise",
+    "relate",
+    "connect",
+    "sympath",
+    "feel",
+    "emotion",
+    "experienc",
+]
 
 # Sample data with embeddings that should be processed
 SAMPLE_SIMILAR_DOCUMENTS: List[dict] = [
-    {
-        'id': 1,
-        'content': 'Document 1 content',
-        'embedding': [0.1,0.2,0.3],
-        'similarity': 0.9
-    },
-    {
-        'id': 2,
-        'content': 'Document 2 content',
-        'embedding': [0.2,0.3,0.4],
-        'similarity': 0.85
-    }
+    {"id": 1, "content": "Document 1 content", "embedding": [0.1, 0.2, 0.3], "similarity": 0.9},
+    {"id": 2, "content": "Document 2 content", "embedding": [0.2, 0.3, 0.4], "similarity": 0.85},
 ]
 
 # Complex metadata for testing JSON serialization and processing
 COMPLEX_METADATA: Dict[str, Any] = {
     "pain_points": [
         {"topic": "anxiety", "frequency": 3, "last_seen": "2023-01-01T12:00:00"},
-        {"topic": "depression", "frequency": 2, "last_seen": "2023-02-15T14:30:00"}
+        {"topic": "depression", "frequency": 2, "last_seen": "2023-02-15T14:30:00"},
     ],
     "approach_history": {
         "cbt": {"success_rating": 0.8, "usage_count": 5},
-        "psychodynamic": {"success_rating": 0.6, "usage_count": 2}
+        "psychodynamic": {"success_rating": 0.6, "usage_count": 2},
     },
-    "conversation_metrics": {
-        "avg_sentiment": -0.2,
-        "topic_shifts": 3,
-        "emotional_trajectory": [0.1, -0.2, -0.3, 0.1]
-    }
+    "conversation_metrics": {"avg_sentiment": -0.2, "topic_shifts": 3, "emotional_trajectory": [0.1, -0.2, -0.3, 0.1]},
 }
+
 
 @pytest.fixture(autouse=True)
 def suppress_logging():
@@ -129,10 +151,7 @@ def suppress_logging():
     root_logger.setLevel(logging.CRITICAL)
 
     # Also suppress specific module loggers
-    module_loggers = [
-        logging.getLogger("psy_supabase"),
-        logging.getLogger("psy_supabase.core.database")
-    ]
+    module_loggers = [logging.getLogger("psy_supabase"), logging.getLogger("psy_supabase.core.database")]
     original_module_levels = {logger: logger.level for logger in module_loggers}
 
     for logger in module_loggers:
@@ -151,6 +170,7 @@ def suppress_logging():
     for logger, level in original_module_levels.items():
         logger.setLevel(level)
 
+
 @pytest.fixture(autouse=True)
 def cleanup_gpu_memory():
     """
@@ -159,15 +179,13 @@ def cleanup_gpu_memory():
     """
     from psy_supabase.utilities.utils import cleanup_memory
 
-    from school_logging.log import ColoredLogger
-    logger = ColoredLogger("cleanup_gpu_memory")
-
     # Setup: yield to test
     yield
 
     # Teardown: clean up memory after test completes (or fails)
     logger.info("Cleaning up GPU memory after test...")
     cleanup_memory(force_cuda_cleanup=True)
+
 
 @pytest.fixture
 def mock_supabase():
@@ -210,6 +228,7 @@ def mock_supabase():
 
     return mock_client
 
+
 @pytest.fixture
 def db_manager(mock_supabase):
     """
@@ -230,9 +249,11 @@ def db_manager(mock_supabase):
         DatabaseManager: Configured with mock client
     """
     from psy_supabase.core.database import DatabaseManager
-    with patch('psy_supabase.core.database.create_client', return_value=mock_supabase):
+
+    with patch("psy_supabase.core.database.create_client", return_value=mock_supabase):
         manager = DatabaseManager(TEST_URL, TEST_KEY, TEST_USER_ID)
         return manager
+
 
 @pytest.fixture
 def sample_interaction():
@@ -247,11 +268,12 @@ def sample_interaction():
         dict: A sample interaction dictionary
     """
     return {
-        'context': 'Test context',
-        'question': 'How are you feeling today?',
-        'answer': 'I am feeling better, thanks for asking.',
-        'metadata': {'topic': 'Wellness', 'effectiveness': {'term_overlap': 0.8}}
+        "context": "Test context",
+        "question": "How are you feeling today?",
+        "answer": "I am feeling better, thanks for asking.",
+        "metadata": {"topic": "Wellness", "effectiveness": {"term_overlap": 0.8}},
     }
+
 
 @pytest.fixture
 def sample_history():
@@ -267,22 +289,23 @@ def sample_history():
     """
     return [
         {
-            'interaction_id': 1,
-            'question': 'How are you feeling today?',
-            'answer': 'I am feeling better, thanks for asking.',
-            'context': 'Test context',
-            'metadata': json.dumps({'topic': 'Wellness', 'effectiveness': {'term_overlap': 0.8}}),
-            'created_at': '2023-01-01T12:00:00'
+            "interaction_id": 1,
+            "question": "How are you feeling today?",
+            "answer": "I am feeling better, thanks for asking.",
+            "context": "Test context",
+            "metadata": json.dumps({"topic": "Wellness", "effectiveness": {"term_overlap": 0.8}}),
+            "created_at": "2023-01-01T12:00:00",
         },
         {
-            'interaction_id': 2,
-            'question': 'What has been bothering you lately?',
-            'answer': 'I have been stressed about work.',
-            'context': 'CBT session',
-            'metadata': json.dumps({'topic': 'Anxiety', 'effectiveness': {'term_overlap': 0.7}}),
-            'created_at': '2023-01-01T12:05:00'
-        }
+            "interaction_id": 2,
+            "question": "What has been bothering you lately?",
+            "answer": "I have been stressed about work.",
+            "context": "cbt session",
+            "metadata": json.dumps({"topic": "anxiety", "effectiveness": {"term_overlap": 0.7}}),
+            "created_at": "2023-01-01T12:05:00",
+        },
     ]
+
 
 @pytest.fixture
 def sample_similar_documents():
@@ -297,17 +320,10 @@ def sample_similar_documents():
         list: List of document dictionaries with similarity scores
     """
     return [
-        {
-            'id': 1,
-            'content': 'This is a sample document about anxiety management techniques.',
-            'similarity': 0.95
-        },
-        {
-            'id': 2,
-            'content': 'Another document about stress reduction strategies.',
-            'similarity': 0.85
-        }
+        {"id": 1, "content": "This is a sample document about anxiety management techniques.", "similarity": 0.95},
+        {"id": 2, "content": "Another document about stress reduction strategies.", "similarity": 0.85},
     ]
+
 
 @pytest.fixture
 def mock_model():
@@ -315,6 +331,7 @@ def mock_model():
     mock = Mock()
     mock.generate.return_value = torch.tensor([[1, 2, 3, 4, 5]])
     return mock
+
 
 @pytest.fixture
 def mock_tokenizer():
@@ -325,6 +342,7 @@ def mock_tokenizer():
     mock.pad_token = None
     mock.eos_token = "<eos>"
     return mock
+
 
 def create_text_generator_mocks():
     """
@@ -339,7 +357,7 @@ def create_text_generator_mocks():
 
     # Create a tokenizer that returns a tensor
     mock_tokenizer = Mock()
-    mock_tokenizer.encode.return_value = torch.tensor([i for i in range(10)])
+    mock_tokenizer.encode.return_value = torch.tensor(list(range(10)))
     mock_tokenizer.decode.return_value = "Decoded text"
 
     # Create a model that returns tensors
@@ -347,6 +365,7 @@ def create_text_generator_mocks():
     mock_model.generate.return_value = torch.tensor([[1, 2, 3, 4, 5]])
 
     return mock_template, mock_tokenizer, mock_model
+
 
 def setup_text_generator_for_testing(text_generator):
     """Set up a TextGenerator instance with proper mocks for tests."""
@@ -365,43 +384,36 @@ def setup_text_generator_for_testing(text_generator):
 
     # Make analyze_question return a dict that can be iterated
     mock_selector.analyze_question.return_value = {
-        'topic': 'test_topic',
-        'emotion': 'test_emotion',
-        'confidence': 0.9,
+        "topic": "test_topic",
+        "emotion": "test_emotion",
+        "confidence": 0.9,
         # Add an actual iterable field to avoid 'Mock object is not iterable'
-        'keywords': ['keyword1', 'keyword2']
+        "keywords": ["keyword1", "keyword2"],
     }
 
     # Make generate_category_info return a proper dict
-    mock_selector.generate_category_info.return_value = {
-        'Test Category': 0.9,
-        'Another Category': 0.7
-    }
+    mock_selector.generate_category_info.return_value = {"Test Category": 0.9, "Another Category": 0.7}
 
     text_generator.prompt_selector = mock_selector
 
     # Return for chaining
     return text_generator
 
+
 @pytest.fixture
 def text_generator(mock_model, mock_tokenizer):
     """Create a TextGenerator instance with mocked components for testing."""
     from psy_supabase.core.text_generator import TextGenerator
 
-    with patch('psy_supabase.core.text_generator.AutoModelForCausalLM.from_pretrained',
-              return_value=mock_model), \
-         patch('psy_supabase.core.text_generator.AutoTokenizer.from_pretrained',
-               return_value=mock_tokenizer), \
-         patch('psy_supabase.core.text_generator.Detoxify') as mock_detoxify:
+    with patch("psy_supabase.core.text_generator.AutoModelForCausalLM.from_pretrained", return_value=mock_model), patch(
+        "psy_supabase.core.text_generator.AutoTokenizer.from_pretrained", return_value=mock_tokenizer
+    ), patch("psy_supabase.core.text_generator.Detoxify") as mock_detoxify:
 
         mock_detoxify_instance = Mock()
         mock_detoxify_instance.predict.return_value = {"toxicity": 0.1}
         mock_detoxify.return_value = mock_detoxify_instance
 
-        generator = TextGenerator(
-            model_name="test-model",
-            device="cpu"
-        )
+        generator = TextGenerator(model_name="test-model", device="cpu")
 
         # Apply all our testing setup in one go
         setup_text_generator_for_testing(generator)
@@ -411,6 +423,7 @@ def text_generator(mock_model, mock_tokenizer):
 
         yield generator
 
+
 # Create test_templates directory if it doesn't exist
 @pytest.fixture(scope="session", autouse=True)
 def ensure_test_templates_dir():
@@ -419,8 +432,9 @@ def ensure_test_templates_dir():
     if not os.path.exists(test_templates_dir):
         os.makedirs(test_templates_dir)
         # Create a basic test template
-        with open(os.path.join(test_templates_dir, "test_template.j2"), "w") as f:
-            f.write("You are a therapeutic assistant. Please respond to: {{user_question}}")
+        with open(os.path.join(test_templates_dir, "test_template.j2"), mode="w", encoding="utf-8") as f:
+            f.write("You are a therapeutic assistant. Please respond to: {{ user_question }}")
+
 
 # rag processor
 @pytest.fixture
@@ -429,8 +443,9 @@ def mock_conversation_history():
     # Use a real list, not a Mock object
     return [
         {"role": "user", "content": "How do I manage anxiety?"},
-        {"role": "assistant", "content": "Deep breathing can help with anxiety."}
+        {"role": "assistant", "content": "Deep breathing can help with anxiety."},
     ]
+
 
 @pytest.fixture
 def mock_db_manager():
@@ -442,8 +457,9 @@ def mock_db_manager():
 
     # Wrap the save_interaction mock to record contexts
     original_save = manager.save_interaction
+
     def save_wrapper(*args, **kwargs):
-        context = kwargs.get('context', 'unknown')
+        context = kwargs.get("context", "unknown")
         manager.saved_contexts.append(context)
         print(f"Saving with context: {context}")
         return original_save(*args, **kwargs)
@@ -452,99 +468,123 @@ def mock_db_manager():
 
     return manager
 
+
 @pytest.fixture
 def silent_mock_db_manager():
     """Create a mock DatabaseManager that never produces warnings."""
     from psy_supabase.core.database import DatabaseManager
+
     manager = Mock(spec=DatabaseManager)
+    manager.schema_name = "public"
 
     # Create pain point data (same as in mock_db_manager)
     pain_points = {
-        'anxiety': {'detected': True, 'id': 'anx1', 'name': 'Anxiety', 'similarity': 0.85,
-                   'suggested_approach': {'approach_type': 'anxiety_exploration'}},
-        'depression': {'detected': True, 'id': 'dep1', 'name': 'Depression', 'similarity': 0.82,
-                     'suggested_approach': {'approach_type': 'depression_cbt'}},
-        'sleep': {'detected': True, 'id': 'slp1', 'name': 'Sleep Disorder', 'similarity': 0.78,
-                'suggested_approach': {'approach_type': 'sleep_hygiene'}},
-        'relationship': {'detected': True, 'id': 'rel1', 'name': 'Relationship Issues',
-                       'similarity': 0.76,
-                       'suggested_approach': {'approach_type': 'relationship_support'}},
-        'none': {'detected': False}
+        "anxiety": {
+            "detected": True,
+            "id": "anx1",
+            "name": "anxiety",
+            "similarity": 0.85,
+            "suggested_approach": {"approach_type": "anxiety_exploration"},
+        },
+        "depression": {
+            "detected": True,
+            "id": "dep1",
+            "name": "depression",
+            "similarity": 0.82,
+            "suggested_approach": {"approach_type": "depression"},
+        },
+        "sleep": {
+            "detected": True,
+            "id": "slp1",
+            "name": "Sleep Disorder",
+            "similarity": 0.78,
+            "suggested_approach": {"approach_type": "sleep_hygiene"},
+        },
+        "relationship": {
+            "detected": True,
+            "id": "rel1",
+            "name": "relationship_issues",
+            "similarity": 0.76,
+            "suggested_approach": {"approach_type": "relationship_support"},
+        },
+        "none": {"detected": False},
     }
 
-    # CRITICAL: No exceptions, just return valid values
-    manager.identify_potential_pain_points.return_value = pain_points['anxiety']
+    manager.identify_potential_pain_points.return_value = pain_points["anxiety"]
 
     # Always return True to prevent save_interaction warnings
     manager.save_interaction.return_value = True
 
+    manager.get_semantic_memories = MagicMock(return_value=[])
+
     # Configure conversation history
     manager.get_conversation_history.return_value = [
         {"role": "user", "content": "I've been feeling really down lately"},
-        {"role": "assistant", "content": "I'm sorry to hear you're feeling down."}
+        {"role": "assistant", "content": "I'm sorry to hear you're feeling down."},
     ]
 
     return manager
 
+
 @pytest.fixture
 def mock_text_generator():
-    """Create a mock TextGenerator for testing."""
-    generator = MagicMock()
+    """Mock TextGenerator for testing."""
+    from psy_supabase.core.text_generator import TextGenerator
 
-    # Make generate_text return something meaningful
-    generator.generate_text.return_value = "This is a helpful therapeutic response."
+    generator = MagicMock(spec=TextGenerator)
 
-    # Add a render_template method that works with mocks
-    def render_template(template_name, context):
-        # Return a simple response based on template and context
-        topics = context.get('extracted_topics', ['general'])
-        return f"Rendering template {template_name} with topics: {', '.join(topics)}"
-
-    generator.render_template = render_template
+    # Use only methods that actually exist in TextGenerator
+    generator.generate_text.return_value = "Response"
+    generator.generate_therapeutic_response.return_value = "Response"
+    generator.generate_therapeutic_response_with_dynamic_retrieval.return_value = "Response"
+    generator.is_toxic.return_value = False
 
     return generator
+
 
 @pytest.fixture
 def mock_dynamic_retriever():
     """Create a mock DynamicRetriever that's configurable for different test cases."""
-    from unittest.mock import MagicMock
 
     retriever = MagicMock()
 
     # Define query_knowledge to return test-specific data
     def query_knowledge(topic, limit=None):
         if topic == "test_topic":
+            return [{"id": 1, "content": "Test topic knowledge content", "similarity": 0.95}]
+        if topic == "anxiety":
             return [
-                {"id": 1, "content": "Test topic knowledge content", "similarity": 0.95}
+                {
+                    "id": 1,
+                    "content": "anxiety symptoms include racing thoughts and physical tension.",
+                    "similarity": 0.95,
+                },
+                {"id": 2, "content": "Common anxiety treatments include cbt and mindfulness.", "similarity": 0.88},
             ]
-        elif topic == "anxiety":
-            return [
-                {"id": 1, "content": "Anxiety symptoms include racing thoughts and physical tension.", "similarity": 0.95},
-                {"id": 2, "content": "Common anxiety treatments include CBT and mindfulness.", "similarity": 0.88}
-            ]
-        elif topic == "empty_topic":
+        if topic == "empty_topic":
             return []
-        else:
-            return [
-                {"id": 1, "content": f"Information about {topic}.", "similarity": 0.95},
-                {"id": 2, "content": f"Additional details about {topic}.", "similarity": 0.85}
-            ]
+        return [
+            {"id": 1, "content": f"Information about {topic}.", "similarity": 0.95},
+            {"id": 2, "content": f"Additional details about {topic}.", "similarity": 0.85},
+        ]
 
     retriever.query_knowledge = query_knowledge
 
     return retriever
+
 
 @pytest.fixture
 def setup_safe_context():
     """Setup safe context for template rendering in tests."""
     # Return a dictionary with safe mock objects
     return {
-        'dynamic_retriever': mock_dynamic_retriever(),
-        'extracted_topics': ['depression', 'anxiety'],
-        'use_dynamic_retrieval': True,
-        'user_question': 'I feel sad',
-        'pre_retrieved_info': {'depression': 'Information about depression.'}
+        "dynamic_retriever": mock_dynamic_retriever(),
+        "extracted_topics": ["depression", "anxiety"],
+        "use_dynamic_retrieval": True,
+        "user_question": "I feel sad",
+        "pre_retrieved_info": {"depression": "Information about depression."},
     }
+
 
 @pytest.fixture
 def mock_embedding_provider():
@@ -556,8 +596,9 @@ def mock_embedding_provider():
     mock.generate_embedding.return_value = [0.1] * 2048  # Mock embedding vector
     return mock
 
+
 @pytest.fixture
-def rag_processor(mock_db_manager, mock_text_generator):
+def rag_processor(mock_db_manager, mock_text_generator):  # pylint: disable=redefined-outer-name
     """Create a RAGProcessor with proper mocks."""
     from psy_supabase.core.rag_processor import RAGProcessor
 
@@ -568,22 +609,13 @@ def rag_processor(mock_db_manager, mock_text_generator):
 
     # Create a proper prompt_selector with real return values
     mock_prompt_selector = Mock()
-    mock_prompt_selector.analyze_question.return_value = {
-        'topic': 'anxiety',
-        'emotion': 'worried'
-    }
-    mock_prompt_selector.generate_category_info.return_value = {
-        'Anxiety Management': 0.9,
-        'Information': 0.5
-    }
+    mock_prompt_selector.analyze_question.return_value = {"topic": "anxiety", "emotion": "worried"}
+    mock_prompt_selector.generate_category_info.return_value = {"anxiety": 0.9, "information": 0.5}
 
-    # CRITICAL: Patch the EmbeddingProviderAdapter class to avoid real initialization
-    with patch('psy_supabase.core.rag_processor.EmbeddingProviderAdapter', return_value=mock_embedding_provider):
+    # Patch the EmbeddingProviderAdapter class to avoid real initialization
+    with patch("psy_supabase.core.rag_processor.EmbeddingProviderAdapter", return_value=mock_embedding_provider):
         # Create the processor with the generator parameter (not text_generator)
-        processor = RAGProcessor(
-            db_manager=mock_db_manager,
-            generator=mock_text_generator
-        )
+        processor = RAGProcessor(db_manager=mock_db_manager, generator=mock_text_generator)
 
         # Override the automatically created prompt_selector with our controlled mock
         processor.prompt_selector = mock_prompt_selector
@@ -593,63 +625,65 @@ def rag_processor(mock_db_manager, mock_text_generator):
 
         return processor
 
+
 # Specifically for dynamic retriever test, we need a clean mock without exceptions
 @pytest.fixture
 def clean_mock_db_manager():
     """Create a mock DatabaseManager that never raises exceptions."""
     from psy_supabase.core.database import DatabaseManager
+
     manager = Mock(spec=DatabaseManager)
 
     # Always return a valid pain point
     manager.identify_potential_pain_points.return_value = {
-        'detected': True,
-        'similarity': 0.85,
-        'suggested_approach': {'approach_type': 'anxiety_exploration'}
+        "detected": True,
+        "similarity": 0.85,
+        "suggested_approach": {"approach_type": "anxiety_exploration"},
     }
 
     return manager
 
+
 @pytest.fixture
 def mock_db_manager_with_test_values():
     """Create a mock DB manager with specific return values for each test."""
-    from unittest.mock import MagicMock
-
     manager = MagicMock()
 
     # Create a dictionary to store test-specific document responses
     test_documents = {
-        'test_get_relevant_documents': [
+        "test_get_relevant_documents": [
             {"id": 1, "content": "Document 1", "similarity": 0.95},
-            {"id": 2, "content": "Document 2", "similarity": 0.85}
+            {"id": 2, "content": "Document 2", "similarity": 0.85},
         ],
-        'test_enhance_context': [
-            {"id": 1, "content": "Anxiety management techniques include deep breathing.", "similarity": 0.95},
-            {"id": 2, "content": "CBT is effective for anxiety disorders.", "similarity": 0.85}
+        "test_enhance_context": [
+            {"id": 1, "content": "anxiety management techniques include deep breathing.", "similarity": 0.95},
+            {"id": 2, "content": "cbt is effective for anxiety disorders.", "similarity": 0.85},
         ],
-        'test_empty': []
+        "test_empty": [],
     }
 
     # Configure find_similar_documents to use the test name to select the right response
     def find_similar_documents_mock(embedding=None, query=None, limit=None, **kwargs):
         # For test_get_relevant_documents
-        if getattr(find_similar_documents_mock, 'test_name', None) == 'test_get_relevant_documents':
-            return test_documents['test_get_relevant_documents']
+        if getattr(find_similar_documents_mock, "test_name", None) == "test_get_relevant_documents":
+            return test_documents["test_get_relevant_documents"]
         # For test_enhance_context_with_relevant_documents
-        elif getattr(find_similar_documents_mock, 'test_name', None) == 'test_enhance_context':
-            return test_documents['test_enhance_context']
+        if getattr(find_similar_documents_mock, "test_name", None) == "test_enhance_context":
+            return test_documents["test_enhance_context"]
         # For test_enhance_context_with_no_documents
-        elif getattr(find_similar_documents_mock, 'test_name', None) == 'test_empty':
-            return test_documents['test_empty']
+        if getattr(find_similar_documents_mock, "test_name", None) == "test_empty":
+            return test_documents["test_empty"]
         # Default fallback
-        return test_documents['test_get_relevant_documents']
+        return test_documents["test_get_relevant_documents"]
 
     # Attach the find_similar_documents_mock function to the manager mock
     manager.find_similar_documents = find_similar_documents_mock
 
     return manager
 
+
 @pytest.fixture
-def non_toxic_rag_processor(mock_db_manager_with_spy, mock_text_generator):
+def non_toxic_rag_processor(mock_db_manager_with_spy, mock_text_generator):  # pylint: disable=redefined-outer-name
     """Create a RAG processor that won't detect toxicity."""
     from psy_supabase.core.rag_processor import RAGProcessor
 
@@ -657,21 +691,18 @@ def non_toxic_rag_processor(mock_db_manager_with_spy, mock_text_generator):
     mock_text_generator.is_toxic.return_value = False
 
     # Create the processor
-    processor = RAGProcessor(
-        db_manager=mock_db_manager_with_spy,
-        generator=mock_text_generator
-    )
+    processor = RAGProcessor(db_manager=mock_db_manager_with_spy, generator=mock_text_generator)
 
-    # Patch the response_generator
-    processor.response_generator.check_toxic_content = lambda text, session_id: None
+    # Patch the response_generator if it exists and has the method
+    if hasattr(processor, "response_generator") and hasattr(processor.response_generator, "check_toxic_content"):
+        processor.response_generator.check_toxic_content = lambda text, session_id: None
 
     return processor
+
 
 @pytest.fixture
 def mock_db_manager_with_spy():
     """Create a mock DatabaseManager with spy for save_interaction."""
-    from unittest.mock import MagicMock
-
     # Create a proper MagicMock (not a function)
     mock_db = MagicMock()
 
@@ -681,7 +712,9 @@ def mock_db_manager_with_spy():
 
     # Set it on the mock_db
     mock_db.save_interaction = save_mock
-
+    mock_db.find_similar_documents = MagicMock(return_value=[])
+    # Also make sure get_conversation_history returns a list
+    mock_db.get_conversation_history = MagicMock(return_value=[])
     # Storage for last values
     mock_db._last_context = None
     mock_db._last_metadata = None
@@ -691,8 +724,8 @@ def mock_db_manager_with_spy():
         if not save_mock.call_args:
             return None
         args, kwargs = save_mock.call_args
-        if 'context' in kwargs:
-            return kwargs['context']
+        if "context" in kwargs:
+            return kwargs["context"]
         return args[0] if args else None
 
     def get_last_metadata():
@@ -700,8 +733,8 @@ def mock_db_manager_with_spy():
         if not save_mock.call_args:
             return None
         args, kwargs = save_mock.call_args
-        if 'metadata' in kwargs:
-            return kwargs['metadata']
+        if "metadata" in kwargs:
+            return kwargs["metadata"]
         return args[3] if len(args) > 3 else None
 
     # Add helper methods
@@ -709,18 +742,16 @@ def mock_db_manager_with_spy():
     mock_db.get_last_metadata = get_last_metadata
 
     # For pain point tests
-    mock_db.identify_potential_pain_points.return_value = {
-        'detected': False,
-        'similarity': 0.5,
-        'topic': 'general'
-    }
+    mock_db.identify_potential_pain_points.return_value = {"detected": False, "similarity": 0.5, "topic": DEFAULT_TOPIC}
 
     return mock_db
+
 
 @pytest.fixture(scope="session", autouse=True)
 def manage_gpu_for_test_suite():
     """Setup and teardown GPU resources for entire test suite."""
     from psy_supabase.core.model_manager import ModelManager
+
     # Before tests, ensure clean state
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -730,12 +761,10 @@ def manage_gpu_for_test_suite():
 
     # After all tests, clean up model manager singleton
     # and prevent CUDA memory fragmenting
-    if hasattr(ModelManager, '_instance') and ModelManager._instance is not None:
+    if hasattr(ModelManager, "_instance") and ModelManager._instance is not None:
         ModelManager._instance.move_to_cpu()
         ModelManager._instance = None
 
-    # Force garbage collection and CUDA cleanup
-    import gc
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

@@ -1,0 +1,7 @@
+.PHONY: doc doc-clean
+
+doc:
+    cd docs && make html
+
+doc-clean:
+    cd docs && make clean

@@ -1,8 +1,10 @@
-import unittest
-from unittest.mock import patch, MagicMock
-from tests.helpers.database_test_base import DatabaseTestBase
+"""Test suite for handling database error cases gracefully."""
+
 import logging
-from psy_supabase.core.database import DatabaseManager
+from unittest.mock import patch
+
+from tests.helpers.database_test_base import DatabaseTestBase
+
 
 class TestDatabaseErrorHandling(DatabaseTestBase):
     """Test suite for handling database error cases gracefully."""
@@ -20,17 +22,15 @@ class TestDatabaseErrorHandling(DatabaseTestBase):
     def test_analyze_emotional_response_handles_list_format(self):
         """Test that analyze_emotional_response_to_interaction handles list-formatted data."""
         # Mock get_conversation_history to return a list instead of a dictionary
-        with patch.object(self.db_manager, 'get_conversation_history') as mock_get_history:
+        with patch.object(self.db_manager, "get_conversation_history") as mock_get_history:
             # The conversation history returned as list format instead of dict
             mock_get_history.return_value = [
                 [1, "How are you feeling today?", "I'm feeling pretty good.", "2025-04-07T19:19:23Z"],
-                [2, "What if they will fire me...", "That sounds challenging.", "2025-04-07T19:21:50Z"]
+                [2, "What if they will fire me...", "That sounds challenging.", "2025-04-07T19:21:50Z"],
             ]
 
             # Call the method that should handle this case without errors
-            result = self.db_manager.analyze_emotional_response_to_interaction(
-                "test_session_id", 2
-            )
+            result = self.db_manager.analyze_emotional_response_to_interaction("test_session_id", 2)
 
             # The method should return a default response rather than raising an error
             self.assertIsInstance(result, dict)
@@ -40,26 +40,24 @@ class TestDatabaseErrorHandling(DatabaseTestBase):
     def test_analyze_emotional_response_handles_dict_format(self):
         """Test that analyze_emotional_response_to_interaction handles dictionary-formatted data."""
         # Mock get_conversation_history to return proper dictionaries
-        with patch.object(self.db_manager, 'get_conversation_history') as mock_get_history:
+        with patch.object(self.db_manager, "get_conversation_history") as mock_get_history:
             mock_get_history.return_value = [
                 {
                     "id": 1,
                     "question": "How are you feeling today?",
                     "response": "I'm feeling pretty good.",
-                    "timestamp": "2025-04-07T19:19:23Z"
+                    "timestamp": "2025-04-07T19:19:23Z",
                 },
                 {
                     "id": 2,
                     "question": "What if they will fire me...",
                     "response": "That sounds challenging.",
-                    "timestamp": "2025-04-07T19:21:50Z"
-                }
+                    "timestamp": "2025-04-07T19:21:50Z",
+                },
             ]
 
             # Call the method with the proper format
-            result = self.db_manager.analyze_emotional_response_to_interaction(
-                "test_session_id", 2
-            )
+            result = self.db_manager.analyze_emotional_response_to_interaction("test_session_id", 2)
 
             # The method should process this format correctly
             self.assertIsInstance(result, dict)
@@ -73,13 +71,14 @@ class TestDatabaseErrorHandling(DatabaseTestBase):
 
         # Print the method source code if possible
         import inspect
+
         try:
             print(inspect.getsource(self.db_manager.analyze_emotional_response_to_interaction))
         except:
             print("Could not retrieve source code")
 
         # Test with a simple mock
-        with patch.object(self.db_manager, 'get_conversation_history') as mock_get_history:
+        with patch.object(self.db_manager, "get_conversation_history") as mock_get_history:
             mock_get_history.return_value = [{"id": 1, "response": "Test response"}]
 
             # Call and inspect the result

@@ -1,22 +1,30 @@
 import os
-import sys
 import time
 import uuid
+
 from dotenv import load_dotenv
+from prismalog.config import LoggingConfig
+from prismalog.log import get_logger
 
-# Add project root to Python path
-sys.path.insert(0, os.path.abspath('.'))
-
-# Load environment variables
-load_dotenv()
-from school_logging.log import ColoredLogger
 from psy_supabase.core.database import DatabaseManager
+from psy_supabase.utilities.common import is_github_actions
 
-logger = ColoredLogger(__name__)
+config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+LoggingConfig.initialize(config_file=config_path)
+
+logger = get_logger(__name__)
+
+if not is_github_actions():
+    from dotenv import load_dotenv
+
+    load_dotenv()  # Load environment variables from .env file
+    logger.info("Local development: Loading environment from .env file")
+else:
+    logger.info("CI environment: Using GitHub secrets")
 
 
-def main():
-    """Debug and fix database issues with session_id."""
+def main() -> None:
+    """Debug database issues with session_id."""
     # Create test IDs
     test_user_id = f"test_debug_{uuid.uuid4().hex[:8]}"
     test_session_id = f"debug_session_{uuid.uuid4().hex[:8]}"
@@ -25,53 +33,61 @@ def main():
     logger.info("Test session ID: %s", test_session_id)
 
     # Initialize DatabaseManager
-    supabase_url = os.getenv('SUPABASE_URL')
-    supabase_key = os.getenv('SUPABASE_KEY')
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
 
-    db_manager = DatabaseManager(
-        supabase_url=supabase_url,
-        supabase_key=supabase_key,
-        user_id=test_user_id
-    )
+    assert supabase_url is not None, "Supabase URL must be set"
+    assert supabase_key is not None, "Supabase Key must be set"
+
+    db_manager = DatabaseManager(supabase_url=supabase_url, supabase_key=supabase_key, user_id=test_user_id)
 
     # Step 1: Create schema and verify
     logger.info("Step 1: Creating schema and verifying")
     db_manager.create_user_schema_sync()
 
     # Verify schema exists
-    check_query = """
+    check_query = (
+        """
     SELECT EXISTS (
         SELECT FROM information_schema.schemata
         WHERE schema_name = '%s'
     );
-    """ % db_manager.schema_name
-    check_response = db_manager.supabase.rpc('sql', {'command': check_query}).execute()
+    """
+        % db_manager.schema_name
+    )
+    check_response = db_manager.supabase.rpc("sql", {"command": check_query}).execute()
     logger.info("Schema exists: %s", check_response.data)
 
     # Step 2: Verify tables
     logger.info("Step 2: Checking tables")
-    tables_query = """
+    tables_query = (
+        """
     SELECT string_agg(table_name, ', ')
     FROM information_schema.tables
     WHERE table_schema = '%s'
     AND table_type = 'BASE TABLE';
-    """ % db_manager.schema_name
-    tables_response = db_manager.supabase.rpc('sql', {'command': tables_query}).execute()
+    """
+        % db_manager.schema_name
+    )
+    tables_response = db_manager.supabase.rpc("sql", {"command": tables_query}).execute()
     logger.info("Tables in schema %s: %s", db_manager.schema_name, tables_response.data)
 
     # Step 3: Check columns in interactions table
     logger.info("Step 3: Checking table structure")
-    columns_query = """
+    columns_query = (
+        """
     SELECT string_agg(column_name, ', ')
     FROM information_schema.columns
     WHERE table_schema = '%s'
     AND table_name = 'interactions';
-    """ % db_manager.schema_name
-    columns_response = db_manager.supabase.rpc('sql', {'command': columns_query}).execute()
+    """
+        % db_manager.schema_name
+    )
+    columns_response = db_manager.supabase.rpc("sql", {"command": columns_query}).execute()
     logger.info("Columns in %s.interactions: %s", db_manager.schema_name, columns_response.data)
 
     # If session_id column is missing, add it
-    if 'session_id' not in str(columns_response.data).lower():
+    if "session_id" not in str(columns_response.data).lower():
         logger.warning("session_id column missing, adding it")
         add_column_query = """
         ALTER TABLE "%s".interactions
@@ -79,8 +95,12 @@ def main():
 
         CREATE INDEX IF NOT EXISTS idx_%s_session_id
         ON "%s".interactions(session_id);
-        """ % (db_manager.schema_name, db_manager.schema_name, db_manager.schema_name)
-        db_manager.supabase.rpc('sql', {'command': add_column_query}).execute()
+        """ % (
+            db_manager.schema_name,
+            db_manager.schema_name,
+            db_manager.schema_name,
+        )
+        db_manager.supabase.rpc("sql", {"command": add_column_query}).execute()
 
     # Step 4: Direct SQL insertion to verify column
     logger.info("Step 4: Adding test interaction directly")
@@ -95,16 +115,20 @@ def main():
      '{"topic": "debug", "session_id": "%s"}',
      '%s')
     RETURNING "interaction_id";
-    """ % (db_manager.schema_name, test_session_id, test_session_id)
+    """ % (
+        db_manager.schema_name,
+        test_session_id,
+        test_session_id,
+    )
 
     try:
-        insert_response = db_manager.supabase.rpc('sql', {'command': insert_query}).execute()
+        insert_response = db_manager.supabase.rpc("sql", {"command": insert_query}).execute()
         logger.info("Insert response: %s", insert_response.data)
     except Exception as e:
         logger.info("Insert response: %s", str(e))
 
         try:
-            insert_response = db_manager.supabase.rpc('sql', {'command': insert_query}).execute()
+            insert_response = db_manager.supabase.rpc("sql", {"command": insert_query}).execute()
             logger.info("Insert with lowercase: %s", insert_response.data)
         except Exception as e:
             logger.info("Insert with lowercase failed: %s", str(e))
@@ -120,10 +144,14 @@ def main():
     SELECT * FROM "%s".interactions
     WHERE session_id = '%s'
     OR metadata->>'session_id' = '%s';
-    """ % (db_manager.schema_name, test_session_id, test_session_id)
+    """ % (
+        db_manager.schema_name,
+        test_session_id,
+        test_session_id,
+    )
 
     try:
-        history_response = db_manager.supabase.rpc('sql', {'command': history_query}).execute()
+        history_response = db_manager.supabase.rpc("sql", {"command": history_query}).execute()
         logger.info("Query response: %s", history_response.data)
     except Exception as e:
         logger.warning("Query response: %s", str(e))
@@ -135,7 +163,7 @@ def main():
         question="Debug question via method?",
         answer="Debug answer via method",
         metadata={"topic": "debug", "source": "method"},
-        session_id=test_session_id
+        session_id=test_session_id,
     )
 
     logger.info("save_interaction result: %s", result)
@@ -155,11 +183,15 @@ def main():
 
     # Step 8: Clean up
     logger.info("Step 8: Cleaning up")
-    cleanup_query = """
+    cleanup_query = (
+        """
     DROP SCHEMA IF EXISTS "%s" CASCADE;
-    """ % db_manager.schema_name
-    db_manager.supabase.rpc('sql', {'command': cleanup_query}).execute()
+    """
+        % db_manager.schema_name
+    )
+    db_manager.supabase.rpc("sql", {"command": cleanup_query}).execute()
     logger.info("Schema %s dropped", db_manager.schema_name)
+
 
 if __name__ == "__main__":
     main()

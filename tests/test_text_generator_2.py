@@ -1,17 +1,21 @@
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import torch
-import json
+""" Test suite for the TextGenerator class. """
+
 import os
 import types
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+import torch
 from jinja2 import Template
-from tests.conftest import mock_model, mock_tokenizer, text_generator
+
 from psy_supabase.core.text_generator import TextGenerator
+from tests.conftest import DEFAULT_TOPIC, mock_model, mock_tokenizer, text_generator
 
 # Create test_templates directory if it doesn't exist
 test_templates_dir = os.path.join(os.path.dirname(__file__), "test_templates")
 if not os.path.exists(test_templates_dir):
     os.makedirs(test_templates_dir)
+
 
 class TestTherapeuticResponse:
     """Test suite for the generate_therapeutic_response method in TextGenerator."""
@@ -31,9 +35,9 @@ class TestTherapeuticResponse:
         """Test that emotion analysis is performed and added to the context."""
         # Mock prompt selector with emotions
         text_generator.prompt_selector.analyze_question.return_value = {
-            'topic': 'grief',
-            'emotion': 'sad',
-            'confidence': 0.85
+            "topic": "grief",
+            "emotion": "sad",
+            "confidence": 0.85,
         }
 
         # Create a template that includes psychological context
@@ -43,7 +47,7 @@ class TestTherapeuticResponse:
             "I'm here to support you during this difficult time."
         )
 
-        with patch.object(text_generator, '_load_template', return_value=emotional_template):
+        with patch.object(text_generator, "_load_template", return_value=emotional_template):
             # Override generate_text to return the actual template rendering
             original_generate_text = text_generator.generate_text
 
@@ -57,13 +61,11 @@ class TestTherapeuticResponse:
             try:
                 # Call the method with a sad question
                 result = text_generator.generate_therapeutic_response(
-                    "I'm feeling sad about my loss",
-                    "test_template",
-                    {'user_question': "I'm feeling sad about my loss"}
+                    "I'm feeling sad about my loss", "test_template", {"user_question": "I'm feeling sad about my loss"}
                 )
 
                 # Check that emotion info is in the response
-                assert 'Topic: grief, Emotion: sad' in result
+                assert "Topic: grief, Emotion: sad" in result
 
             finally:
                 # Restore original function
@@ -73,30 +75,25 @@ class TestTherapeuticResponse:
         """Test that category information is added to the context."""
         # Mock analyze_question
         text_generator.prompt_selector.analyze_question.return_value = {
-            'topic': 'anxiety',
-            'emotion': 'worried',
-            'confidence': 0.78
+            "topic": "anxiety",
+            "emotion": "worried",
+            "confidence": 0.78,
         }
 
         # Mock generate_category_info
-        category_dict = {
-            'Anxiety Management': 0.85,
-            'Stress Reduction': 0.75
-        }
-        text_generator.prompt_selector.generate_category_info = Mock(
-            return_value=category_dict
-        )
+        category_dict = {"anxiety": 0.85, "stress_reduction": 0.75}
+        text_generator.prompt_selector.generate_category_info = Mock(return_value=category_dict)
 
         # IMPORTANT: Create a pre-populated context with categories already set
         # This is what was missing before
         context = {
-            'user_question': "I'm worried about my upcoming exam",
-            'psychological_context': {
-                'topic': 'anxiety',
-                'emotion': 'worried',
-                'confidence': 0.78,
-                'categories': list(category_dict.keys())  # EXPLICITLY set categories
-            }
+            "user_question": "I'm worried about my upcoming exam",
+            "psychological_context": {
+                "topic": "anxiety",
+                "emotion": "worried",
+                "confidence": 0.78,
+                "categories": list(category_dict.keys()),  # EXPLICITLY set categories
+            },
         }
 
         # Create template with categories
@@ -105,7 +102,7 @@ class TestTherapeuticResponse:
             "I'm here to support you with anxiety management techniques."
         )
 
-        with patch.object(text_generator, '_load_template', return_value=category_template):
+        with patch.object(text_generator, "_load_template", return_value=category_template):
             # Override generate_text to return the actual template rendering
             original_generate_text = text_generator.generate_text
             text_generator.generate_text = lambda prompt, **kwargs: prompt
@@ -113,13 +110,11 @@ class TestTherapeuticResponse:
             try:
                 # Call the method with our PRE-POPULATED context
                 result = text_generator.generate_therapeutic_response(
-                    "I'm worried about my upcoming exam",
-                    "test_template",
-                    context  # Use our pre-populated context
+                    "I'm worried about my upcoming exam", "test_template", context  # Use our pre-populated context
                 )
 
                 # Check that category info is in the response
-                assert 'Categories: Anxiety Management, Stress Reduction' in result
+                assert "Categories: anxiety, stress_reduction" in result
             finally:
                 text_generator.generate_text = original_generate_text
 
@@ -152,24 +147,26 @@ class TestTherapeuticResponse:
         print(f"Actual response: {response}")
 
         # Assert
-        assert 'Previous question: How can I improve my relationship?' in response
+        assert "Previous question: How can I improve my relationship?" in response
 
     def test_short_response_handling(self, text_generator):
         """Test handling of short responses with retry."""
         # Mock emotion analysis
         text_generator.prompt_selector.analyze_question.return_value = {
-            'topic': 'general',
-            'emotion': 'neutral',
-            'confidence': 0.5
+            "topic": DEFAULT_TOPIC,
+            "emotion": "neutral",
+            "confidence": 0.5,
         }
 
         # Mock template
         mock_template = Template("Basic template")
 
         # First, add the method if it doesn't exist
-        if not hasattr(text_generator, '_is_response_too_short'):
+        if not hasattr(text_generator, "_is_response_too_short"):
+
             def _is_response_too_short(self, response):
                 return len(response) < 20  # Basic implementation
+
             text_generator._is_response_too_short = types.MethodType(_is_response_too_short, text_generator)
 
         # Test two responses
@@ -184,8 +181,7 @@ class TestTherapeuticResponse:
         # automatic retry behavior
 
     @pytest.mark.skipif(
-        not torch.cuda.is_available() or os.environ.get('GITHUB_ACTIONS') == 'true',
-        reason="CUDA not available"
+        not torch.cuda.is_available() or os.environ.get("GITHUB_ACTIONS") == "true", reason="CUDA not available"
     )
     def test_memory_optimization_for_gpu(self, text_generator):
         """Test memory optimization when using GPU."""
@@ -196,9 +192,7 @@ class TestTherapeuticResponse:
         # Without trying to check internal implementation details
         try:
             result = text_generator.generate_therapeutic_response(
-                "GPU test question",
-                "test_template",
-                {'user_question': "GPU test question"}
+                "GPU test question", "test_template", {"user_question": "GPU test question"}
             )
 
             # Just verify we got some kind of result
@@ -226,9 +220,9 @@ class TestTherapeuticResponse:
         """Test with additional debugging to locate the issue."""
         # Mock emotion analysis result
         text_generator.prompt_selector.analyze_question.return_value = {
-            'topic': 'grief',
-            'emotion': 'sad',
-            'confidence': 0.85
+            "topic": "grief",
+            "emotion": "sad",
+            "confidence": 0.85,
         }
 
         # Mock template
@@ -236,18 +230,18 @@ class TestTherapeuticResponse:
 
         # Test with exception capture to identify the specific error
         try:
-            with patch.object(text_generator, '_load_template', return_value=mock_template), \
-                 patch.object(text_generator, 'generate_text', return_value="Generated response"):
+            with patch.object(text_generator, "_load_template", return_value=mock_template), patch.object(
+                text_generator, "generate_text", return_value="Generated response"
+            ):
 
                 result = text_generator.generate_therapeutic_response(
-                    "I'm feeling sad about my loss",
-                    "test_template",
-                    {'user_question': "I'm feeling sad about my loss"}
+                    "I'm feeling sad about my loss", "test_template", {"user_question": "I'm feeling sad about my loss"}
                 )
                 print(f"RESULT: {result}")
 
         except Exception as e:
             import traceback
+
             print(f"EXCEPTION CAUGHT: {str(e)}")
             traceback.print_exc()
             assert False, f"Test failed with exception: {str(e)}"

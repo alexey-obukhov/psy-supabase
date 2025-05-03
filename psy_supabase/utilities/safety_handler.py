@@ -6,26 +6,29 @@ in user input. It acts as middleware to process queries before they reach the ma
 content is identified and addressed appropriately.
 
 Key Features:
-- **Harmful Content Detection**:
-  - Detects suicide-related, self-harm-related, and violence-related content using regex patterns.
-  - Categorizes harmful content into predefined categories with associated severity levels.
 
-- **Safety Interventions**:
-  - Generates tailored responses for each category of harmful content.
-  - Provides crisis helpline information and encourages users to seek professional help.
+- **Harmful Content Detection**: Detects suicide-related, self-harm-related, and violence-related content
+  using regex patterns. Categorizes harmful content into predefined categories with associated severity levels.
 
-- **Metadata Generation**:
-  - Creates metadata for detected harmful content, including the category, severity, and matched pattern.
-  - Facilitates logging and tracking of safety interventions.
+- **Safety Interventions**: Generates tailored responses for each category of harmful content.
+  Provides crisis helpline information and encourages users to seek professional help.
+
+- **Metadata Generation**: Creates metadata for detected harmful content, including the category,
+  severity, and matched pattern. Facilitates logging and tracking of safety interventions.
 
 Classes:
+
 - `SafetyHandler`: The main class that provides methods for detecting harmful content and generating appropriate responses.
 
 Dependencies:
+
 - `re`: Used for regex-based pattern matching to detect harmful content.
-- `school_logging.log.ColoredLogger`: Provides enhanced logging for debugging and monitoring.
+- `prismalog.log.ColoredLogger`: Provides enhanced logging for debugging and monitoring.
 
 Usage:
+
+.. code-block:: python
+
     from psy_supabase.utilities.safety_handler import SafetyHandler
 
     # Initialize the safety handler
@@ -41,13 +44,23 @@ Usage:
         print("Metadata:", metadata)
     else:
         print("No harmful content detected.")
+
 """
+
 import re
-from typing import Dict, Tuple, Optional
-from school_logging.log import ColoredLogger
+from typing import Callable, Dict, List, Optional, Tuple, TypedDict
+
+from prismalog.log import get_logger
 
 # Set up logging
-logger = ColoredLogger(__name__)
+logger = get_logger(__name__)
+
+
+class SafetyCategoryData(TypedDict):
+    patterns: List[str]
+    severity: str
+    response: Callable[[], str]  # A function that takes no args and returns a string
+
 
 class SafetyHandler:
     """
@@ -55,35 +68,34 @@ class SafetyHandler:
     Acts as middleware to process queries before they reach the RAG system.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize SafetyHandler with detection patterns and response templates."""
-        # Define categories of harmful content
-        self.categories = {
-            'suicide': {
-                'patterns': [
-                    r'(?i)(suicide|kill myself|end my life|take my life|don\'t want to live|want to die)',
-                    r'(?i)(no reason to live|can\'t go on|better off dead|life is too painful)',
-                    r'(?i)(ending it all|my suicide note|planning to end|how to commit suicide)'
+        self.categories: Dict[str, SafetyCategoryData] = {
+            "suicide": {
+                "patterns": [
+                    r"(?i)(suicide|kill myself|end my life|take my life|don\'t want to live|want to die)",
+                    r"(?i)(no reason to live|can\'t go on|better off dead|life is too painful)",
+                    r"(?i)(ending it all|my suicide note|planning to end|how to commit suicide)",
                 ],
-                'severity': 'critical',
-                'response': self._get_suicide_response
+                "severity": "critical",
+                "response": self._get_suicide_response,
             },
-            'self_harm': {
-                'patterns': [
-                    r'(?i)(cut myself|hurt myself|self harm|self-harm|injure myself)',
-                    r'(?i)(burning myself|hitting myself|starve myself)'
+            "self_harm": {
+                "patterns": [
+                    r"(?i)(cut myself|hurt myself|self harm|self-harm|injure myself)",
+                    r"(?i)(burning myself|hitting myself|starve myself)",
                 ],
-                'severity': 'high',
-                'response': self._get_self_harm_response
+                "severity": "high",
+                "response": self._get_self_harm_response,
             },
-            'violence': {
-                'patterns': [
-                    r'(?i)(kill|murder|hurt|attack|bomb|shoot) (someone|people|them|him|her)',
-                    r'(?i)(planning|want|going) to (kill|murder|hurt|attack)'
+            "violence": {
+                "patterns": [
+                    r"(?i)(kill|murder|hurt|attack|bomb|shoot) (someone|people|them|him|her)",
+                    r"(?i)(planning|want|going) to (kill|murder|hurt|attack)",
                 ],
-                'severity': 'high',
-                'response': self._get_violence_response
-            }
+                "severity": "high",
+                "response": self._get_violence_response,
+            },
         }
 
     def process_input(self, user_input: str) -> Tuple[bool, Optional[str], Optional[Dict]]:
@@ -100,19 +112,19 @@ class SafetyHandler:
             - metadata: Dictionary with detection metadata
         """
         for category, data in self.categories.items():
-            for pattern in data['patterns']:
+            for pattern in data["patterns"]:
                 if re.search(pattern, user_input):
                     logger.warning("Detected %s content: '%s'", category, user_input)
 
                     # Get appropriate response
-                    response = data['response']()
+                    response = data["response"]()
 
                     # Create metadata for logging and tracking
                     metadata = {
-                        'detected_category': category,
-                        'severity': data['severity'],
-                        'matched_pattern': pattern,
-                        'response_type': 'safety_intervention'
+                        "detected_category": category,
+                        "severity": data["severity"],
+                        "matched_pattern": pattern,
+                        "response_type": "safety_intervention",
                     }
 
                     return True, response, metadata
