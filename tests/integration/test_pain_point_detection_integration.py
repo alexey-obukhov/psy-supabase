@@ -3,14 +3,16 @@ Integration tests for the pain point detection system.
 These tests focus on the complete flow from user question to response generation
 with real component interactions.
 """
+
 import time
 import uuid
-import pytest
-
-from prismalog.log import get_logger
 from unittest.mock import patch
 
+import pytest
+from prismalog.log import get_logger
+
 logger = get_logger(__name__)
+
 
 class TestPainPointDetectionIntegration:
     """Integration tests for pain point detection."""
@@ -22,27 +24,24 @@ class TestPainPointDetectionIntegration:
         question = "I keep having flashbacks to my car accident from last year"
 
         # PATCH to force trauma detection
-        with patch.object(integration_rag_processor.db_manager, 'identify_potential_pain_points') as mock_pain:
+        with patch.object(integration_rag_processor.db_manager, "identify_potential_pain_points") as mock_pain:
             mock_pain.return_value = {
                 "detected": True,
                 "pain_point_detected": True,
-                "name": "trauma_flashbacks",
+                "name": "flashback",
                 "similarity": 0.95,
                 "suggested_approach": {
-                    "approach_type": "trauma_informed",
+                    "approach_type": "trauma",
                     "guidance_question": "How do these flashbacks affect you?",
-                }
+                },
             }
 
             # Also patch any template mapping
-            with patch('psy_supabase.utilities.utils_mapping.map_approach_to_template') as mock_map:
-                mock_map.return_value = "trauma_informed_therapy"
+            with patch("psy_supabase.utilities.utils_mapping.map_approach_to_template") as mock_map:
+                mock_map.return_value = "trauma"
 
                 # Act
-                response = integration_rag_processor.generate_response(
-                    user_question=question,
-                    session_id=session_id
-                )
+                response = integration_rag_processor.generate_response(user_question=question, session_id=session_id)
 
         # Wait for any async operations
         time.sleep(0.5)
@@ -54,7 +53,7 @@ class TestPainPointDetectionIntegration:
         assert len(history) > 0, "No conversation history saved"
 
         # Get metadata from the saved interaction
-        metadata = history[0].get('metadata', {})
+        metadata = history[0].get("metadata", {})
         if isinstance(metadata, list) and metadata:
             metadata = metadata[0]
 
@@ -63,9 +62,10 @@ class TestPainPointDetectionIntegration:
 
         # Since we patched the pain point detection to explicitly return trauma_informed,
         # we should see that directly in the metadata
-        assert metadata.get('therapeutic_approach') == "trauma_informed" or \
-               metadata.get('template_used') == "trauma_informed_therapy", \
-               "Trauma-related approach was not detected for flashback question"
+        logger.info(f"DEBUG METADATA: {metadata}")
+        assert (
+            metadata.get("therapeutic_approach") == "trauma" or metadata.get("template_used") == "trauma"
+        ), "Trauma-related approach was not detected for flashback question"
 
     def test_anxiety_pain_point_detection(self, integration_rag_processor):
         """Test that anxiety pain points are detected properly."""
@@ -74,7 +74,7 @@ class TestPainPointDetectionIntegration:
         question = "I feel constantly anxious and worried that something bad will happen"
 
         # PATCH to force anxiety detection
-        with patch.object(integration_rag_processor.db_manager, 'identify_potential_pain_points') as mock_pain:
+        with patch.object(integration_rag_processor.db_manager, "identify_potential_pain_points") as mock_pain:
             mock_pain.return_value = {
                 "detected": True,
                 "pain_point_detected": True,
@@ -83,7 +83,7 @@ class TestPainPointDetectionIntegration:
                 "suggested_approach": {
                     "approach_type": "anxiety",
                     "guidance_question": "What triggers your anxiety?",
-                }
+                },
             }
 
             # Also patch the context determination to ensure anxiety is used
@@ -96,10 +96,7 @@ class TestPainPointDetectionIntegration:
             integration_rag_processor.response_generator.determine_final_context = mock_determine_context
 
             # Act
-            response = integration_rag_processor.generate_response(
-                user_question=question,
-                session_id=session_id
-            )
+            response = integration_rag_processor.generate_response(user_question=question, session_id=session_id)
 
             # Restore original method
             integration_rag_processor.response_generator.determine_final_context = original_determine
@@ -114,7 +111,7 @@ class TestPainPointDetectionIntegration:
         assert len(history) > 0, "No conversation history saved"
 
         # Get metadata from the saved interaction
-        metadata = history[0].get('metadata', {})
+        metadata = history[0].get("metadata", {})
         if isinstance(metadata, list) and metadata:
             metadata = metadata[0]
 
@@ -122,16 +119,16 @@ class TestPainPointDetectionIntegration:
         logger.info(f"Retrieved metadata: {metadata}")
 
         # Check for anxiety in context or approach
-        context = metadata.get('context', '')
-        approach = metadata.get('therapeutic_approach', '')
-        template = metadata.get('template_used', '')
+        context = metadata.get("context", "")
+        approach = metadata.get("therapeutic_approach", "")
+        template = metadata.get("template_used", "")
 
         # With our patches, one of these should contain anxiety
-        anxiety_terms = ['anxiety', 'anxious', 'worry']
+        anxiety_terms = ["anxiety", "anxious", "worry"]
         anxiety_detected = (
-            any(term in context.lower() for term in anxiety_terms) or
-            any(term in approach.lower() for term in anxiety_terms) or
-            any(term in template.lower() for term in anxiety_terms)
+            any(term in context.lower() for term in anxiety_terms)
+            or any(term in approach.lower() for term in anxiety_terms)
+            or any(term in template.lower() for term in anxiety_terms)
         )
 
         assert anxiety_detected, "Anxiety was not detected in any of: context, approach, or template"
@@ -158,9 +155,9 @@ class TestPainPointDetectionIntegration:
                 metadata={
                     "pain_point_detected": True,
                     "therapeutic_approach": "depression",
-                    "template_used": "depression_therapy"
+                    "template_used": "depression_therapy",
                 },
-                context="depression"
+                context="depression",
             )
 
             return result
@@ -170,10 +167,7 @@ class TestPainPointDetectionIntegration:
 
         try:
             # Act - call generate_response
-            response = integration_rag_processor.generate_response(
-                user_question=question,
-                session_id=session_id
-            )
+            response = integration_rag_processor.generate_response(user_question=question, session_id=session_id)
 
         finally:
             # Restore original method
@@ -189,14 +183,13 @@ class TestPainPointDetectionIntegration:
         assert len(history) > 0, "No conversation history saved"
 
         # Get metadata
-        metadata = history[0].get('metadata', {})
+        metadata = history[0].get("metadata", {})
         if isinstance(metadata, list) and metadata:
             metadata = metadata[0]
 
         # With our direct override, the template should be exactly what we specified
-        template_used = metadata.get('template_used', '')
+        template_used = metadata.get("template_used", "")
         logger.info(f"Template used: {template_used}")
 
         # Check for exact match from our forced save
-        assert template_used == "depression_therapy", \
-            f"Depression template was not used, got '{template_used}' instead"
+        assert template_used == "depression_therapy", f"Depression template was not used, got '{template_used}' instead"

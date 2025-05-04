@@ -292,25 +292,27 @@ class RAGProcessor:
             )
 
             # Determine final context using ResponseGenerator's method
-            _, updated_metadata = self.response_generator.determine_final_context(
+            context, updated_metadata = self.response_generator.determine_final_context(
                 user_question=user_question,
                 topics_context=topics_context,
                 pain_point_results=pain_point_results,
                 metadata=metadata,
             )
 
-            # Use the updated metadata which now contains proper topic information
+            logger.info("Final context determined: %s", context)
+
             metadata = updated_metadata
+            context_str = context
 
             # Save interaction with metadata including context sources
             # Convert context to string before passing to save_interaction
-            if topics_context is None:
-                context_str = "therapeutic_dialogue"
-            elif isinstance(topics_context, (list, tuple, set)):
-                # Take first item from collection if it exists, otherwise use default
-                context_str = str(next(iter(topics_context), "therapeutic_dialogue"))
-            else:
-                context_str = str(topics_context)
+            # if topics_context is None:
+            #     context_str = "therapeutic_dialogue"
+            # elif isinstance(topics_context, (list, tuple, set)):
+            #     # Take first item from collection if it exists, otherwise use default
+            #     context_str = str(next(iter(topics_context), "therapeutic_dialogue"))
+            # else:
+            #     context_str = str(topics_context)
 
             self.db_manager.save_interaction(
                 question=user_question,
@@ -797,10 +799,9 @@ class RAGProcessor:
                         }
                     )
                 return result
-            else:
-                # pain_point was None
-                logger.warning("No pain point detected (None returned from DB manager)")
-                return default_response
+            # pain_point was None
+            logger.warning("No pain point detected (None returned from DB manager)")
+            return default_response
 
         except Exception as e:
             logger.error("Error in pain point detection: %s", e)

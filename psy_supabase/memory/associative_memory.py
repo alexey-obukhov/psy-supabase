@@ -183,8 +183,7 @@ class AssociativeMemory:
                 cached_result = self.cache[query_text]
                 if isinstance(cached_result, list):
                     return cached_result
-                else:
-                    logger.warning("Cache contained unexpected format for key %s. Re-fetching.", query_text[:50])
+                logger.warning("Cache contained unexpected format for key %s. Re-fetching.", query_text[:50])
 
             if not self.memories:
                 return ["No memories available."]

@@ -2,14 +2,16 @@
 Integration tests for the response generation system.
 Tests the entire pipeline from input to response with real components.
 """
+
 import time
 import uuid
-import pytest
 from unittest.mock import patch
 
+import pytest
 from prismalog.log import get_logger
 
 logger = get_logger(__name__)
+
 
 class TestResponseGenerationIntegration:
     """Integration tests for response generation."""
@@ -33,7 +35,7 @@ class TestResponseGenerationIntegration:
             pain_point_results=pain_point_results,
             query_embedding=query_embedding,
             dynamic_retriever=dynamic_retriever,
-            hot_topics=hot_topics
+            hot_topics=hot_topics,
         )
 
         # Assert that extracted_topics was created from topic
@@ -48,23 +50,23 @@ class TestResponseGenerationIntegration:
                 "user_question": "I feel anxious all the time",
                 "topics_context": {"topic": "anxiety"},
                 "pain_point_results": {},
-                "expected_template": "anxiety"
+                "expected_template": "anxiety",
             },
             {
                 "user_question": "I lost my father recently",
                 "topics_context": {"topic": "grief_loss"},
                 "pain_point_results": {},
-                "expected_template": "grief_support"
+                "expected_template": "grief_support",
             },
             {
                 "user_question": "I'm having relationship problems",
                 "topics_context": {"topic": "relationship_issues"},
                 "pain_point_results": {
                     "pain_point_detected": True,
-                    "suggested_approach": {"approach_type": "interpersonal_therapy"}
+                    "suggested_approach": {"approach_type": "interpersonal_therapy"},
                 },
-                "expected_template": "interpersonal_relationship_therapy"
-            }
+                "expected_template": "interpersonal_relationship_therapy",
+            },
         ]
 
         # Test each case with a completely different approach
@@ -110,7 +112,7 @@ class TestResponseGenerationIntegration:
                     user_question=case["user_question"],
                     session_id=session_id,
                     generation_context={"psychological_context": {"topic": case["topics_context"]["topic"]}},
-                    pain_point_results=case["pain_point_results"]
+                    pain_point_results=case["pain_point_results"],
                 )
 
                 # Assert the template was used via our flag
@@ -128,22 +130,27 @@ class TestResponseGenerationIntegration:
                 "user_question": "I feel depressed",
                 "topics_context": {"topic": "depression"},
                 "pain_point_results": {},
-                "expected_context": "depression"
+                "expected_context": "depression",
             },
             {
                 "user_question": "I'm having panic attacks",
                 "topics_context": {"extracted_topics": ["anxiety"]},
                 "pain_point_results": {},
-                "expected_context": "anxiety"
+                "expected_context": "anxiety",
             },
             {
                 "user_question": "I'm stressed at work",
                 "topics_context": {},
                 "pain_point_results": {
-                    "suggested_approach": {"approach_type": "stress_management"}
+                    "pain_point_detected": True,
+                    "suggested_approach": {"approach_type": "stress_management"},
                 },
-                "expected_contexts": ["stress_management", "stress", "workplace_stress"]  # Allow multiple acceptable values
-            }
+                "expected_contexts": [
+                    "stress_management",
+                    "stress",
+                    "workplace_stress",
+                ],
+            },
         ]
 
         for case in test_cases:
@@ -152,7 +159,7 @@ class TestResponseGenerationIntegration:
                 user_question=case["user_question"],
                 topics_context=case["topics_context"],
                 pain_point_results=case["pain_point_results"],
-                metadata={}
+                metadata={},
             )
 
             logger.info(f"Determined context: {context}")
@@ -160,15 +167,14 @@ class TestResponseGenerationIntegration:
             # Check that the context was determined correctly - using more flexible matching
             if "expected_contexts" in case:
                 # Check if context matches any of the acceptable values
-                context_match = any(expected in context.lower() or context.lower() in expected
-                                  for expected in case["expected_contexts"])
-                assert context_match, \
-                    f"Expected one of {case['expected_contexts']}, got '{context}'"
+                context_match = any(
+                    expected in context.lower() or context.lower() in expected for expected in case["expected_contexts"]
+                )
+                assert context_match, f"Expected one of {case['expected_contexts']}, got '{context}'"
             else:
                 # Use original single expected_context check
                 expected = case.get("expected_context", "")
-                assert expected in context.lower(), \
-                    f"Expected '{expected}' in context, got '{context}'"
+                assert expected in context.lower(), f"Expected '{expected}' in context, got '{context}'"
 
             # Check metadata has required fields
             assert "pain_point_detected" in metadata, "Missing pain_point_detected in metadata"

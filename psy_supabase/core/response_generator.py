@@ -30,6 +30,7 @@ from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.prompt_selector import PromptSelector
+from psy_supabase.utilities.semantic_emotion_detector import SemanticEmotionDetector
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 
 # Set up logging
@@ -139,6 +140,19 @@ class ResponseGenerator:
         detected_topic = question_analysis.get("topic", DEFAULT_TOPIC)
         emotion = question_analysis.get("emotion", DEFAULT_EMOTION)
 
+        detector = SemanticEmotionDetector()
+        standardized_topic = detector.get_standardized_topic(detected_topic)
+        standardized_emotion = detector.get_standardized_emotion(emotion)
+
+        # Log both original and standardized values
+        logger.info(
+            "Question analysis: Topic=%s (std: %s), Emotion=%s (std: %s)",
+            detected_topic,
+            standardized_topic,
+            emotion,
+            standardized_emotion,
+        )
+
         # Get more detailed category information
         category_info = self.prompt_selector.generate_category_info(user_question)
 
@@ -181,10 +195,12 @@ class ResponseGenerator:
         extracted_topics = extracted_topics[:3]
         logger.info("Extracted topics for RAG retrieval: %s", extracted_topics)
 
-        # Return structured context information
+        # Return structured context information with both original and standardized values
         return {
             "topic": detected_topic,
+            "standardized_topic": standardized_topic,
             "emotion": emotion,
+            "standardized_emotion": standardized_emotion,
             "category_info": category_info,
             "extracted_topics": extracted_topics,
         }
@@ -214,6 +230,10 @@ class ResponseGenerator:
         detected_topic = topics_context.get("topic", DEFAULT_TOPIC)
         emotion = topics_context.get("emotion", DEFAULT_EMOTION)
 
+        is_pain_point_detected = pain_point_results.get("pain_point_detected", False) or (
+            pain_point_results.get("pain_point", {}).get("detected", False)
+        )
+
         # Create a fully structured enhanced_context with all required fields
         enhanced_context = {
             "has_knowledge": False,
@@ -225,7 +245,7 @@ class ResponseGenerator:
                 "emotion": emotion,
                 "emotional_signals": [],
                 "pain_point": None,
-                "pain_point_detected": False,
+                "pain_point_detected": is_pain_point_detected,
             },
         }
 
@@ -384,104 +404,111 @@ class ResponseGenerator:
                 logger.error(f"Fallback template also failed: {str(fallback_e)}")
                 return "I'm here to support you. Could you share a bit more about what's on your mind?"
 
-    def determine_final_context_(
-        self, user_question: str, topics_context: Dict, pain_point_results: Dict, metadata: Dict
-    ) -> Tuple[str, Dict]:
-        """Determine the final context for database storage."""
-        try:
-            topics_context = topics_context or {}
-            pain_point_results = pain_point_results or {}
-            metadata = metadata or {}
-
-            # Access needed information from previous steps
-            detected_topic = topics_context.get("topic", DEFAULT_TOPIC)
-            pain_point = pain_point_results.get("pain_point", {})
-            approach_type = pain_point_results.get("approach_type")
-
-            # Determine the context
-            context = "therapeutic_dialogue"  # Default fallback
-
-            if detected_topic and detected_topic != DEFAULT_TOPIC:
-                context = detected_topic.replace(" ", "_").lower()
-            elif pain_point and "topic" in pain_point and pain_point["topic"]:
-                context = pain_point["topic"].replace(" ", "_").lower()
-            elif approach_type and approach_type != DEFAULT_APPROACH:
-                context = approach_type.replace(" ", "_").lower()
-
-            # Update metadata
-            updated_metadata = metadata.copy() if metadata else {}
-            updated_metadata.update(
-                {
-                    "pain_point_detected": bool(pain_point.get("detected", False)),
-                    "therapeutic_approach": approach_type,
-                    "template_used": pain_point_results.get("template_used", "default"),
-                    "recurring_themes": pain_point.get("recurring_terms", []),
-                    "pain_point_similarity": pain_point.get("count", 0),
-                    "context": context,
-                }
-            )
-
-            return context, updated_metadata
-
-        except Exception as e:
-            logger.error(f"Error determining context: {str(e)}")
-            logger.error(traceback.format_exc())
-            return "therapeutic_dialogue", metadata or {}
-
     @typechecked
     def determine_final_context(
         self, user_question: str, topics_context: Dict, pain_point_results: Dict, metadata: Dict
     ) -> Tuple[str, Dict]:
-        """Determine the final context for database storage."""
+        """Determine the final context for response generation using systematic source checking."""
         try:
+            detector = SemanticEmotionDetector()
+
+            # 1. Initialize variables and copy metadata once
             topics_context = topics_context or {}
             pain_point_results = pain_point_results or {}
-            metadata = metadata or {}
+            updated_metadata = metadata.copy() if metadata else {}
 
-            # Access needed information from previous steps
-            detected_topic = topics_context.get("topic", DEFAULT_TOPIC)
-            pain_point = pain_point_results.get("pain_point", {})
-            approach_type = pain_point_results.get("approach_type")
+            # 2. Extract ALL potential context sources systematically
+            context_sources = {
+                "from_topic": topics_context.get("topic", ""),
+                "from_extracted_topics": topics_context.get("extracted_topics", []),
+                "from_pain_point": pain_point_results.get("pain_point", {}).get("topic", ""),
+                "from_approach": pain_point_results.get("suggested_approach", {}).get("approach_type", ""),
+            }
 
-            # Determine the context
+            # 3. Standardize ALL sources using existing methods
+            standardized_sources = {
+                "topic": detector.get_standardized_topic(context_sources["from_topic"]),
+                "extracted_topics": [
+                    detector.get_standardized_topic(t) for t in context_sources["from_extracted_topics"]
+                ],
+                "pain_point": detector.get_standardized_topic(context_sources["from_pain_point"]),
+                "approach": detector.get_standardized_approach(context_sources["from_approach"]),
+            }
+
+            # 4. Determine context with clear priority rules
             context = "therapeutic_dialogue"  # Default fallback
 
-            # Get extracted topics
-            extracted_topics = []
-            category_info = self.prompt_selector.generate_category_info(user_question)
-            if category_info:
-                determined_topic = self.prompt_selector.determine_topic(category_info, user_question)
-                if determined_topic:
-                    extracted_topics = [determined_topic]
+            extracted_topics_list = standardized_sources["extracted_topics"]  # type: ignore
+            if extracted_topics_list and len(extracted_topics_list) > 0:
+                # Extract a single topic to avoid type errors
+                context = extracted_topics_list[0]
+            elif isinstance(standardized_sources["topic"], str) and standardized_sources["topic"] not in [
+                "supportive_listening",
+                "general_support",
+                "therapeutic_dialogue",
+            ]:
+                context = standardized_sources["topic"]
+            elif isinstance(standardized_sources["pain_point"], str) and standardized_sources["pain_point"] not in [
+                "supportive_listening",
+                "general_support",
+                "therapeutic_dialogue",
+            ]:
+                context = standardized_sources["pain_point"]
+            elif (
+                isinstance(standardized_sources["approach"], str)
+                and standardized_sources["approach"].strip()  # Ensure approach is non-empty
+                and standardized_sources["approach"]
+                not in [
+                    "supportive_listening",
+                    "general_support",
+                    "therapeutic_dialogue",
+                ]
+            ):
+                # Accept any non-empty approach, including 'stress_management'
+                context = standardized_sources["approach"]
 
-            # Determine the best context
-            if detected_topic and detected_topic != DEFAULT_TOPIC:
-                context = detected_topic.replace(" ", "_").lower()
-            elif extracted_topics and extracted_topics[0] != "therapeutic_dialogue":
-                context = extracted_topics[0]
-            elif approach_type and approach_type != DEFAULT_APPROACH:
-                context = map_approach_to_template(approach_type)
-            elif pain_point and "topic" in pain_point and pain_point["topic"]:
-                context = pain_point["topic"]
+            # 5. Update metadata with all standardized information
+            is_pain_point_detected = pain_point_results.get("pain_point_detected", False) or (
+                pain_point_results.get("pain_point", {}).get("detected", False)
+            )
 
-            # Update metadata
-            updated_metadata = metadata.copy() if metadata else {}
+            approach_type = (
+                pain_point_results.get("approach_type")
+                or pain_point_results.get("suggested_approach", {}).get("approach_type")
+                or standardized_sources["approach"]
+                or "supportive_listening"
+            )
+
+            template_used = pain_point_results.get("template_used")
+            if not template_used and approach_type:
+                template_used = map_approach_to_template(approach_type)
+            if not template_used:
+                template_used = "default_template"
+
+            logger.info(f"FINAL: approach_type={approach_type}, template_used={template_used}")
+
             updated_metadata.update(
                 {
-                    "pain_point_detected": pain_point_results.get("pain_point_detected", False),
+                    "pain_point_detected": is_pain_point_detected,
                     "therapeutic_approach": approach_type,
-                    "template_used": pain_point_results.get("template_used", "default"),
-                    "recurring_themes": pain_point_results.get("pain_point", {}).get("recurring_terms", []),
-                    "pain_point_similarity": pain_point_results.get("pain_point", {}).get("count", 0),
+                    "standardized_approach": approach_type,
                     "context": context,
+                    "standardized_topic": standardized_sources["topic"],
+                    "template_used": template_used,
                 }
             )
 
+            logger.info(f"DEBUG: updated_metadata={updated_metadata}")
+            # Add extracted topics to metadata
+            if context_sources["from_extracted_topics"]:
+                updated_metadata["extracted_topics"] = context_sources["from_extracted_topics"]
+                updated_metadata["primary_extracted_topic"] = context_sources["from_extracted_topics"][0]
+
+            logger.info(f"Determined context: {context}")
             return context, updated_metadata
 
         except Exception as e:
             logger.error(f"Error determining context: {str(e)}")
-            logger.error(traceback.format_exc())
             return "therapeutic_dialogue", metadata or {}
 
     def save_interaction(

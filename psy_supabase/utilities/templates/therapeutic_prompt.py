@@ -95,7 +95,6 @@ Usage:
     )
 """
 
-
 prompt_templates = {
     "Question": """
 You are responding to someone who mentioned: "{question}"
@@ -110,7 +109,6 @@ Your response should:
 
 Write ONLY your response without any instructions or meta-commentary.
 """,
-
     "Restatement or Paraphrasing": """
 You are responding to someone who mentioned: "{question}"
 
@@ -125,7 +123,6 @@ Your response should:
 
 Write ONLY your therapeutic response without any instructions or markers.
 """,
-
     "Reflection of feelings": """
 You are responding to someone who shared: "{question}"
 
@@ -140,7 +137,6 @@ Your response should:
 
 Write ONLY your reflective response without any instructions or markers.
 """,
-
     "Self-disclosure": """
 You are responding to someone who mentioned: "{question}"
 
@@ -155,7 +151,6 @@ Your response should:
 
 Write ONLY your response without any labels, instructions, or markers.
 """,
-
     "Affirmation and Reassurance": """
 You are responding to someone expressing anxiety or worry: "{question}"
 
@@ -170,7 +165,6 @@ Your response should:
 
 Write ONLY your supportive response without any instructions or markers.
 """,
-
     "Providing Suggestions": """
 You are responding to someone who might benefit from practical guidance: "{question}"
 
@@ -185,7 +179,6 @@ Your response should:
 
 Write ONLY your response without including instructions or meta-commentary.
 """,
-
     "Heartbreak": """
 You are responding to someone experiencing relationship heartbreak: "{question}"
 
@@ -201,7 +194,6 @@ Your response should:
 
 Write ONLY your compassionate response without any instructions or markers.
 """,
-
     "Workplace Trauma": """
 You are responding to someone experiencing workplace trauma or abuse: "{question}"
 
@@ -217,7 +209,6 @@ Your response should:
 
 Write ONLY your supportive response without any instructions or markers.
 """,
-
     "Relationship Issues": """
 You are responding to someone navigating relationship difficulties: "{question}"
 
@@ -233,7 +224,6 @@ Your response should:
 
 Write ONLY your therapeutic response without any instructions or markers.
 """,
-
     "Information": """
 You are responding to someone seeking understanding about: "{question}"
 
@@ -248,7 +238,6 @@ Your response should:
 
 Write ONLY your informative response without any instructions or markers.
 """,
-
     "Others": """
 You are responding to someone who shared: "{question}"
 
@@ -263,7 +252,6 @@ Your response should:
 
 Write ONLY your therapeutic response without any instructions or markers.
 """,
-
     "Empathy and Validation": """
 You are responding to someone experiencing emotional distress: "{question}"
 
@@ -278,7 +266,6 @@ Your response should:
 
 Write ONLY your empathetic response without any instructions or markers.
 """,
-
     "Cognitive Behavioral Therapy (CBT)": """
 You are responding to someone who might benefit from examining thought patterns: "{question}"
 
@@ -294,7 +281,6 @@ Your response should:
 
 Write ONLY your therapeutic response without any instructions or markers.
 """,
-
     "Mindfulness and Relaxation": """
 You are responding to someone who could benefit from present-moment awareness: "{question}"
 
@@ -310,7 +296,6 @@ Your response should:
 
 Write ONLY your mindfulness guidance without any instructions or markers.
 """,
-
     "Solution-Focused Brief Therapy (SFBT)": """
 You are responding to someone who could benefit from focusing on solutions: "{question}"
 
@@ -326,7 +311,6 @@ Your response should:
 
 Write ONLY your solution-focused response without any instructions or markers.
 """,
-
     "Motivational Interviewing": """
 You are responding to someone who may be ambivalent about change: "{question}"
 
@@ -342,7 +326,6 @@ Your response should:
 
 Write ONLY your motivational response without any instructions or markers.
 """,
-
     "Acceptance and Commitment Therapy (ACT)": """
 You are responding to someone who might benefit from acceptance strategies: "{question}"
 
@@ -358,7 +341,6 @@ Your response should:
 
 Write ONLY your therapeutic response without any instructions or markers.
 """,
-
     "Dialectical Behavior Therapy (DBT)": """
 You are responding to someone who might benefit from emotion regulation skills: "{question}"
 
@@ -374,7 +356,6 @@ Your response should:
 
 Write ONLY your skills-based response without any instructions or markers.
 """,
-
     "Trauma": """
 You are responding to someone who has experienced trauma: "{question}"
 
@@ -390,7 +371,6 @@ Your response should:
 
 Write ONLY your trauma-informed response without any instructions or markers.
 """,
-
     "Grief and Loss": """
 You are responding to someone experiencing grief or loss: "{question}"
 
@@ -406,7 +386,6 @@ Your response should:
 
 Write ONLY your compassionate response without any instructions or markers.
 """,
-
     "Crisis Support": """
 You are responding to someone in urgent emotional distress: "{question}"
 
@@ -423,7 +402,6 @@ Your response should:
 
 Write ONLY your supportive response without any instructions or markers.
 """,
-
     "Depression": """
 You are responding to someone experiencing depression: "{question}"
 
@@ -439,7 +417,6 @@ Your response should:
 
 Write ONLY your supportive response without any instructions or markers.
 """,
-
     "Anxiety": """
 You are responding to someone experiencing anxiety: "{question}"
 

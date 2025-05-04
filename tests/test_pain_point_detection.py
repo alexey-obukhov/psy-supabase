@@ -1,13 +1,12 @@
-import unittest
-import uuid
 import json
 import os
 import time
-from typing import Dict, Any, List, Optional
-from unittest.mock import MagicMock, patch, Mock
+import unittest
+import uuid
+from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-
 from prismalog.log import get_logger
 
 from psy_supabase.core.database import DatabaseManager
@@ -20,16 +19,28 @@ from tests.helpers.database_test_base import DatabaseTestBase
 
 logger = get_logger(__name__)
 
+
 class TestPainPointDetection(DatabaseTestBase):
     """Tests for pain point detection, topic identification, and therapeutic approach selection."""
+
+    @pytest.fixture
+    def mock_retriever_class(self):
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_text_generator(self):
+        return MagicMock()
+
+    @pytest.fixture
+    def silent_mock_db_manager(self):
+        return MagicMock()
 
     def setUp(self):
         """Set up test environment."""
         super().setUp()
 
         # Patch the is_toxic method to always return False
-        self.toxic_patcher = patch('psy_supabase.core.text_generator.TextGenerator.is_toxic',
-                                   return_value=False)
+        self.toxic_patcher = patch("psy_supabase.core.text_generator.TextGenerator.is_toxic", return_value=False)
         self.toxic_patcher.start()
 
         # Create mocks
@@ -42,9 +53,7 @@ class TestPainPointDetection(DatabaseTestBase):
 
         # Create RAG processor with properly mocked text generator
         self.rag_processor = RAGProcessor(
-            db_manager=self.db_manager,
-            generator=self.text_generator,
-            intelligent_processing_enabled=True
+            db_manager=self.db_manager, generator=self.text_generator, intelligent_processing_enabled=True
         )
 
         # Store the original save_interaction method
@@ -53,8 +62,8 @@ class TestPainPointDetection(DatabaseTestBase):
         # Create a wrapper that ensures interactions are saved
         def ensure_save_interaction(**kwargs):
             # Make sure context is present
-            if 'context' not in kwargs:
-                kwargs['context'] = {}
+            if "context" not in kwargs:
+                kwargs["context"] = {}
             result = self.original_save(**kwargs)
             logger.info(f"Saving interaction for session {kwargs.get('session_id')}")
             return result
@@ -68,7 +77,7 @@ class TestPainPointDetection(DatabaseTestBase):
         self.toxic_patcher.stop()
 
         # Restore original methods
-        if hasattr(self, 'original_save'):
+        if hasattr(self, "original_save"):
             self.db_manager.save_interaction = self.original_save
 
         super().tearDown()
@@ -76,7 +85,7 @@ class TestPainPointDetection(DatabaseTestBase):
     def test_pain_point_detection_system(self):
         """Test the end-to-end pain point detection system."""
         # Setup mock embedding provider
-        with patch('psy_supabase.core.model_manager.EmbeddingProviderAdapter') as mock_embedding:
+        with patch("psy_supabase.core.model_manager.EmbeddingProviderAdapter") as mock_embedding:
             mock_instance = MagicMock()
             mock_instance.generate_embedding.return_value = [0.1] * 768
             mock_instance.get_embedding_dimension.return_value = 768
@@ -89,9 +98,7 @@ class TestPainPointDetection(DatabaseTestBase):
 
             # Create a fresh RAG processor with our mocks
             rag_processor = RAGProcessor(
-                db_manager=self.db_manager,
-                generator=text_gen,
-                intelligent_processing_enabled=True
+                db_manager=self.db_manager, generator=text_gen, intelligent_processing_enabled=True
             )
 
             # Inject a mock pain point detection result
@@ -130,12 +137,14 @@ class TestPainPointDetection(DatabaseTestBase):
                 question="How can I manage everyday stress?",
                 answer=response,
                 metadata={
-                    "pain_points": [{
-                        "detected": True,
-                        "name": "test_pain_point",
-                        "similarity": 0.95,
-                        "suggested_approach": {"approach_type": "cognitive_behavioral"}
-                    }]
+                    "pain_points": [
+                        {
+                            "detected": True,
+                            "name": "test_pain_point",
+                            "similarity": 0.95,
+                            "suggested_approach": {"approach_type": "cognitive_behavioral"},
+                        }
+                    ]
                 },
                 context={},
             )
@@ -156,13 +165,13 @@ class TestPainPointDetection(DatabaseTestBase):
 
     def test_approach_type_selection(self):
         """Test that the appropriate therapeutic approach is selected based on pain points."""
-        with patch('psy_supabase.utilities.utils_mapping.map_approach_to_template') as mock_map:
+        with patch("psy_supabase.utilities.utils_mapping.map_approach_to_template") as mock_map:
             # Set up the mock to return expected templates
             def side_effect(approach):
                 mapping = {
-                    "trauma_informed": "Trauma",
+                    "trauma": "Trauma",
                     "cognitive_behavioral": "cognitive_behavioral_therapy",
-                    "compassionate": "empathy_validation"
+                    "compassionate": "empathy_validation",
                 }
                 return mapping.get(approach, "empathy_validation")
 
@@ -174,11 +183,11 @@ class TestPainPointDetection(DatabaseTestBase):
                     "question": "I keep having flashbacks to my accident",
                     "pain_point": {
                         "detected": True,
-                        "name": "trauma_flashbacks",
+                        "name": "flashback",
                         "similarity": 0.92,
-                        "suggested_approach": {"approach_type": "trauma_informed"},
+                        "suggested_approach": {"approach_type": "trauma"},
                     },
-                    "expected_approach": "trauma_informed",
+                    "expected_approach": "trauma",
                 },
                 # Add more test cases as needed
             ]
@@ -202,18 +211,9 @@ class TestPainPointDetection(DatabaseTestBase):
 
         # Test emotion detection directly
         test_cases = [
-            {
-                "question": "I'm feeling so anxious and worried about my exam tomorrow",
-                "expected_emotion": "anxiety"
-            },
-            {
-                "question": "I feel sad and depressed all the time lately",
-                "expected_emotion": "sadness"
-            },
-            {
-                "question": "I'm so frustrated and angry at my boss for criticizing me",
-                "expected_emotion": "anger"
-            },
+            {"question": "I'm feeling so anxious and worried about my exam tomorrow", "expected_emotion": "anxiety"},
+            {"question": "I feel sad and depressed all the time lately", "expected_emotion": "sadness"},
+            {"question": "I'm so frustrated and angry at my boss for criticizing me", "expected_emotion": "anger"},
         ]
 
         for case in test_cases:
@@ -222,7 +222,9 @@ class TestPainPointDetection(DatabaseTestBase):
 
             # Log what we get
             emotion = result.get("emotion", "unknown")
-            logger.info(f"Emotion detection for '{case['question']}': got={emotion}, expected={case['expected_emotion']}")
+            logger.info(
+                f"Emotion detection for '{case['question']}': got={emotion}, expected={case['expected_emotion']}"
+            )
 
             # We're not asserting exact matches since emotion detection is complex
             # Just log the results to verify the emotion detection is working somewhat reasonably
@@ -246,7 +248,7 @@ class TestPainPointDetection(DatabaseTestBase):
                 "confidence": 0.95,
                 "topic_confidence": 0.95,
                 "emotion_confidence": 0.85,
-                "extracted_topics": ["workplace", "stress", "anxiety"]
+                "extracted_topics": ["workplace", "stress", "anxiety"],
             }
 
         rag_processor.prompt_selector.analyze_question = mock_analyze_question
@@ -265,7 +267,7 @@ class TestPainPointDetection(DatabaseTestBase):
 
     def test_no_pain_points_detected(self):
         """Test the behavior when no pain points are detected."""
-        with patch('psy_supabase.core.model_manager.EmbeddingProviderAdapter') as mock_embedding:
+        with patch("psy_supabase.core.model_manager.EmbeddingProviderAdapter") as mock_embedding:
             mock_instance = MagicMock()
             mock_instance.generate_embedding.return_value = [0.1] * 768
             mock_embedding.return_value = mock_instance
@@ -344,19 +346,21 @@ class TestPainPointDetection(DatabaseTestBase):
 
     def test_multiple_pain_points_detected(self):
         """Test the behavior when multiple pain points are detected."""
-        with patch('psy_supabase.core.model_manager.EmbeddingProviderAdapter') as mock_embedding:
+        with patch("psy_supabase.core.model_manager.EmbeddingProviderAdapter") as mock_embedding:
             mock_instance = MagicMock()
             mock_instance.generate_embedding.return_value = [0.1] * 768
             mock_embedding.return_value = mock_instance
 
             # Mock pain point detection to return multiple results
-            self.db_manager.identify_potential_pain_points = MagicMock(return_value={
-                "detected": True,
-                "pain_points": [
-                    {"name": "stress", "similarity": 0.9},
-                    {"name": "anxiety", "similarity": 0.85},
-                ],
-            })
+            self.db_manager.identify_potential_pain_points = MagicMock(
+                return_value={
+                    "detected": True,
+                    "pain_points": [
+                        {"name": "stress", "similarity": 0.9},
+                        {"name": "anxiety", "similarity": 0.85},
+                    ],
+                }
+            )
 
             # Mock therapeutic response generation
             self.text_generator.generate_therapeutic_response.return_value = "Sample therapeutic response"
@@ -417,7 +421,9 @@ class TestPainPointDetection(DatabaseTestBase):
                             parsed_metadata = json.loads(metadata[0])
                             if "pain_points" in parsed_metadata:
                                 pain_points = parsed_metadata["pain_points"]
-                                logger.info(f"✓ Successfully extracted pain points from JSON string in metadata list: {pain_points}")
+                                logger.info(
+                                    f"✓ Successfully extracted pain points from JSON string in metadata list: {pain_points}"
+                                )
                         except json.JSONDecodeError as e:
                             logger.error(f"Failed to parse metadata JSON: {e}")
                     elif isinstance(metadata[0], dict) and "pain_points" in metadata[0]:
@@ -471,42 +477,69 @@ class TestPainPointDetection(DatabaseTestBase):
             if len(pain_points) == 2:
                 # Test first pain point (stress)
                 self.assertIn("name", pain_points[0], f"First pain point missing 'name' field: {pain_points[0]}")
-                self.assertEqual(pain_points[0]["name"], "stress", f"Expected 'stress' but got '{pain_points[0].get('name')}'")
-                self.assertIn("similarity", pain_points[0], f"First pain point missing 'similarity' field: {pain_points[0]}")
-                self.assertAlmostEqual(pain_points[0]["similarity"], 0.9, delta=0.01,
-                                      msg=f"Expected similarity 0.9 but got {pain_points[0].get('similarity')}")
+                self.assertEqual(
+                    pain_points[0]["name"], "stress", f"Expected 'stress' but got '{pain_points[0].get('name')}'"
+                )
+                self.assertIn(
+                    "similarity", pain_points[0], f"First pain point missing 'similarity' field: {pain_points[0]}"
+                )
+                self.assertAlmostEqual(
+                    pain_points[0]["similarity"],
+                    0.9,
+                    delta=0.01,
+                    msg=f"Expected similarity 0.9 but got {pain_points[0].get('similarity')}",
+                )
 
                 # Test second pain point (anxiety)
                 self.assertIn("name", pain_points[1], f"Second pain point missing 'name' field: {pain_points[1]}")
-                self.assertEqual(pain_points[1]["name"], "anxiety", f"Expected 'anxiety' but got '{pain_points[1].get('name')}'")
-                self.assertIn("similarity", pain_points[1], f"Second pain point missing 'similarity' field: {pain_points[1]}")
-                self.assertAlmostEqual(pain_points[1]["similarity"], 0.85, delta=0.01,
-                                      msg=f"Expected similarity 0.85 but got {pain_points[1].get('similarity')}")
+                self.assertEqual(
+                    pain_points[1]["name"], "anxiety", f"Expected 'anxiety' but got '{pain_points[1].get('name')}'"
+                )
+                self.assertIn(
+                    "similarity", pain_points[1], f"Second pain point missing 'similarity' field: {pain_points[1]}"
+                )
+                self.assertAlmostEqual(
+                    pain_points[1]["similarity"],
+                    0.85,
+                    delta=0.01,
+                    msg=f"Expected similarity 0.85 but got {pain_points[1].get('similarity')}",
+                )
 
                 # Verify the pain points are sorted by similarity (highest first)
-                self.assertGreaterEqual(pain_points[0].get("similarity", 0), pain_points[1].get("similarity", 0),
-                                      msg="Pain points should be sorted by similarity (descending)")
+                self.assertGreaterEqual(
+                    pain_points[0].get("similarity", 0),
+                    pain_points[1].get("similarity", 0),
+                    msg="Pain points should be sorted by similarity (descending)",
+                )
 
                 # Additional structure checks
                 for i, point in enumerate(pain_points):
                     self.assertIsInstance(point, dict, f"Pain point {i} should be a dictionary, got {type(point)}")
-                    self.assertTrue(all(isinstance(k, str) for k in point.keys()),
-                                   f"All keys in pain point {i} should be strings")
+                    self.assertTrue(
+                        all(isinstance(k, str) for k in point.keys()), f"All keys in pain point {i} should be strings"
+                    )
 
                 logger.info(f"✓ Successfully verified both pain points in expected order: {pain_points}")
             else:
-                logger.warning(f"Cannot perform detailed pain point verification - expected 2 points but got {len(pain_points)}")
+                logger.warning(
+                    f"Cannot perform detailed pain point verification - expected 2 points but got {len(pain_points)}"
+                )
 
             # Verify session ID was used correctly
             for i, item in enumerate(history):
                 if isinstance(item, dict) and "session_id" in item:
-                    self.assertEqual(item["session_id"], self.session_id,
-                                    f"Session ID mismatch: {item['session_id']} != {self.session_id}")
+                    self.assertEqual(
+                        item["session_id"],
+                        self.session_id,
+                        f"Session ID mismatch: {item['session_id']} != {self.session_id}",
+                    )
 
     def test_dynamic_rag_retriever_integration1(self, mock_retriever_class, rag_processor, mock_text_generator):
         """Test the integration of DynamicRAGRetriever with the RAGProcessor."""
         rag_processor.text_generator.is_toxic = MagicMock(return_value=False)
-        rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(return_value="Response")
+        rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(
+            return_value="Response"
+        )
 
         rag_processor.response_generator.is_valid_input = MagicMock(return_value=True)
         rag_processor.response_generator.check_toxic_content = MagicMock(return_value=None)
@@ -516,7 +549,7 @@ class TestPainPointDetection(DatabaseTestBase):
         mock_retriever_instance.get_relevant_context.return_value = "Some relevant context"
         mock_retriever_class.return_value = mock_retriever_instance
 
-        with patch.object(rag_processor, "process_query", return_value=[0.1]*2048):
+        with patch.object(rag_processor, "process_query", return_value=[0.1] * 2048):
             response = rag_processor.generate_response("How can I manage anxiety?", "test_session")
             assert response == "Response"
 
@@ -528,7 +561,9 @@ class TestPainPointDetection(DatabaseTestBase):
 
         # Mock out the actual methods to ensure we can set .return_value
         rag_processor.text_generator.is_toxic = MagicMock(return_value=False)
-        rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(return_value="Response")
+        rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(
+            return_value="Response"
+        )
 
         rag_processor.response_generator.is_valid_input = MagicMock(return_value=True)
         rag_processor.response_generator.check_toxic_content = MagicMock(return_value=None)
@@ -538,6 +573,6 @@ class TestPainPointDetection(DatabaseTestBase):
         mock_retriever_instance.get_relevant_context.return_value = "Retrieved context"
         mock_retriever_class.return_value = mock_retriever_instance
 
-        with patch.object(rag_processor, "process_query", return_value=[0.1]*2048):
+        with patch.object(rag_processor, "process_query", return_value=[0.1] * 2048):
             response = rag_processor.generate_response("How can I manage anxiety?", "test_session")
             assert response == "Response"

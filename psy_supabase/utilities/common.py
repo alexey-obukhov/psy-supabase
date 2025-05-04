@@ -60,7 +60,7 @@ def load_toxicity_model(
 
     log = logger_instance or logger
     toxicity_model_name = "facebook/roberta-hate-speech-dynabench-r4-target"
-    model_folder = toxicity_model_name.split("/")[-1]
+    model_folder = toxicity_model_name.rsplit("/", maxsplit=1)[-1]
     models_dir = get_models_dir()
     local_path = os.path.join(models_dir, model_folder)
     ensure_dir_exists(models_dir)

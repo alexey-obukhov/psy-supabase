@@ -2,25 +2,22 @@
 Fixtures for integration tests.
 These fixtures create real components with minimal mocking to test actual integration.
 """
+
 import os
-import pytest
 import uuid
 from unittest.mock import MagicMock, patch
 
-# Import from main test fixtures
-from tests.conftest import (
-    mock_supabase,
-    mock_db_manager,
-    mock_db_manager_with_spy,
-    TEST_URL,
-    TEST_KEY
-)
+import pytest
 
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.response_generator import ResponseGenerator
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.prompt_selector import PromptSelector
+
+# Import from main test fixtures
+from tests.conftest import TEST_KEY, TEST_URL, mock_db_manager, mock_db_manager_with_spy, mock_supabase
+
 
 @pytest.fixture
 def mock_text_generator():
@@ -31,6 +28,7 @@ def mock_text_generator():
     generator.is_toxic.return_value = False
     return generator
 
+
 @pytest.fixture
 def mock_embedding_provider():
     """Create a mock embedding provider for tests."""
@@ -39,10 +37,12 @@ def mock_embedding_provider():
     mock.get_embedding_dimension.return_value = 768
     return mock
 
+
 @pytest.fixture
 def real_prompt_selector(mock_text_generator):
     """Create a real prompt selector with the required generator argument."""
     return PromptSelector(generator=mock_text_generator)
+
 
 @pytest.fixture
 def integration_db_manager(mock_db_manager):
@@ -64,13 +64,15 @@ def integration_db_manager(mock_db_manager):
         if session_id not in conversation_store:
             conversation_store[session_id] = []
 
-        conversation_store[session_id].append({
-            'question': question,
-            'answer': answer,
-            'metadata': metadata,
-            'context': context,
-            'timestamp': str(uuid.uuid4())  # Fake timestamp for ordering
-        })
+        conversation_store[session_id].append(
+            {
+                "question": question,
+                "answer": answer,
+                "metadata": metadata,
+                "context": context,
+                "timestamp": str(uuid.uuid4()),  # Fake timestamp for ordering
+            }
+        )
 
         return result
 
@@ -90,14 +92,14 @@ def integration_db_manager(mock_db_manager):
 
     return db_manager
 
+
 @pytest.fixture
 def integration_response_generator(mock_text_generator, integration_db_manager, real_prompt_selector):
     """Create a response generator for integration tests with real prompt selector."""
     return ResponseGenerator(
-        text_generator=mock_text_generator,
-        db_manager=integration_db_manager,
-        prompt_selector=real_prompt_selector
+        text_generator=mock_text_generator, db_manager=integration_db_manager, prompt_selector=real_prompt_selector
     )
+
 
 @pytest.fixture
 def integration_rag_processor(mock_text_generator, integration_db_manager, mock_embedding_provider):
@@ -105,11 +107,9 @@ def integration_rag_processor(mock_text_generator, integration_db_manager, mock_
 
     This uses real components where possible, with mocks only for external dependencies.
     """
-    with patch('psy_supabase.core.model_manager.EmbeddingProviderAdapter', return_value=mock_embedding_provider):
+    with patch("psy_supabase.core.model_manager.EmbeddingProviderAdapter", return_value=mock_embedding_provider):
         processor = RAGProcessor(
-            db_manager=integration_db_manager,
-            generator=mock_text_generator,
-            intelligent_processing_enabled=True
+            db_manager=integration_db_manager, generator=mock_text_generator, intelligent_processing_enabled=True
         )
 
         # Make sure embedding provider is mocked
@@ -117,13 +117,11 @@ def integration_rag_processor(mock_text_generator, integration_db_manager, mock_
 
         return processor
 
+
 @pytest.fixture
 def mock_dynamic_retriever():
     """Create a mock dynamic retriever."""
     mock = MagicMock()
     mock.retrieve.return_value = []
-    mock.get_conversation_context.return_value = {
-        "relevant_past_messages": [],
-        "relevant_topics": ["test_topic"]
-    }
+    mock.get_conversation_context.return_value = {"relevant_past_messages": [], "relevant_topics": ["test_topic"]}
     return mock

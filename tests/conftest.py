@@ -459,7 +459,11 @@ def mock_db_manager():
     original_save = manager.save_interaction
 
     def save_wrapper(*args, **kwargs):
-        context = kwargs.get("context", "unknown")
+        context = kwargs.get("context")
+        if context is None and args:
+            context = args[0]
+        if context is None:
+            context = "unknown"
         manager.saved_contexts.append(context)
         print(f"Saving with context: {context}")
         return original_save(*args, **kwargs)

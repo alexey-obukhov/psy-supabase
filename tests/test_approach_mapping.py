@@ -28,7 +28,7 @@ class TestApproachMapping(DatabaseTestBase):
         self.assertEqual(map_approach_to_template("behavioral_activation"), "depression")
         self.assertEqual(map_approach_to_template("interpersonal_therapy"), "relationship_issues")
         self.assertEqual(map_approach_to_template("self-compassion"), "empathy_validation")
-        self.assertEqual(map_approach_to_template("trauma_informed"), "trauma")
+        self.assertEqual(map_approach_to_template("trauma"), "trauma")
         self.assertEqual(map_approach_to_template("connection_building"), "loneliness")
         self.assertEqual(map_approach_to_template("grief_processing"), "grief_loss")
         self.assertEqual(map_approach_to_template("supportive_listening"), "empathy_validation")

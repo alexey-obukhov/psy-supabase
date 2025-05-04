@@ -1,5 +1,7 @@
 """ Utility functions for therapeutic mappings. """
-from typing import Dict, List, Any, Optional, Final, Tuple
+
+from typing import Any, Dict, Final, List, Optional, Tuple
+
 
 class TherapeuticMappings:
     """Centralized therapeutic mappings for consistent theme/keyword handling."""
@@ -426,7 +428,7 @@ class TherapeuticMappings:
             "conscience",
             "remorse",
             "apologize",
-            "sorry"
+            "sorry",
         ],
         "shame": [
             "shame",
@@ -506,20 +508,39 @@ class TherapeuticMappings:
             "human_readable": "depression_support",
         },
         "relationship": {
-            "keywords": ["relationship", "partner", "husband", "wife", "girlfriend", "boyfriend", "friend", "family"],
+            "keywords": [
+                "relationship",
+                "breakup",
+                "partner",
+                "husband",
+                "wife",
+                "girlfriend",
+                "boyfriend",
+                "friend",
+                "family",
+            ],
             "approach": "interpersonal_therapy",
             "template": "relationship_issues",
             "human_readable": "relationship_guidance",
         },
         "self-worth": {
-            "keywords": ["worthless", "undeserving", "inadequate", "unworthy", "failure", "confidence", "self-esteem", "worth"],
+            "keywords": [
+                "worthless",
+                "undeserving",
+                "inadequate",
+                "unworthy",
+                "failure",
+                "confidence",
+                "self-esteem",
+                "worth",
+            ],
             "approach": "self-compassion",
             "template": "empathy_validation",
             "human_readable": "self-worth-enhancement",
         },
         "trauma": {
-            "keywords": ["trauma", "ptsd", "abuse", "assault"],
-            "approach": "trauma_informed",
+            "keywords": ["trauma", "ptsd", "flashback", "abuse", "assault"],
+            "approach": "trauma",
             "template": "trauma",
             "human_readable": "trauma_support",
         },
@@ -550,16 +571,18 @@ class TherapeuticMappings:
         "guilt": {
             "keywords": [
                 "feel guilty",
+                "guilt",
+                "remorse",
                 "feeling guilty",
                 "guilt about",
                 "guilty about",
                 "regret doing",
                 "wrongdoing",
-                "did something wrong"
+                "did something wrong",
             ],
             "approach": "self-compassion",
             "template": "guilt",
-            "human_readable": "Guilt Processing"
+            "human_readable": "Guilt Processing",
         },
         "shame": {
             "keywords": [
@@ -567,15 +590,23 @@ class TherapeuticMappings:
                 "feeling ashamed",
                 "shame about",
                 "ashamed of",
+                "embarrassment",
                 "humiliated",
+                "humiliation",
                 "embarrassed",
                 "feel worthless",
                 "feel defective",
-                "feel inadequate"
+                "feel inadequate",
             ],
             "approach": "self-compassion",
             "template": "shame",
-            "human_readable": "Shame Processing"
+            "human_readable": "Shame Processing",
+        },
+        "workplace_anxiety": {
+            "keywords": ["work", "job", "career", "boss", "workplace", "office", "coworker", "colleague"],
+            "approach": "cognitive_behavioral",
+            "template": "cognitive_behavioral_therapy",
+            "human_readable": "Workplace Anxiety Support",
         },
     }
 
@@ -584,7 +615,7 @@ class TherapeuticMappings:
         "behavioral_activation": "depression",
         "interpersonal_therapy": "relationship_issues",
         "self-compassion": "empathy_validation",
-        "trauma_informed": "trauma",
+        "trauma": "trauma",
         "connection_building": "others",
         "grief_processing": "grief_loss",
         "supportive_listening": "empathy_validation",
@@ -656,6 +687,8 @@ class TherapeuticMappings:
             (r"\bsorry\b", 1.5),
             (r"\bapologetic\b", 1.5),
             (r"\bwrongdoing\b", 1.5),
+            (r"\bself[- ]?blame\b", 1.5),
+            (r"\bembarrass(ed|ment)?\b", 1.2),
         ],
         "anxiety": [
             # Standard patterns - with higher weight (2.0)
@@ -794,14 +827,6 @@ class TherapeuticMappings:
             (r"\bannoy(ed|ing)?\b", 1.2),
             (r"\bresent(ment)?\b", 1.5),
             (r"\bfed up\b", 2.3),
-        ],
-        "guilt": [
-            (r"\bguilt(y)?\b", 2.0),
-            (r"\bremorse\b", 1.5),
-            (r"\bregret\b", 1.5),
-            (r"\bshame\b", 2.0),
-            (r"\bself[- ]?blame\b", 1.5),
-            (r"\bembarrass(ed|ment)?\b", 1.2),
         ],
         "joy": [
             (r"\bhappy\b", 2.0),
@@ -1086,20 +1111,23 @@ class TherapeuticMappings:
 
     @classmethod
     def find_theme_for_keyword(cls, keyword: str) -> Optional[str]:
+        """Find the appropriate theme for a given keyword using all available taxonomies."""
+        if not keyword:
+            return "supportive_listening"
+
         keyword = keyword.lower()
-        # Exact and partial match in themes
+
+        # First check THERAPEUTIC_THEMES
         for theme, data in cls.THERAPEUTIC_THEMES.items():
-            for k in data.get("keywords", []):
-                if k not in cls.APPROACH_TO_TEMPLATE:
-                    print(f"Missing approach in APPROACH_TO_TEMPLATE: {k} (theme: {theme})")
-                if keyword == k.lower() or keyword in k.lower() or k.lower() in keyword:
-                    return theme
-        # Exact and partial match in taxonomy
-        for category, keywords in cls.ENHANCED_TAXONOMY.items():
-            for k in keywords:
-                if keyword == k.lower() or keyword in k.lower() or k.lower() in keyword:
-                    return category
-        return None
+            if any(k.lower() == keyword or keyword in k.lower() for k in data.get("keywords", [])):
+                return theme
+
+        # Then check ENHANCED_TAXONOMY
+        for theme, keywords in cls.ENHANCED_TAXONOMY.items():
+            if any(k.lower() == keyword or keyword in k.lower() for k in keywords):
+                return theme
+
+        return "supportive_listening"
 
     # @classmethod
     # def get_emotion_pattern(cls, emotion: str) -> List[Tuple[str, float]]:

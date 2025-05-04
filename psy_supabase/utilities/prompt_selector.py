@@ -95,7 +95,7 @@ class PromptSelector:
                 regex_confidence = 0.0
 
             # Process semantic topic results
-            semantic_topic, topic_confidence = self.semantic_helper.detect_topic(question_text)
+            semantic_topic, topic_confidence = self.semantic_helper.detect_topic_standardized(question_text)
             logger.info(f"Semantic topic detected: {semantic_topic} ({topic_confidence:.2f})")
 
             # Map "greeting" topic to "supportive_listening" for consistency with tests
@@ -162,7 +162,7 @@ class PromptSelector:
                 regex_emotion_confidence = 0.0
 
             # HYBRID APPROACH - STEP 4: Get semantic emotion detection
-            semantic_emotion, semantic_confidence = self.semantic_helper.detect_emotion(question_text)
+            semantic_emotion, semantic_confidence = self.semantic_helper.detect_emotion_standardized(question_text)
             logger.info(f"Semantic emotion detected: {semantic_emotion} ({semantic_confidence:.2f})")
 
             # Map "greeting" emotion to "concern" for consistency

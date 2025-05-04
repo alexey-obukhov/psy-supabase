@@ -1,11 +1,15 @@
-from typing import Tuple, Dict, List, Any
 import re
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
-from transformers import AutoTokenizer, AutoModel
 import torch
 from prismalog.log import get_logger
+from transformers import AutoModel, AutoTokenizer
+
+from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
 
 logger = get_logger(__name__)
+
 
 class SemanticEmotionDetector:
     """
@@ -16,7 +20,6 @@ class SemanticEmotionDetector:
     def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
         """
         Initialize with a very small but effective sentence transformer model.
-        This model is only ~80MB vs 1.6GB+ for BART models.
         """
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -40,7 +43,7 @@ class SemanticEmotionDetector:
                 "surprise": "feeling shocked, amazed, or caught off guard by something unexpected",
                 "concern": "feeling uneasy, troubled, or bothered about a situation",
                 # Add greeting category for emotion detection
-                "greeting": "saying hello, hi, good morning, or checking in without expressing a specific emotion"
+                "greeting": "saying hello, hi, good morning, or checking in without expressing a specific emotion",
             }
 
             # Add topic templates including greeting
@@ -55,19 +58,17 @@ class SemanticEmotionDetector:
                 "shame": "shame, embarrassment, humiliation, social rejection",
                 "guilt": "guilt, regret, remorse, responsibility, blame",
                 # Add greeting category for topic detection
-                "greeting": "hello, hi, hey, good morning, good day, greetings, checking in, how are you, what's up, introduction, small talk"
+                "greeting": "hello, hi, hey, good morning, good day, greetings, checking in, how are you, what's up, introduction, small talk",
             }
 
             # Pre-compute emotion embeddings
             self.emotion_embeddings = {
-                emotion: self._get_embedding(description)
-                for emotion, description in self.emotion_templates.items()
+                emotion: self._get_embedding(description) for emotion, description in self.emotion_templates.items()
             }
 
             # Pre-compute topic embeddings
             self.topic_embeddings = {
-                topic: self._get_embedding(description)
-                for topic, description in self.topic_templates.items()
+                topic: self._get_embedding(description) for topic, description in self.topic_templates.items()
             }
 
         except Exception as e:
@@ -78,8 +79,7 @@ class SemanticEmotionDetector:
     def _get_embedding(self, text: str) -> np.ndarray:
         """Extract embeddings from the model in a memory-efficient way"""
         with torch.no_grad():
-            inputs = self.tokenizer(text, return_tensors="pt",
-                                   padding=True, truncation=True, max_length=128)
+            inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=128)
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
             outputs = self.model(**inputs)
@@ -165,3 +165,134 @@ class SemanticEmotionDetector:
     def _cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
         """Compute cosine similarity between two vectors"""
         return float(np.dot(vec1, vec2))
+
+    def get_standardized_emotion(self, emotion: str) -> str:
+        """Map detected emotions to standardized emotions."""
+        if not emotion:
+            return "neutral"
+
+        lower_emotion = str(emotion).lower()
+
+        # Test-aligned emotion mappings
+        emotion_mapping = {
+            "anxiety": "anxiety",
+            "stress": "anxiety",
+            "worry": "anxiety",
+            "concern": "anxiety",
+            "nervous": "anxiety",
+            "fear": "anxiety",
+            "panic": "anxiety",
+            "sadness": "sadness",
+            "depression": "sadness",
+            "grief": "sadness",
+            "hopelessness": "sadness",
+            "despair": "sadness",
+            "anger": "anger",
+            "frustration": "anger",
+            "irritation": "anger",
+            "shame": "shame",
+            "embarrassment": "shame",
+            "humiliation": "shame",
+            "guilt": "guilt",
+            "regret": "guilt",
+            "remorse": "guilt",
+            "joy": "happiness",
+            "happiness": "happiness",
+            "contentment": "happiness",
+            "surprise": "surprise",
+            "shock": "surprise",
+            "amazement": "surprise",
+            "neutral": "neutral",
+            "calm": "neutral",
+            "greeting": "neutral",
+        }
+
+        return emotion_mapping.get(lower_emotion, "neutral")
+
+    def get_standardized_topic(self, topic: str) -> str:
+        """Map detected topics to standardized test-expected topics."""
+        if not topic:
+            return "supportive_listening"
+
+        # Use the centralized mapping system
+        theme = TherapeuticMappings.find_theme_for_keyword(topic)
+        # Add null check to handle Optional[str] return type
+        return theme if theme else "supportive_listening"
+
+    def get_standardized_approach(self, topic: str) -> str:
+        """Map topics to standardized approach types expected by tests."""
+        if not topic:
+            return "supportive_listening"
+
+        # First, check if the topic is already a standard approach type
+        standard_approaches = [
+            "cognitive_behavioral",
+            "trauma",
+            "interpersonal_therapy",
+            "compassion_focused_therapy",
+            "behavioral_activation",
+            "grief_processing",
+            "supportive_listening",
+            "stress_management",
+            "workplace_stress",
+            "stress",
+        ]
+
+        lower_topic = topic.lower()
+
+        # Pass through if already a standard approach
+        if lower_topic in standard_approaches:
+            return lower_topic
+
+        # Then proceed with regular mapping
+        approach_mapping = {
+            "anxiety": "cognitive_behavioral",
+            "depression": "behavioral_activation",
+            "trauma": "trauma",
+            "ptsd": "trauma",
+            "flashback": "trauma",
+            "relationship": "interpersonal_therapy",
+            "self_worth": "compassion_focused_therapy",
+            "grief": "grief_processing",
+            "shame": "compassion_focused_therapy",
+            "guilt": "cognitive_behavioral",
+            "general_support": "supportive_listening",
+            "cbt": "cognitive_behavioral",
+        }
+
+        return approach_mapping.get(lower_topic, "supportive_listening")
+
+    def get_emotion_mappings(self) -> Dict[str, List[str]]:
+        """Return standardized emotion mappings for tests."""
+        return {
+            "anxiety": ["worry", "concern", "nervous", "anxious"],
+            "sadness": ["sad", "depressed", "down", "hopeless"],
+            "anger": ["angry", "frustrated", "irritated", "mad"],
+            "shame": ["embarrassed", "humiliated", "inadequate"],
+            "guilt": ["guilty", "remorseful", "regretful"],
+            "happiness": ["happy", "joyful", "excited", "pleased"],
+            "surprise": ["surprised", "shocked", "amazed"],
+            "neutral": ["neutral", "calm", "balanced"],
+        }
+
+    def detect_emotion_standardized(self, text: str) -> Tuple[str, float]:
+        """Detect emotion and standardize the output for testing compatibility."""
+        raw_emotion, score = self.detect_emotion(text)
+        standardized_emotion = self.get_standardized_emotion(raw_emotion)
+        logger.info(f"Raw emotion: {raw_emotion} → Standardized: {standardized_emotion}")
+        return (standardized_emotion, score)
+
+    def detect_topic_standardized(self, text: str) -> Tuple[str, float]:
+        """Detect topic and standardize the output for testing compatibility."""
+        raw_topic, score = self.detect_topic(text)
+        standardized_topic = self.get_standardized_topic(raw_topic)
+        logger.info(f"Raw topic: {raw_topic} → Standardized: {standardized_topic}")
+        return (standardized_topic, score)
+
+    def recommend_approach(self, text: str) -> str:
+        """Recommend a standardized therapeutic approach based on topic."""
+        topic, _ = self.detect_topic(text)
+        standardized_topic = self.get_standardized_topic(topic)
+        approach = self.get_standardized_approach(standardized_topic)
+        logger.info(f"Topic: {topic} → Standardized topic: {standardized_topic} → Approach: {approach}")
+        return approach

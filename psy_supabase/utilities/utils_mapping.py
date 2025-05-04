@@ -44,7 +44,7 @@ def map_approach_to_template(approach: Optional[str] = None) -> str:
         "act": "acceptance_commitment_therapy",
         "self-compassion": "empathy_validation",
         "interpersonal_therapy": "relationship_issues",
-        "trauma_informed": "trauma",
+        "trauma": "trauma",
         "grief_processing": "grief_loss",
         "behavioral_activation": "depression",
         "supportive_listening": "empathy_validation",

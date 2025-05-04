@@ -1830,9 +1830,8 @@ class DatabaseManager:
             # Ensure it's a list of floats before returning
             if isinstance(embedding, list) and all(isinstance(x, (float, int)) for x in embedding):
                 return [float(x) for x in embedding]
-            else:
-                logger.error("Generated embedding is not a valid list of floats.")
-                return None
+            logger.error("Generated embedding is not a valid list of floats.")
+            return None
 
         except Exception as e:
             logger.error("Error creating embedding: %s", e)
@@ -2193,8 +2192,8 @@ class DatabaseManager:
                     "exploration_questions": "How would you respond to a friend who felt this way? What might self-compassion look like here?",
                 },
                 "trauma": {
-                    "name": "trauma_processing",
-                    "primary_technique": "trauma_informed",
+                    "name": "trauma",
+                    "primary_technique": "trauma",
                     "redirection_strategy": "Focus on safety and grounding before processing traumatic content",
                     "exploration_questions": "What helps you feel safe in the present moment? How can we work on grounding techniques?",
                 },

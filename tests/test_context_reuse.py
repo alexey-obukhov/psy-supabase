@@ -500,7 +500,7 @@ class TestContextReuse(DatabaseTestBase):
             {"approach_type": "dbt", "expected_template": "dialectical_behavior_therapy"},
             {"approach_type": "act", "expected_template": "acceptance_commitment_therapy"},
             # Specific therapeutic focuses
-            {"approach_type": "trauma_informed", "expected_template": "trauma"},
+            {"approach_type": "trauma", "expected_template": "trauma"},
             # {"approach_type": "mindfulness", "expected_template": "mindfulness_therapy"},
             {"approach_type": "supportive_listening", "expected_template": "empathy_validation"},
             # Edge cases

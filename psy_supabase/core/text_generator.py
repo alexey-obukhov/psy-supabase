@@ -92,6 +92,7 @@ from psy_supabase.utilities.common import (
     is_github_actions,
     load_toxicity_model,
 )
+from psy_supabase.utilities.semantic_emotion_detector import SemanticEmotionDetector
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 
@@ -1076,30 +1077,38 @@ class TextGenerator:
                     extracted_topics.append(detected_topic)
 
                 # Add topics from categories (up to 2 total)
+                detector = SemanticEmotionDetector()
                 for category in category_names[:2]:
-                    # Map category names to search terms
+                    # Map category names to standardized topics
                     if category == "empathy_validation":
-                        if "depression" not in extracted_topics:
-                            extracted_topics.append("depression")
+                        standardized_topic = detector.get_standardized_topic("depression")
+                        if standardized_topic not in extracted_topics:
+                            extracted_topics.append(standardized_topic)
                     elif category == "affirmation_reassurance":
-                        if "anxiety" not in extracted_topics:
-                            extracted_topics.append("anxiety")
+                        standardized_topic = detector.get_standardized_topic("anxiety")
+                        if standardized_topic not in extracted_topics:
+                            extracted_topics.append(standardized_topic)
                     elif category == "trauma":
-                        if "trauma" not in extracted_topics:
-                            extracted_topics.append("trauma")
+                        standardized_topic = detector.get_standardized_topic("trauma")
+                        if standardized_topic not in extracted_topics:
+                            extracted_topics.append(standardized_topic)
                     elif "cbt" in category:
-                        if "cognitive_behavioral_therapy" not in extracted_topics:
-                            extracted_topics.append("cognitive_behavioral_therapy")
+                        standardized_topic = detector.get_standardized_topic("cognitive_behavioral_therapy")
+                        if standardized_topic not in extracted_topics:
+                            extracted_topics.append(standardized_topic)
 
-                # Set emotion as a topic if appropriate
+                # Set standardized emotion as a topic if appropriate
                 if emotion and emotion not in ["confusion", "surprise"]:
-                    extracted_topics.append(emotion)
+                    standardized_emotion = detector.get_standardized_emotion(emotion)
+                    extracted_topics.append(standardized_emotion)
 
                 # Ensure we have at least one topic
                 if not extracted_topics:
-                    # Use the detected topic or a fallback
-                    topic_from_text = detected_topic if detected_topic != DEFAULT_TOPIC else "therapeutic_support"
-                    extracted_topics.append(topic_from_text)
+                    # Use the standardized detected topic or a fallback
+                    standardized_topic = detector.get_standardized_topic(
+                        detected_topic if detected_topic != DEFAULT_TOPIC else "therapeutic_support"
+                    )
+                    extracted_topics.append(standardized_topic)
 
                 # Limit to top 3 topics
                 extracted_topics = extracted_topics[:3]
@@ -1699,26 +1708,38 @@ class TextGenerator:
                 extracted_topics.append(detected_topic)
 
             # Add topics from categories (up to 2 total)
+            detector = SemanticEmotionDetector()
             for category in category_names[:2]:
-                # Map category names to search terms
-                if category == "empathy_validation" and "depression" not in extracted_topics:
-                    extracted_topics.append("depression")
-                elif category == "affirmation_reassurance" and "anxiety" not in extracted_topics:
-                    extracted_topics.append("anxiety")
-                elif category == "trauma" and "trauma" not in extracted_topics:
-                    extracted_topics.append("trauma")
-                elif "cbt" in category and "cognitive_behavioral_therapy" not in extracted_topics:
-                    extracted_topics.append("cognitive_behavioral_therapy")
+                # Map category names to standardized topics
+                if category == "empathy_validation":
+                    standardized_topic = detector.get_standardized_topic("depression")
+                    if standardized_topic not in extracted_topics:
+                        extracted_topics.append(standardized_topic)
+                elif category == "affirmation_reassurance":
+                    standardized_topic = detector.get_standardized_topic("anxiety")
+                    if standardized_topic not in extracted_topics:
+                        extracted_topics.append(standardized_topic)
+                elif category == "trauma":
+                    standardized_topic = detector.get_standardized_topic("trauma")
+                    if standardized_topic not in extracted_topics:
+                        extracted_topics.append(standardized_topic)
+                elif "cbt" in category:
+                    standardized_topic = detector.get_standardized_topic("cognitive_behavioral_therapy")
+                    if standardized_topic not in extracted_topics:
+                        extracted_topics.append(standardized_topic)
 
-            # Set emotion as a topic if appropriate
+            # Set standardized emotion as a topic if appropriate
             if emotion and emotion not in ["confusion", "surprise"]:
-                extracted_topics.append(emotion)
+                standardized_emotion = detector.get_standardized_emotion(emotion)
+                extracted_topics.append(standardized_emotion)
 
             # Ensure we have at least one topic
             if not extracted_topics:
-                # Use the detected topic or a fallback
-                topic_from_text = detected_topic if detected_topic != DEFAULT_TOPIC else "therapeutic_support"
-                extracted_topics.append(topic_from_text)
+                # Use the standardized detected topic or a fallback
+                standardized_topic = detector.get_standardized_topic(
+                    detected_topic if detected_topic != DEFAULT_TOPIC else "therapeutic_support"
+                )
+                extracted_topics.append(standardized_topic)
 
             # Limit to top 3 topics
             extracted_topics = extracted_topics[:3]

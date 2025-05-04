@@ -1,12 +1,15 @@
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from jinja2 import Template
 import re
+
+import torch
+from jinja2 import Template
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # 1. Load the model and tokenizer
 model_name = "rasyosef/Phi-1_5-Instruct-v0.1"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name, torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = model.to(device)
 
@@ -16,9 +19,15 @@ context = {
     "extracted_topics": ["work stress"],
     "psychological_context": {"emotion": "concern"},
     "conversation_history": [
-        {"question": "How can I manage my anxiety?", "answer": "Try to focus on your breathing and take things one step at a time."},
-        {"question": "What if I can't sleep?", "answer": "Establish a calming bedtime routine and avoid screens before bed."}
-    ]
+        {
+            "question": "How can I manage my anxiety?",
+            "answer": "Try to focus on your breathing and take things one step at a time.",
+        },
+        {
+            "question": "What if I can't sleep?",
+            "answer": "Establish a calming bedtime routine and avoid screens before bed.",
+        },
+    ],
 }
 
 # 3. Load and render the template from a hardcoded path
