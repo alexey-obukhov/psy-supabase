@@ -35,7 +35,7 @@ jobs:
           pip install text2emotion==0.0.5
         else
           # For Python 3.10+ - use newer versions
-          pip install nltk spacy text2emotion
+          pip install numpy==1.24.4 spacy==3.7.5 nltk text2emotion
         fi
 
         # Download required models
@@ -47,14 +47,6 @@ jobs:
         # Set up pip with proper cache
         python -m pip install --upgrade pip wheel setuptools
 
-        if [[ "${{ matrix.python-version }}" == "3.8" ]]; then
-          # For Python 3.8 - stricter constraints
-          pip install numpy==1.22.4  # Known compatible version for Python 3.8
-        else
-          # For Python 3.10 - more flexibility
-          pip install numpy==1.24.4
-        fi
-
         # Install pre-built spaCy wheel to avoid compilation issues
         pip install --no-build-isolation --only-binary=:all: spacy==3.6.1
 
@@ -63,9 +55,6 @@ jobs:
 
         # Install remaining requirements, but skip already installed packages
         pip install -r requirements.txt
-
-        # Install school-logging explicitly
-        pip install git+https://github.com/vertok/school_logging.git@main#egg=school-logging
 
         # Install your package in development mode
         pip install -e .
