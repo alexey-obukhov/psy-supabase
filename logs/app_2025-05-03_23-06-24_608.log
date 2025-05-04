@@ -1,0 +1,287 @@
+2025-05-03 23:06:24.988132 - log.py - psy_supabase.__main__ - [INFO] - Application entry point executing...
+2025-05-03 23:06:28.581458 - log.py - psy_supabase.core.text_generator - [INFO] - Local development: Loading environment from .env file
+2025-05-03 23:06:28.940174 - log.py - psy_supabase.utilities.nlp_utils - [INFO] - Downloading NLTK resource: punkt
+2025-05-03 23:06:28.940580 - log.py - psy_supabase.utilities.nlp_utils - [DEBUG] - NLTK resource 'stopwords' already downloaded
+2025-05-03 23:06:28.941722 - log.py - psy_supabase.utilities.nlp_utils - [INFO] - Downloading NLTK resource: wordnet
+2025-05-03 23:06:30.241544 - log.py - psy_supabase.utilities.nlp_utils - [INFO] - Loaded spaCy model 'en_core_web_sm'
+2025-05-03 23:06:30.243312 - log.py - psy_supabase.main - [INFO] - Local development: Loading environment from .env file
+2025-05-03 23:06:31.010803 - log.py - psy_supabase.main - [INFO] - Successfully loaded spaCy model 'en_core_web_sm'
+2025-05-03 23:06:31.011761 - log.py - psy_supabase.main - [INFO] - Intelligent processing enabled: True
+2025-05-03 23:06:31.013589 - log.py - psy_supabase.main - [INFO] - Setting up application...
+2025-05-03 23:06:31.014214 - log.py - psy_supabase.main - [INFO] - Welcome to the Therapy AI Assistant! Using model: rasyosef/Phi-1_5-Instruct-v0.1 on cuda
+2025-05-03 23:06:31.015282 - log.py - psy_supabase.core.model_manager - [INFO] - Generation model found locally at /home/vertok/git-projects/psy_supabase/models/rasyosef_Phi-1_5-Instruct-v0.1
+2025-05-03 23:06:31.016300 - log.py - psy_supabase.core.model_manager - [INFO] - Embedding model found locally at /home/vertok/git-projects/psy_supabase/models/sentence-transformers_all-mpnet-base-v2
+2025-05-03 23:06:31.019791 - log.py - psy_supabase.core.model_manager - [INFO] - Toxicity model found locally at /home/vertok/git-projects/psy_supabase/models/facebook_roberta-hate-speech-dynabench-r4-target
+2025-05-03 23:06:31.023602 - log.py - psy_supabase.core.text_generator - [INFO] - GPU memory check passed: 5.93GB free of 5.93GB total
+2025-05-03 23:06:31.024427 - log.py - psy_supabase.core.text_generator - [INFO] - Loading model: /home/vertok/git-projects/psy_supabase/models/rasyosef_Phi-1_5-Instruct-v0.1
+2025-05-03 23:06:33.137850 - log.py - psy_supabase.core.text_generator - [INFO] - Model loaded successfully: /home/vertok/git-projects/psy_supabase/models/rasyosef_Phi-1_5-Instruct-v0.1
+2025-05-03 23:06:33.603747 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Initialized emotion detector with model sentence-transformers/all-MiniLM-L6-v2 on cpu
+2025-05-03 23:06:34.374938 - log.py - psy_supabase.core.text_generator - [INFO] - TextGenerator initialized with model: /home/vertok/git-projects/psy_supabase/models/rasyosef_Phi-1_5-Instruct-v0.1 on device: cuda
+2025-05-03 23:06:35.198468 - log.py - psy_supabase.main - [INFO] - Model manager initialized for rasyosef/Phi-1_5-Instruct-v0.1
+2025-05-03 23:06:35.201261 - log.py - psy_supabase.__main__ - [DEBUG] - Imported main application module.
+2025-05-03 23:06:35.201486 - log.py - psy_supabase.__main__ - [INFO] - Found app object in main module. Running app...
+2025-05-03 23:06:35.201656 - log.py - psy_supabase.__main__ - [INFO] - Running Flask/FastAPI app on 0.0.0.0:5008
+2025-05-03 23:06:43.322650 - log.py - psy_supabase.core.database - [INFO] - Schema 'test_user_2' and tables created successfully.
+2025-05-03 23:06:43.386809 - log.py - psy_supabase.core.database - [INFO] - Schema structure verification successful for test_user_2
+2025-05-03 23:06:43.387226 - log.py - psy_supabase.main - [INFO] - Received chat request from user test_user_2: my girlfrien left me and i am alone now. do not kn...
+2025-05-03 23:06:43.387533 - log.py - psy_supabase.core.model_manager - [INFO] - Ensuring generator model is on device: cuda
+2025-05-03 23:06:43.755289 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Initialized emotion detector with model sentence-transformers/all-MiniLM-L6-v2 on cpu
+2025-05-03 23:06:44.070281 - log.py - psy_supabase.core.text_generator - [INFO] - Toxicity score: 0.041897 - Text: my girlfrien left me and i am alone now. do not kn...
+2025-05-03 23:06:44.070981 - log.py - psy_supabase.core.rag_processor - [DEBUG] - Checking DB for existing embedding for query in session test_user_2
+2025-05-03 23:06:44.071555 - log.py - psy_supabase.core.model_manager - [INFO] - Ensuring generator model is on device: cuda
+2025-05-03 23:06:44.075675 - log.py - psy_supabase.core.model_manager - [INFO] - Using TextGenerator for embedding generation
+2025-05-03 23:06:44.778352 - log.py - psy_supabase.core.database - [INFO] - No similar question found with threshold 0.98
+2025-05-03 23:06:44.778713 - log.py - psy_supabase.core.rag_processor - [DEBUG] - No existing/cached embedding found. Generating new one for session test_user_2
+2025-05-03 23:06:44.779146 - log.py - psy_supabase.core.model_manager - [INFO] - Ensuring generator model is on device: cuda
+2025-05-03 23:06:44.782173 - log.py - psy_supabase.core.model_manager - [INFO] - Using TextGenerator for embedding generation
+2025-05-03 23:06:44.887139 - log.py - psy_supabase.core.rag_processor - [DEBUG] - Generated new embedding for query in session test_user_2
+2025-05-03 23:06:44.887671 - log.py - psy_supabase.core.model_manager - [INFO] - Ensuring generator model is on device: cuda
+2025-05-03 23:06:44.890665 - log.py - psy_supabase.core.model_manager - [INFO] - Using TextGenerator for embedding generation
+2025-05-03 23:06:45.141376 - log.py - psy_supabase.core.database - [DEBUG] - Retrieving conversation history for session: test_user_2
+2025-05-03 23:06:45.200926 - log.py - psy_supabase.core.database - [DEBUG] - No data returned from get_conversation_history
+2025-05-03 23:06:45.224003 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Raw topic: relationship_issues → Standardized: relationship
+2025-05-03 23:06:45.224215 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Semantic topic detected: relationship (0.77)
+2025-05-03 23:06:45.237577 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Raw emotion: concern → Standardized: anxiety
+2025-05-03 23:06:45.237917 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Semantic emotion detected: anxiety (0.79)
+2025-05-03 23:06:45.238121 - log.py - psy_supabase.utilities.prompt_selector - [DEBUG] - Using semantic emotion: anxiety (0.79)
+2025-05-03 23:06:45.238264 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Question analysed - Topic: loneliness (0.90), Emotion: anxiety (0.79)
+2025-05-03 23:06:45.297458 - log.py - psy_supabase.memory.associative_memory - [INFO] - AssociativeMemory initialized with model: sentence-transformers/all-MiniLM-L6-v2 (dim: 2048)
+2025-05-03 23:06:45.297782 - log.py - psy_supabase.core.database - [INFO] - Finding similar documents in schema: test_user_2
+2025-05-03 23:06:45.299919 - log.py - psy_supabase.core.database - [INFO] - Finding similar documents in schema: test_user_2
+2025-05-03 23:06:45.404467 - log.py - psy_supabase.core.database - [WARNING] - No similar documents found
+2025-05-03 23:06:45.404831 - log.py - psy_supabase.core.database - [DEBUG] - Retrieving conversation history for session: test_user_2
+2025-05-03 23:06:45.467030 - log.py - psy_supabase.core.database - [DEBUG] - No data returned from get_conversation_history
+2025-05-03 23:06:45.467430 - log.py - psy_supabase.core.rag_processor - [INFO] - Knowledge context: 0 chars from vector similarity search
+2025-05-03 23:06:45.467777 - log.py - psy_supabase.core.rag_processor - [INFO] - Conversation context: 0 chars
+2025-05-03 23:06:45.467932 - log.py - psy_supabase.core.rag_processor - [INFO] - Total prompt context: 0 chars
+2025-05-03 23:06:45.468191 - log.py - psy_supabase.core.database - [INFO] - Finding similar documents in schema: test_user_2
+2025-05-03 23:06:45.470294 - log.py - psy_supabase.core.database - [INFO] - Finding similar documents in schema: test_user_2
+2025-05-03 23:06:45.553967 - log.py - psy_supabase.core.database - [WARNING] - No similar documents found
+2025-05-03 23:06:45.554336 - log.py - psy_supabase.core.response_generator - [INFO] - Selected template 'empathy_validation' for direct approach 'empathy_validation'
+2025-05-03 23:06:45.554639 - log.py - psy_supabase.core.database - [DEBUG] - Retrieving conversation history for session: test_user_2
+2025-05-03 23:06:45.606908 - log.py - psy_supabase.core.database - [DEBUG] - No data returned from get_conversation_history
+2025-05-03 23:06:45.607222 - log.py - psy_supabase.core.text_generator - [INFO] - Starting dynamic RAG generation with template: empathy_validation
+2025-05-03 23:06:45.619624 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Raw topic: relationship_issues → Standardized: relationship
+2025-05-03 23:06:45.619905 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Semantic topic detected: relationship (0.77)
+2025-05-03 23:06:45.632288 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Raw emotion: concern → Standardized: anxiety
+2025-05-03 23:06:45.632552 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Semantic emotion detected: anxiety (0.79)
+2025-05-03 23:06:45.632760 - log.py - psy_supabase.utilities.prompt_selector - [DEBUG] - Using semantic emotion: anxiety (0.79)
+2025-05-03 23:06:45.632956 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Question analysed - Topic: loneliness (0.90), Emotion: anxiety (0.79)
+2025-05-03 23:06:45.647392 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Raw topic: relationship_issues → Standardized: relationship
+2025-05-03 23:06:45.647623 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Semantic topic detected: relationship (0.77)
+2025-05-03 23:06:45.662567 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Raw emotion: concern → Standardized: anxiety
+2025-05-03 23:06:45.662836 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Semantic emotion detected: anxiety (0.79)
+2025-05-03 23:06:45.662986 - log.py - psy_supabase.utilities.prompt_selector - [DEBUG] - Using semantic emotion: anxiety (0.79)
+2025-05-03 23:06:45.663119 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Question analysed - Topic: loneliness (0.90), Emotion: anxiety (0.79)
+2025-05-03 23:06:45.663370 - log.py - psy_supabase.core.text_generator - [INFO] - PromptSelector analysis: Topic=loneliness, Emotion=anxiety
+2025-05-03 23:06:45.663627 - log.py - psy_supabase.core.text_generator - [INFO] - Detected categories: ['loneliness']
+2025-05-03 23:06:46.219217 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Initialized emotion detector with model sentence-transformers/all-MiniLM-L6-v2 on cpu
+2025-05-03 23:06:46.366288 - log.py - psy_supabase.core.text_generator - [INFO] - Extracted topics for RAG retrieval: ['loneliness', 'anxiety']
+2025-05-03 23:06:46.370523 - log.py - psy_supabase.core.text_generator - [INFO] - Template 'empathy_validation' loaded successfully
+2025-05-03 23:06:46.370893 - log.py - psy_supabase.core.model_manager - [INFO] - Ensuring generator model is on device: cuda
+2025-05-03 23:06:46.374775 - log.py - psy_supabase.core.model_manager - [INFO] - Using TextGenerator for embedding generation
+2025-05-03 23:06:46.504012 - log.py - psy_supabase.core.text_generator - [DEBUG] - Pre-retrieved knowledge for topics: {'loneliness': 'No relevant interactions found.'}
+2025-05-03 23:06:46.504219 - log.py - psy_supabase.core.text_generator - [INFO] - Added pre-retrieved info for topics: ['loneliness']
+2025-05-03 23:06:46.504332 - log.py - psy_supabase.core.text_generator - [INFO] - Rendering template with context
+2025-05-03 23:06:46.504423 - log.py - psy_supabase.core.text_generator - [DEBUG] - Template context keys: ['user_question', 'dynamic_retriever', 'use_dynamic_retrieval', 'session_id', 'extracted_topics', 'query_embedding', 'psychological_context', 'enhanced_context', 'metadata', 'query_knowledge', 'query_history', 'get_pain_point', 'pre_retrieved_info']
+2025-05-03 23:06:46.504998 - log.py - psy_supabase.core.text_generator - [INFO] - Template rendered successfully, length: 339 chars (69 tokens)
+2025-05-03 23:06:46.505143 - log.py - psy_supabase.core.text_generator - [INFO] - Generating text with rendered prompt
+2025-05-03 23:06:46.511864 - log.py - psy_supabase.core.text_generator - [INFO] - Prompt token count: 69 (limit: 2048)
+2025-05-03 23:06:46.512082 - log.py - psy_supabase.core.text_generator - [INFO] - Generating text with prompt of length 339
+2025-05-03 23:06:46.512220 - log.py - psy_supabase.core.text_generator - [DEBUG] - Prompt: <|im_start|>system
+You are a therapeutic AI assistant trained to provide supportive, empathetic responses for psychological well-being. Your goal is to help the person feel heard, understood, and supported.<|im_end|>
+<|im_start|>user
+
+my girlfrien left me and i am alone now. do not know how to live anymore<|im_end|>
+<|im_start|>assistant
+2025-05-03 23:06:55.336030 - log.py - psy_supabase.core.text_generator - [WARNING] - CUDA out of memory. Trying on CPU...
+2025-05-03 23:07:40.637775 - log.py - psy_supabase.core.text_generator - [INFO] - Generated text of length 1158
+2025-05-03 23:07:40.638108 - log.py - psy_supabase.core.text_generator - [DEBUG] - Generated text: I'm here for you during this difficult time of feeling lonely or uncertain about your future after leaving someone important in your life like a girlfriend/partner behind. Remember that it's normal to experience emotions such as sadness, confusion, or even anger when going through changes in relationships. Allow yourself these feelings while also seeking support from friends, family members, therapists, or other trusted individuals who can offer guidance and perspective on navigating new circumstances without them around all the time. It may be helpful to engage in self-care activities, explore hobbies or interests outside of romantic partnerships, focus on personal growth opportunities (education, career development), maintain social connections with others beyond just one relationship type, and practice mindfulness techniques if needed. With patience and resilience, I believe you'll find ways to adapt and thrive despite being single again. You're never truly alone; there will always be people willing to lend an ear and share their experiences whenever they come across another individual facing similar challenges. Stay strong! 💪🌟<|im_end|>
+2025-05-03 23:07:40.638375 - log.py - psy_supabase.core.text_generator - [INFO] - Generated response of length 1158
+2025-05-03 23:07:40.638519 - log.py - psy_supabase.core.text_generator - [DEBUG] - First 100 chars of response: I'm here for you during this difficult time of feeling lonely or uncertain about your future after l
+2025-05-03 23:07:40.638651 - log.py - psy_supabase.core.text_generator - [DEBUG] - Cleaning therapeutic response of length 1158
+2025-05-03 23:07:40.638783 - log.py - psy_supabase.core.text_generator - [INFO] - Removed <|im_end|> marker from response
+2025-05-03 23:07:40.638916 - log.py - psy_supabase.core.text_generator - [INFO] - Cleaned response, final length: 1148
+2025-05-03 23:07:40.639051 - log.py - psy_supabase.core.response_generator - [INFO] - Generated response with dynamic retrieval template 'empathy_validation'
+2025-05-03 23:07:41.231031 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Initialized emotion detector with model sentence-transformers/all-MiniLM-L6-v2 on cpu
+2025-05-03 23:07:41.346408 - log.py - psy_supabase.core.response_generator - [INFO] - Standardized approach: empathy_validation → supportive_listening
+2025-05-03 23:07:41.357519 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Raw topic: relationship_issues → Standardized: relationship
+2025-05-03 23:07:41.357747 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Semantic topic detected: relationship (0.77)
+2025-05-03 23:07:41.372614 - log.py - psy_supabase.utilities.semantic_emotion_detector - [INFO] - Raw emotion: concern → Standardized: anxiety
+2025-05-03 23:07:41.372846 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Semantic emotion detected: anxiety (0.79)
+2025-05-03 23:07:41.372997 - log.py - psy_supabase.utilities.prompt_selector - [DEBUG] - Using semantic emotion: anxiety (0.79)
+2025-05-03 23:07:41.373143 - log.py - psy_supabase.utilities.prompt_selector - [INFO] - Question analysed - Topic: loneliness (0.90), Emotion: anxiety (0.79)
+2025-05-03 23:07:41.377780 - log.py - psy_supabase.core.database - [INFO] - Ensuring schema exists for user: test_user_2
+2025-05-03 23:07:41.547760 - log.py - psy_supabase.core.database - [DEBUG] - Schema 'test_user_2' already exists, skipping creation
+2025-05-03 23:07:41.548389 - log.py - psy_supabase.core.database - [INFO] - Adding session_id to metadata: test_user_2
+2025-05-03 23:07:41.549320 - log.py - psy_supabase.core.database - [INFO] - Calling add_interaction RPC with schema: test_user_2, session_id: test_user_2
+2025-05-03 23:07:41.638479 - log.py - psy_supabase.core.database - [INFO] - RPC response: 1
+2025-05-03 23:07:41.639168 - log.py - psy_supabase.core.database - [INFO] - Interaction saved successfully with ID: 1
+2025-05-03 23:07:41.639720 - log.py - psy_supabase.core.database - [INFO] - Generating embedding for question
+2025-05-03 23:07:41.641307 - log.py - psy_supabase.core.model_manager - [INFO] - Ensuring generator model is on device: cuda
+2025-05-03 23:07:42.471360 - log.py - psy_supabase.core.model_manager - [INFO] - Using TextGenerator for embedding generation
+2025-05-03 23:07:42.487971 - log.py - psy_supabase.core.text_generator - [ERROR] - Error during embedding generation: CUDA out of memory. Tried to allocate 2.00 MiB. GPU 0 has a total capacity of 5.93 GiB of which 1024.00 KiB is free. Including non-PyTorch memory, this process has 5.92 GiB memory in use. Of the allocated memory 5.79 GiB is allocated by PyTorch, and 52.71 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+2025-05-03 23:07:42.489750 - log.py - psy_supabase.core.text_generator - [ERROR] - Traceback (most recent call last):
+  File "/home/vertok/git-projects/psy_supabase/psy_supabase/core/text_generator.py", line 821, in get_embedding
+    outputs = self.model(**inputs, output_hidden_states=True)  # Line 765
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 1235, in forward
+    outputs = self.model(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 980, in forward
+    layer_outputs = decoder_layer(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 720, in forward
+    feed_forward_hidden_states = self.resid_dropout(self.mlp(hidden_states))
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 225, in forward
+    hidden_states = self.fc2(hidden_states)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 117, in forward
+    return F.linear(input, self.weight, self.bias)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 MiB. GPU 0 has a total capacity of 5.93 GiB of which 1024.00 KiB is free. Including non-PyTorch memory, this process has 5.92 GiB memory in use. Of the allocated memory 5.79 GiB is allocated by PyTorch, and 52.71 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+2025-05-03 23:07:42.490053 - log.py - psy_supabase.core.model_manager - [INFO] - Generating embedding directly from model hidden states
+2025-05-03 23:07:42.524647 - log.py - psy_supabase.core.model_manager - [ERROR] - Error generating embedding with main model: CUDA out of memory. Tried to allocate 2.00 MiB. GPU 0 has a total capacity of 5.93 GiB of which 1024.00 KiB is free. Including non-PyTorch memory, this process has 5.92 GiB memory in use. Of the allocated memory 5.79 GiB is allocated by PyTorch, and 52.71 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+2025-05-03 23:07:42.525108 - log.py - psy_supabase.core.model_manager - [ERROR] - Traceback (most recent call last):
+  File "/home/vertok/git-projects/psy_supabase/psy_supabase/core/model_manager.py", line 325, in generate_embedding
+    outputs = generator.model(**inputs, output_hidden_states=True)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 1235, in forward
+    outputs = self.model(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 980, in forward
+    layer_outputs = decoder_layer(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 720, in forward
+    feed_forward_hidden_states = self.resid_dropout(self.mlp(hidden_states))
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 225, in forward
+    hidden_states = self.fc2(hidden_states)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 117, in forward
+    return F.linear(input, self.weight, self.bias)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 MiB. GPU 0 has a total capacity of 5.93 GiB of which 1024.00 KiB is free. Including non-PyTorch memory, this process has 5.92 GiB memory in use. Of the allocated memory 5.79 GiB is allocated by PyTorch, and 52.71 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+2025-05-03 23:07:42.568436 - log.py - psy_supabase.core.model_manager - [ERROR] - Error generating embedding with sentence transformer: CUDA out of memory. Tried to allocate 2.00 MiB. GPU 0 has a total capacity of 5.93 GiB of which 1024.00 KiB is free. Including non-PyTorch memory, this process has 5.92 GiB memory in use. Of the allocated memory 5.79 GiB is allocated by PyTorch, and 52.71 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+2025-05-03 23:07:42.570187 - log.py - psy_supabase.core.model_manager - [ERROR] - Traceback (most recent call last):
+  File "/home/vertok/git-projects/psy_supabase/psy_supabase/core/model_manager.py", line 325, in generate_embedding
+    outputs = generator.model(**inputs, output_hidden_states=True)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 1235, in forward
+    outputs = self.model(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 980, in forward
+    layer_outputs = decoder_layer(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 720, in forward
+    feed_forward_hidden_states = self.resid_dropout(self.mlp(hidden_states))
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/phi/modeling_phi.py", line 225, in forward
+    hidden_states = self.fc2(hidden_states)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 117, in forward
+    return F.linear(input, self.weight, self.bias)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 MiB. GPU 0 has a total capacity of 5.93 GiB of which 1024.00 KiB is free. Including non-PyTorch memory, this process has 5.92 GiB memory in use. Of the allocated memory 5.79 GiB is allocated by PyTorch, and 52.71 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/vertok/git-projects/psy_supabase/psy_supabase/core/model_manager.py", line 369, in generate_embedding_with_sentence_transformer
+    embedding = self.sentence_transformer.encode(text)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/sentence_transformers/SentenceTransformer.py", line 621, in encode
+    out_features = self.forward(features, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/sentence_transformers/SentenceTransformer.py", line 688, in forward
+    input = module(input, **module_kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/sentence_transformers/models/Transformer.py", line 350, in forward
+    output_states = self.auto_model(**trans_features, **kwargs, return_dict=False)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/mpnet/modeling_mpnet.py", line 544, in forward
+    encoder_outputs = self.encoder(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/mpnet/modeling_mpnet.py", line 334, in forward
+    layer_outputs = layer_module(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/mpnet/modeling_mpnet.py", line 293, in forward
+    self_attention_outputs = self.attention(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/mpnet/modeling_mpnet.py", line 234, in forward
+    self_outputs = self.attn(
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/transformers/models/mpnet/modeling_mpnet.py", line 161, in forward
+    q = self.q(hidden_states)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/vertok/git-projects/psy_supabase/.venv/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 117, in forward
+    return F.linear(input, self.weight, self.bias)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 MiB. GPU 0 has a total capacity of 5.93 GiB of which 1024.00 KiB is free. Including non-PyTorch memory, this process has 5.92 GiB memory in use. Of the allocated memory 5.79 GiB is allocated by PyTorch, and 52.71 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+2025-05-03 23:07:42.674596 - log.py - psy_supabase.core.database - [INFO] - Storing embedding for interaction 1
+2025-05-03 23:07:42.751210 - log.py - psy_supabase.core.database - [WARNING] - Embedding storage function returned: False
+2025-05-03 23:07:45.709353 - log.py - psy_supabase.utilities.utils - [INFO] - GPU memory cleanup: 5.69GB → 5.69GB allocated, 5.84GB → 5.73GB reserved

@@ -1,0 +1,258 @@
+[
+  {
+    "name": "workplace_trauma Pattern",
+    "session_id": "workplace_trauma_session",
+    "exchanges": [
+      {
+        "question": "I had a really difficult day at work today. My boss criticized me in front of everyone again.",
+        "answer": "I understand how challenging that must feel. Could you tell me more about when you first noticed this?",
+        "pain_point_detected": false,
+        "recurring_themes": [
+          "work"
+        ]
+      },
+      {
+        "question": "Why do I always feel so nervous before team meetings? I'm prepared but still worry about being called out.",
+        "answer": "It sounds like this situation has been difficult for you. How has it been affecting other areas of your life?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "Should I start looking for another job? I'm tired of feeling inadequate every day in this place.",
+        "answer": "I'm hearing that this is something you've been struggling with. What have you tried so far to address it?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "How do I stop obsessing over every email my supervisor sends? I keep looking for hidden criticisms.",
+        "answer": "That's a really important concern you're raising. How do you feel when you think about this issue?",
+        "pain_point_detected": true,
+        "recurring_themes": [
+          "criticism"
+        ]
+      },
+      {
+        "question": "Yesterday during our department meeting, my manager pointed out my mistake in front of the whole team.",
+        "answer": "Thank you for sharing that with me. It takes courage to discuss these feelings. How long have you been experiencing this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "My heart races whenever my boss schedules a one-on-one meeting with no agenda.",
+        "answer": "I understand how challenging that must feel. Could you tell me more about when you first noticed this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "I feel like I'm walking on eggshells in my workplace, constantly afraid of making a mistake.",
+        "answer": "It sounds like this situation has been difficult for you. How has it been affecting other areas of your life?",
+        "pain_point_detected": true,
+        "recurring_themes": [
+          "workplace",
+          "work"
+        ]
+      },
+      {
+        "question": "I overanalyze everything I say in work meetings because I'm afraid of sounding incompetent.",
+        "answer": "I'm hearing that this is something you've been struggling with. What have you tried so far to address it?",
+        "pain_point_detected": false,
+        "recurring_themes": [
+          "work"
+        ]
+      },
+      {
+        "question": "Sometimes I rehearse what I'll say in meetings for hours beforehand.",
+        "answer": "That's a really important concern you're raising. How do you feel when you think about this issue?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "My colleagues seem so confident while presenting their ideas, but I always feel judged.",
+        "answer": "Thank you for sharing that with me. It takes courage to discuss these feelings. How long have you been experiencing this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      }
+    ],
+    "pain_point_detected": 2,
+    "first_detection_at": 4,
+    "detected_themes": [
+      "workplace",
+      "inadequacy",
+      "criticism",
+      "work"
+    ],
+    "detected_approaches": [],
+    "expected_themes": [
+      "workplace",
+      "inadequacy",
+      "humiliation",
+      "criticism",
+      "anxiety"
+    ]
+  },
+  {
+    "name": "Relationship Insecurity Pattern",
+    "session_id": "relationship_insecurity_session",
+    "exchanges": [
+      {
+        "question": "My partner was texting someone and smiling, but wouldn't tell me who it was.",
+        "answer": "I understand how challenging that must feel. Could you tell me more about when you first noticed this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "Is it normal to check your partner's phone when they're sleeping?",
+        "answer": "It sounds like this situation has been difficult for you. How has it been affecting other areas of your life?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "I can't stop thinking about who my partner might be talking to when we're apart.",
+        "answer": "I'm hearing that this is something you've been struggling with. What have you tried so far to address it?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "Sometimes I make up excuses to call my partner just to check where they are.",
+        "answer": "That's a really important concern you're raising. How do you feel when you think about this issue?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "When my boyfriend gets a text message, I feel anxious until I know who it's from.",
+        "answer": "Thank you for sharing that with me. It takes courage to discuss these feelings. How long have you been experiencing this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "I found myself looking through my girlfriend's social media followers yesterday.",
+        "answer": "I understand how challenging that must feel. Could you tell me more about when you first noticed this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "Do most people worry about their partner cheating as much as I do?",
+        "answer": "It sounds like this situation has been difficult for you. How has it been affecting other areas of your life?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "I feel physically sick when my partner goes out without me.",
+        "answer": "I'm hearing that this is something you've been struggling with. What have you tried so far to address it?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "Yesterday I drove by my partner's workplace to make sure their car was there.",
+        "answer": "That's a really important concern you're raising. How do you feel when you think about this issue?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "I hate that I feel so jealous all the time, but I can't seem to control it.",
+        "answer": "Thank you for sharing that with me. It takes courage to discuss these feelings. How long have you been experiencing this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      }
+    ],
+    "pain_point_detected": 0,
+    "first_detection_at": null,
+    "detected_themes": [
+      "relationship",
+      "anxiety"
+    ],
+    "detected_approaches": [],
+    "expected_themes": [
+      "jealousy",
+      "trust",
+      "anxiety",
+      "insecurity",
+      "relationship"
+    ]
+  },
+  {
+    "name": "family_dynamics Conflict",
+    "session_id": "family_dynamics_session",
+    "exchanges": [
+      {
+        "question": "My mother always favors my sister over me, no matter what I achieve.",
+        "answer": "I understand how challenging that must feel. Could you tell me more about when you first noticed this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "I dread family gatherings because I always feel like an outsider.",
+        "answer": "It sounds like this situation has been difficult for you. How has it been affecting other areas of your life?",
+        "pain_point_detected": true,
+        "recurring_themes": [
+          "family"
+        ]
+      },
+      {
+        "question": "Why do I still seek my parents' approval even though I'm in my 30s?",
+        "answer": "I'm hearing that this is something you've been struggling with. What have you tried so far to address it?",
+        "pain_point_detected": true,
+        "recurring_themes": []
+      },
+      {
+        "question": "I find myself acting like a teenager again whenever I visit my childhood home.",
+        "answer": "That's a really important concern you're raising. How do you feel when you think about this issue?",
+        "pain_point_detected": true,
+        "recurring_themes": []
+      },
+      {
+        "question": "Last week at dinner, my mom praised my brother for a promotion but barely acknowledged my new job.",
+        "answer": "Thank you for sharing that with me. It takes courage to discuss these feelings. How long have you been experiencing this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "Whenever I disagree with my father, he brings up mistakes I made years ago.",
+        "answer": "I understand how challenging that must feel. Could you tell me more about when you first noticed this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "I spend hours preparing for family visits, but still feel ignored when I'm there.",
+        "answer": "It sounds like this situation has been difficult for you. How has it been affecting other areas of your life?",
+        "pain_point_detected": true,
+        "recurring_themes": [
+          "family"
+        ]
+      },
+      {
+        "question": "My siblings all seem to have inside jokes that I'm not part of.",
+        "answer": "I'm hearing that this is something you've been struggling with. What have you tried so far to address it?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      },
+      {
+        "question": "I notice I become very quiet and withdrawn around my family, unlike how I am with friends.",
+        "answer": "That's a really important concern you're raising. How do you feel when you think about this issue?",
+        "pain_point_detected": true,
+        "recurring_themes": [
+          "family"
+        ]
+      },
+      {
+        "question": "Why do I care so much about what my parents think when they've never really understood me?",
+        "answer": "Thank you for sharing that with me. It takes courage to discuss these feelings. How long have you been experiencing this?",
+        "pain_point_detected": false,
+        "recurring_themes": []
+      }
+    ],
+    "pain_point_detected": 5,
+    "first_detection_at": 2,
+    "detected_themes": [
+      "family"
+    ],
+    "detected_approaches": [],
+    "expected_themes": [
+      "favoritism",
+      "family",
+      "childhood",
+      "rejection",
+      "approval"
+    ]
+  }
+]

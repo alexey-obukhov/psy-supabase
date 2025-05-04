@@ -1,0 +1,66 @@
+[
+  {
+    "keyword": "anxiety",
+    "technique": "cbt",
+    "template": "cognitive_behavioral_therapy",
+    "topic": "anxiety",
+    "expected_topic": null,
+    "expected_approach": null
+  },
+  {
+    "keyword": "worried",
+    "technique": "cbt",
+    "template": "cognitive_behavioral_therapy",
+    "topic": "general_support",
+    "expected_topic": null,
+    "expected_approach": null
+  },
+  {
+    "keyword": "relationship",
+    "technique": "interpersonal_therapy",
+    "template": "relationship_issues",
+    "topic": "relationship",
+    "expected_topic": null,
+    "expected_approach": null
+  },
+  {
+    "keyword": "alone",
+    "technique": "attachment_based_therapy",
+    "template": "empathy_validation",
+    "topic": "abandonment",
+    "expected_topic": null,
+    "expected_approach": null
+  },
+  {
+    "keyword": "sad",
+    "technique": "behavioral_activation",
+    "template": "depression",
+    "topic": "depression",
+    "expected_topic": null,
+    "expected_approach": null
+  },
+  {
+    "keyword": "grief",
+    "technique": "grief_processing",
+    "template": "grief_loss",
+    "topic": "grief",
+    "expected_topic": null,
+    "expected_approach": null
+  },
+  {
+    "keyword": "failure",
+    "technique": "compassion_focused_therapy",
+    "template": "empathy_validation",
+    "topic": "self-worth",
+    "expected_topic": null,
+    "expected_approach": null
+  },
+  {
+    "keyword": "trauma",
+    "technique": "trauma",
+    "template": "trauma",
+    "topic": "trauma",
+    "expected_topic": null,
+    "expected_approach": null
+  }
+]

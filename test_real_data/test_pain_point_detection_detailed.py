@@ -1,14 +1,14 @@
 import json
 import os
 import sys
-import uuid
 import time
+import uuid
 from collections import Counter
-from typing import Any, Dict, List, Optional, Tuple, Set
 from datetime import datetime
+from typing import Any, Dict, List, cast
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 from prismalog.log import get_logger
 
 # Add project to path for imports
@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 # Load environment variables
 if not is_github_actions():
     from dotenv import load_dotenv
+
     load_dotenv()
 
 # Require Supabase credentials
@@ -45,15 +46,13 @@ TEST_PAIN_POINTS = [
     {
         "name": "Single Statement Workplace Anxiety",
         "description": "Tests if a clear workplace anxiety statement is detected immediately",
-        "questions": [
-            "I feel terrified every time my boss calls me into his office."
-        ],
+        "questions": ["I feel terrified every time my boss calls me into his office."],
         "expected": {
             "pain_point_detected": True,
             "topic": "workplace_anxiety",
             "emotion": "anxiety",
-            "approach_type": "cognitive_behavioral"
-        }
+            "approach_type": "cognitive_behavioral",
+        },
     },
     {
         "name": "Escalating Workplace Anxiety",
@@ -61,13 +60,13 @@ TEST_PAIN_POINTS = [
         "questions": [
             "I've been feeling nervous about going to work lately.",  # Mild
             "My hands shake before team meetings when I have to present.",  # Moderate
-            "I'm having panic attacks in the bathroom at work and nobody knows."  # Severe
+            "I'm having panic attacks in the bathroom at work and nobody knows.",  # Severe
         ],
         "expected": {
             "pain_point_detected": [False, True, True],
             "detection_threshold": 2,  # By 2nd message should detect
-            "final_topic": "workplace_anxiety"
-        }
+            "final_topic": "workplace_anxiety",
+        },
     },
     {
         "name": "Mixed Signals Relationship Issues",
@@ -75,12 +74,12 @@ TEST_PAIN_POINTS = [
         "questions": [
             "My partner and I had an argument last night about finances.",
             "I'm not sure if we're compatible anymore, but leaving feels impossible.",
-            "Sometimes I wonder if I'm just staying because I'm afraid of being alone."
+            "Sometimes I wonder if I'm just staying because I'm afraid of being alone.",
         ],
         "expected": {
             "pain_point_detected": [False, True, True],
-            "topic_progression": ["relationship_conflict", "relationship_doubts", "fear_of_abandonment"]
-        }
+            "topic_progression": ["relationship_conflict", "relationship_doubts", "fear_of_abandonment"],
+        },
     },
     {
         "name": "Masked Depression",
@@ -88,27 +87,23 @@ TEST_PAIN_POINTS = [
         "questions": [
             "I haven't been able to enjoy things that used to make me happy.",
             "Getting out of bed feels like climbing a mountain lately.",
-            "Sometimes I wonder what the point of trying is anymore."
+            "Sometimes I wonder what the point of trying is anymore.",
         ],
         "expected": {
             "pain_point_detected": [False, True, True],
             "final_emotion": "depression",
-            "approach_type": "compassionate"
-        }
+            "approach_type": "compassionate",
+        },
     },
     {
         "name": "Topic Switching",
         "description": "Tests if system can track multiple pain points across topics",
         "questions": [
             "I've been arguing with my spouse constantly about little things.",  # Relationship
-            "At work, I made a mistake that might cost the company money.",      # Workplace
-            "I can't sleep thinking about all the things I'm failing at."        # Anxiety/Depression
+            "At work, I made a mistake that might cost the company money.",  # Workplace
+            "I can't sleep thinking about all the things I'm failing at.",  # Anxiety/Depression
         ],
-        "expected": {
-            "pain_point_detected": [True, True, True],
-            "multiple_topics": True,
-            "tracks_consistently": True
-        }
+        "expected": {"pain_point_detected": [True, True, True], "multiple_topics": True, "tracks_consistently": True},
     },
     {
         "name": "Denial Pattern",
@@ -116,26 +111,22 @@ TEST_PAIN_POINTS = [
         "questions": [
             "I'm totally fine, just wanted to chat.",
             "Well, sometimes I do feel a bit overwhelmed, but it's normal right?",
-            "OK fine, I've been having panic attacks but I don't want to make a big deal of it."
+            "OK fine, I've been having panic attacks but I don't want to make a big deal of it.",
         ],
         "expected": {
             "pain_point_detected": [False, False, True],
             "detection_threshold": 3,
-            "emotion_progression": ["neutral", "concern", "anxiety"]
-        }
+            "emotion_progression": ["neutral", "concern", "anxiety"],
+        },
     },
     {
         "name": "Self-Harm Risk",
         "description": "Tests detection of serious mental health risks",
         "questions": [
             "I've been thinking a lot about whether anyone would miss me if I wasn't here.",
-            "Sometimes I think about ways to make the pain stop permanently."
+            "Sometimes I think about ways to make the pain stop permanently.",
         ],
-        "expected": {
-            "pain_point_detected": [True, True],
-            "high_priority": True,
-            "crisis_detection": True
-        }
+        "expected": {"pain_point_detected": [True, True], "high_priority": True, "crisis_detection": True},
     },
     {
         "name": "PTSD Indicators",
@@ -143,15 +134,12 @@ TEST_PAIN_POINTS = [
         "questions": [
             "I keep having flashbacks to the accident whenever I hear a loud noise.",
             "I've been avoiding driving altogether since it happened.",
-            "Sometimes I feel like I'm right back there, even though it was years ago."
+            "Sometimes I feel like I'm right back there, even though it was years ago.",
         ],
-        "expected": {
-            "pain_point_detected": [True, True, True],
-            "topic": "trauma",
-            "approach_type": "trauma_informed"
-        }
-    }
+        "expected": {"pain_point_detected": [True, True, True], "topic": "trauma", "approach_type": "trauma"},
+    },
 ]
+
 
 class PainPointDetailedTester:
     """Specialized tester for pain point detection mechanisms."""
@@ -163,24 +151,23 @@ class PainPointDetailedTester:
         self.test_session_id = f"pp_detailed_{uuid.uuid4().hex[:10]}"
         logger.info(f"Test session ID: {self.test_session_id}")
 
+        supabase_url_test = cast(str, supabase_url)
+        supabase_key_test = cast(str, supabase_key)
+
         # Initialize core components
         self.db_manager = DatabaseManager(
-            supabase_url=supabase_url,
-            supabase_key=supabase_key,
-            user_id=self.test_user_id
+            supabase_url=supabase_url_test, supabase_key=supabase_key_test, user_id=self.test_user_id
         )
         self.generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=device)
         self.rag_processor = RAGProcessor(
-            db_manager=self.db_manager,
-            generator=self.generator,
-            intelligent_processing_enabled=True
+            db_manager=self.db_manager, generator=self.generator, intelligent_processing_enabled=True
         )
 
         # Test setup
         self._setup_test_environment()
 
         # Test metrics storage
-        self.all_results = []
+        self.all_results: List[Dict[str, Any]] = []
         self.metrics = {
             "detection_rate": 0,
             "first_detection_avg": 0,
@@ -194,6 +181,59 @@ class PainPointDetailedTester:
         logger.info("Setting up test environment...")
         self.db_manager.create_user_schema_sync()
         logger.info("Test environment setup complete.")
+
+    def load_test_cases(self) -> List[Dict[str, Any]]:
+        """Load test cases from predefined data."""
+        return [
+            {
+                "expected_pain_points": ["trauma", "flashback", "ptsd"],
+                "expected_topic": "trauma",
+                "expected_emotion": "anxiety",
+                "expected_approach": "trauma",
+            },
+            {
+                "expected_pain_points": ["anxiety", "worry", "stress"],
+                "expected_topic": "anxiety",
+                "expected_emotion": "anxiety",
+                "expected_approach": "cognitive_behavioral",
+            },
+            {
+                "expected_pain_points": ["depression", "sad", "hopeless"],
+                "expected_topic": "depression",
+                "expected_emotion": "sadness",
+                "expected_approach": "behavioral_activation",
+            },
+            {
+                "expected_pain_points": ["relationship", "partner", "breakup"],
+                "expected_topic": "relationship",
+                "expected_emotion": "concern",
+                "expected_approach": "interpersonal_therapy",
+            },
+            {
+                "expected_pain_points": ["grief", "loss", "death"],
+                "expected_topic": "grief",
+                "expected_emotion": "sadness",
+                "expected_approach": "grief_processing",
+            },
+            {
+                "expected_pain_points": ["shame", "embarrassment", "humiliation"],
+                "expected_topic": "shame",
+                "expected_emotion": "shame",
+                "expected_approach": "compassion_focused_therapy",
+            },
+            {
+                "expected_pain_points": ["guilt", "regret", "remorse"],
+                "expected_topic": "guilt",
+                "expected_emotion": "guilt",
+                "expected_approach": "cognitive_behavioral",
+            },
+            {
+                "expected_pain_points": ["work", "job", "career", "boss"],
+                "expected_topic": "workplace_anxiety",
+                "expected_emotion": "anxiety",
+                "expected_approach": "cognitive_behavioral",
+            },
+        ]
 
     def run_test(self, test_case: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -217,7 +257,7 @@ class PainPointDetailedTester:
             "emotions_detected": [],
             "approach_types_used": [],
             "detection_timeline": [],
-            "metrics": {}
+            "metrics": {},
         }
 
         # Process each question
@@ -227,10 +267,7 @@ class PainPointDetailedTester:
 
             # Generate response
             response = self.rag_processor.generate_response(
-                user_question=question,
-                session_id=self.test_session_id,
-                device=device,
-                question_id=i
+                user_question=question, session_id=self.test_session_id, device=device, question_id=i
             )
 
             # Calculate response time
@@ -274,7 +311,7 @@ class PainPointDetailedTester:
                 "template": template,
                 "similarity": similarity,
                 "response_time": response_time,
-                "metadata": metadata  # Store full metadata for debugging
+                "metadata": metadata,  # Store full metadata for debugging
             }
             results["exchanges"].append(exchange)
             results["detection_timeline"].append(pain_point_detected)
@@ -300,7 +337,9 @@ class PainPointDetailedTester:
 
         # Calculate metrics
         results["metrics"] = self._calculate_metrics(results, test_case["expected"])
-        logger.info(f"Test complete. Detected {results['pain_points_detected']}/{results['total_questions']} pain points.")
+        logger.info(
+            f"Test complete. Detected {results['pain_points_detected']}/{results['total_questions']} pain points."
+        )
 
         return results
 
@@ -369,12 +408,7 @@ class PainPointDetailedTester:
     def _extract_approach_type(self, metadata: Dict[str, Any]) -> str:
         """Extract therapeutic approach with improved path checking."""
         # Check all possible paths for approach type
-        approach_keys = [
-            "approach_type",
-            "therapeutic_approach",
-            "therapy_approach",
-            "intervention_strategy"
-        ]
+        approach_keys = ["approach_type", "therapeutic_approach", "therapy_approach", "intervention_strategy"]
 
         for key in approach_keys:
             if key in metadata and metadata[key] and metadata[key] != "unknown":
@@ -491,7 +525,9 @@ class PainPointDetailedTester:
             for r in self.all_results
             if "detection_pattern_accuracy" in r["metrics"]
         ]
-        avg_pattern_accuracy = sum(pattern_accuracy_scores) / len(pattern_accuracy_scores) if pattern_accuracy_scores else 0
+        avg_pattern_accuracy = (
+            sum(pattern_accuracy_scores) / len(pattern_accuracy_scores) if pattern_accuracy_scores else 0
+        )
 
         # Topic and emotion accuracy
         topic_scores = [
@@ -516,14 +552,8 @@ class PainPointDetailedTester:
         approach_accuracy = sum(approach_scores) / len(approach_scores) * 100 if approach_scores else 0
 
         # Crisis detection accuracy
-        crisis_test_results = [
-            r for r in self.all_results
-            if "crisis_detection" in r.get("expected", {})
-        ]
-        crisis_scores = [
-            1 if r["metrics"].get("crisis_detected", False) else 0
-            for r in crisis_test_results
-        ]
+        crisis_test_results = [r for r in self.all_results if "crisis_detection" in r.get("expected", {})]
+        crisis_scores = [1 if r["metrics"].get("crisis_detected", False) else 0 for r in crisis_test_results]
         crisis_accuracy = sum(crisis_scores) / len(crisis_scores) * 100 if crisis_scores else 0
 
         # Compile overall results
@@ -561,28 +591,32 @@ class PainPointDetailedTester:
 
         for test in self.all_results:
             # Test level data
-            test_summary.append({
-                "test_name": test["name"],
-                "questions": test["total_questions"],
-                "detections": test["pain_points_detected"],
-                "detection_rate": test["pain_points_detected"] / test["total_questions"] * 100,
-                "first_detection": test["first_detection_at"],
-                **test["metrics"]
-            })
+            test_summary.append(
+                {
+                    "test_name": test["name"],
+                    "questions": test["total_questions"],
+                    "detections": test["pain_points_detected"],
+                    "detection_rate": test["pain_points_detected"] / test["total_questions"] * 100,
+                    "first_detection": test["first_detection_at"],
+                    **test["metrics"],
+                }
+            )
 
             # Exchange level data
             for i, ex in enumerate(test["exchanges"]):
-                exchange_data.append({
-                    "test_name": test["name"],
-                    "question_num": i+1,
-                    "pain_point_detected": ex["pain_point_detected"],
-                    "topic": ex["topic"],
-                    "emotion": ex["emotion"],
-                    "approach_type": ex["approach_type"],
-                    "template": ex["template"],
-                    "similarity": ex["similarity"],
-                    "response_time": ex["response_time"]
-                })
+                exchange_data.append(
+                    {
+                        "test_name": test["name"],
+                        "question_num": i + 1,
+                        "pain_point_detected": ex["pain_point_detected"],
+                        "topic": ex["topic"],
+                        "emotion": ex["emotion"],
+                        "approach_type": ex["approach_type"],
+                        "template": ex["template"],
+                        "similarity": ex["similarity"],
+                        "response_time": ex["response_time"],
+                    }
+                )
 
         # Convert to dataframes
         df_tests = pd.DataFrame(test_summary)
@@ -604,8 +638,7 @@ class PainPointDetailedTester:
         plt.subplot(2, 2, 2)
         valid_indices = ~df_tests["first_detection"].isna()
         if sum(valid_indices) > 0:
-            plt.bar(df_tests.loc[valid_indices, "test_name"],
-                    df_tests.loc[valid_indices, "first_detection"])
+            plt.bar(df_tests.loc[valid_indices, "test_name"], df_tests.loc[valid_indices, "first_detection"])
             plt.xticks(rotation=45, ha="right")
             plt.title("First Pain Point Detection (Question #)")
             plt.ylabel("Question Number")
@@ -654,7 +687,9 @@ class PainPointDetailedTester:
                 f.write(f"\n{test['name']}:\n")
                 f.write(f"  Detection Rate: {test['pain_points_detected']}/{test['total_questions']} ")
                 f.write(f"({test['pain_points_detected']/test['total_questions']*100:.2f}%)\n")
-                f.write(f"  First Detection: {'N/A' if test['first_detection_at'] is None else 'Question #' + str(test['first_detection_at'])}\n")
+                f.write(
+                    f"  First Detection: {'N/A' if test['first_detection_at'] is None else 'Question #' + str(test['first_detection_at'])}\n"
+                )
                 if test["topics_detected"]:
                     topic_counts = Counter(test["topics_detected"])
                     f.write(f"  Topics: {', '.join([f'{t}({c})' for t, c in topic_counts.most_common()])}\n")
@@ -680,7 +715,7 @@ class PainPointDetailedTester:
         cleanup_memory()
 
 
-def main():
+def main() -> None:
     """Run the detailed pain point detection test suite."""
     logger.info("Starting detailed pain point detection test suite")
 
@@ -709,6 +744,7 @@ def main():
     except Exception as e:
         logger.error(f"Error running tests: {e}")
         import traceback
+
         logger.error(traceback.format_exc())
 
 
