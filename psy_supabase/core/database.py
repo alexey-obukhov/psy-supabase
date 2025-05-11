@@ -353,7 +353,6 @@ class DatabaseManager:
             # First check if schema already exists
             schema_check = self.supabase.rpc("get_schema_exists", {"p_schema_name": self.schema_name}).execute()
 
-            # If schema exists, no need to create it
             if schema_check.data:
                 logger.debug("Schema '%s' already exists, skipping creation", self.schema_name)
                 return True
@@ -401,21 +400,6 @@ class DatabaseManager:
         logger.info("Retrieved interaction history for user %s: %s", user_id, history)
         return history
 
-    def ensure_user_schema_view(self, user_id: str) -> bool:
-        """Ensure the view for the user schema exists in the public schema"""
-        logger.info("Ensuring view exists for user: %s with schema %s", user_id, self.schema_name)
-
-        # Call SQL function to ensure the view exists
-        sql_query = f"SELECT ensure_user_schema_view('{self.schema_name}')"
-        response = self.supabase.rpc("sql", {"command": sql_query}).execute()
-
-        if response.data is None:
-            logger.error("Error confirming view for user %s", user_id)
-            return False
-
-        logger.info("View for user %s confirmed.", user_id)
-        return True
-
     def _sanitize_schema_name(self, user_id: str) -> str:
         """Sanitizes the user ID to be a valid PostgreSQL schema name (private method)."""
         if not user_id:
@@ -425,13 +409,6 @@ class DatabaseManager:
         if not (safe_name[0].isalpha() or safe_name[0] == "_"):
             safe_name = "_" + safe_name
         return safe_name[:63]
-
-    def _get_table_name(self, table_name: str) -> str:
-        """
-        Returns the fully qualified table name with the correct schema.
-        Uses the provided `user_id` or falls back to `self.user_id`.
-        """
-        return f'"{self.schema_name}"."{table_name}"'
 
     def get_topic_interactions(self, session_id: str, topic: str, limit: int = 3) -> List[Optional[Dict]]:
         """Retrieves interactions related to a specific topic."""
@@ -781,36 +758,6 @@ class DatabaseManager:
         except Exception as e:
             logger.error("Error extracting psychological themes: %s", e)
             return {}
-
-    def start_therapy_session(
-        self, session_id: str, session_metadata: Optional[dict] = None
-    ) -> Union[Dict[str, Any], bool]:
-        """
-        Marks the start of a new therapy session.
-
-        Args:
-            session_id: Session identifier
-            session_metadata: Optional metadata for the session
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            metadata = session_metadata or {}
-            metadata["session_start"] = True
-            metadata["session_timestamp"] = datetime.now().isoformat()
-
-            data_point = {
-                "context": "Session Start",
-                "question": "Beginning of therapy session",
-                "answer": "",
-                "metadata": metadata,
-            }
-
-            return self.add_interaction(data_point, session_id)
-        except Exception as e:
-            logger.error("Error starting therapy session: %s", e)
-            return False
 
     def mark_therapeutic_insight(self, interaction_id: int, insight_level: str) -> bool:
         """
@@ -2148,54 +2095,189 @@ class DatabaseManager:
         """
         try:
             # Define the available approaches directly within the function
+            # Keys are lowercase trigger terms.
+            # 'name' should be a canonical approach name (often used by map_approach_to_template).
+            # 'primary_technique' is a short identifier for the core technique.
             approaches = {
                 "anxiety": {
-                    "name": "anxiety",
+                    "name": "cognitive_behavioral_therapy",
                     "primary_technique": "cbt",
-                    "redirection_strategy": "Encourage exploration of anxiety triggers and develop coping mechanisms",
-                    "exploration_questions": "What physical sensations do you notice when anxious? What thoughts come to mind?",
+                    "redirection_strategy": "Explore anxiety triggers, cognitive distortions, and develop coping mechanisms.",
+                    "exploration_questions": "What physical sensations do you notice when anxious? What thoughts typically accompany these feelings?",
+                },
+                "panic": {
+                    "name": "cognitive_behavioral_therapy",  # Or specific panic_control_treatment
+                    "primary_technique": "cbt",
+                    "redirection_strategy": "Psychoeducation about panic, identify catastrophic thoughts, and practice coping skills.",
+                    "exploration_questions": "What are your main fears when you experience panic? What has helped, even a little, in the past?",
                 },
                 "worried": {
-                    "name": "worry_management",
+                    "name": "worry_management_cbt",
                     "primary_technique": "cbt",
-                    "redirection_strategy": "Examine evidence for and against worries, develop realistic assessments",
-                    "exploration_questions": "How likely is this worry to come true? What would happen if it did?",
+                    "redirection_strategy": "Examine evidence for and against worries, differentiate productive vs. unproductive worry, and schedule 'worry time'.",
+                    "exploration_questions": "How likely is this worry to come true? What's the worst that could happen, and how would you cope if it did?",
                 },
-                "relationship": {
-                    "name": "relationship_guidance",
-                    "primary_technique": "interpersonal_therapy",
-                    "redirection_strategy": "Explore recurring relationship patterns and attachment style",
-                    "exploration_questions": "Have you noticed this pattern in other relationships? How does this relate to early experiences?",
+                "fear": {  # General fear, could be phobia related
+                    "name": "exposure_therapy",  # Or CBT if more general
+                    "primary_technique": "exposure",
+                    "redirection_strategy": "Gradual exposure to feared situations or stimuli, coupled with relaxation techniques.",
+                    "exploration_questions": "What specific situations or things trigger this fear? What do you typically do to avoid it?",
                 },
-                "alone": {
-                    "name": "loneliness_support",
-                    "primary_technique": "attachment_based_therapy",
-                    "redirection_strategy": "Explore fear of abandonment and connection needs",
-                    "exploration_questions": "What does being alone mean to you? What feelings come up when you think about it?",
-                },
-                "sad": {
-                    "name": "mood_exploration",
+                "depressed": {
+                    "name": "behavioral_activation_cbt",
                     "primary_technique": "behavioral_activation",
-                    "redirection_strategy": "Focus on activities that may improve mood and energy",
-                    "exploration_questions": "What activities used to bring you joy? What small step might feel manageable?",
+                    "redirection_strategy": "Identify and schedule pleasant or mastery-oriented activities to counteract withdrawal and improve mood.",
+                    "exploration_questions": "What activities used to bring you joy or a sense of accomplishment? What's one small step you could take towards re-engaging?",
+                },
+                "sad": {  # General sadness, might be less clinical than "depressed"
+                    "name": "supportive_listening_mood",  # Or behavioral_activation if persistent
+                    "primary_technique": "supportive_listening",
+                    "redirection_strategy": "Validate feelings of sadness, explore its context, and identify potential coping strategies.",
+                    "exploration_questions": "Can you tell me more about what's making you feel sad? What usually helps you when you feel this way?",
+                },
+                "hopeless": {
+                    "name": "cognitive_behavioral_therapy",  # Often linked with depression
+                    "primary_technique": "cbt",
+                    "redirection_strategy": "Challenge hopeless thoughts, identify exceptions, and build a sense of agency or hope.",
+                    "exploration_questions": "What makes you feel hopeless right now? Have there been times when you felt differently, even slightly?",
+                },
+                "trauma": {
+                    "name": "trauma_informed_care",
+                    "primary_technique": "trauma_informed",
+                    "redirection_strategy": "Prioritize safety, grounding, psychoeducation about trauma, and validate experiences.",
+                    "exploration_questions": "What helps you feel safe and grounded in this moment? How are these past experiences affecting you today?",
+                },
+                "ptsd": {
+                    "name": "trauma_informed_care",
+                    "primary_technique": "trauma_informed",
+                    "redirection_strategy": "Focus on managing PTSD symptoms like flashbacks and hyperarousal, using grounding and coping skills.",
+                    "exploration_questions": "Are there specific triggers for your PTSD symptoms? What coping strategies have you found helpful?",
+                },
+                "abuse": {
+                    "name": "trauma_informed_care",
+                    "primary_technique": "trauma_informed",
+                    "redirection_strategy": "Validate the experience of abuse, focus on safety, and explore its impact on current well-being.",
+                    "exploration_questions": "How has this experience of abuse impacted you? What does safety mean to you now?",
                 },
                 "grief": {
                     "name": "grief_processing",
                     "primary_technique": "grief_processing",
-                    "redirection_strategy": "Create space for grief expression and meaning-making",
-                    "exploration_questions": "What does this loss mean to you? What memories are most significant?",
+                    "redirection_strategy": "Provide space for expressing grief, validate feelings, explore meaning-making and coping with the loss.",
+                    "exploration_questions": "What does this loss mean to you? What are some of the most challenging aspects of this grief right now?",
+                },
+                "loss": {
+                    "name": "grief_processing",
+                    "primary_technique": "grief_processing",
+                    "redirection_strategy": "Acknowledge the pain of loss, explore the different emotions involved, and support adaptation.",
+                    "exploration_questions": "How are you coping with this loss day-to-day? Are there any rituals or memories you find comforting?",
+                },
+                "relationship": {
+                    "name": "interpersonal_therapy",
+                    "primary_technique": "interpersonal",
+                    "redirection_strategy": "Explore patterns in relationships, communication styles, unmet needs, and role transitions.",
+                    "exploration_questions": "What are the recurring themes in your relationship conflicts? What are your needs and expectations in a relationship?",
+                },
+                "partner": {  # More specific than "relationship"
+                    "name": "interpersonal_therapy",
+                    "primary_technique": "interpersonal",
+                    "redirection_strategy": "Focus on the dynamics with the specific partner, communication, and shared goals or conflicts.",
+                    "exploration_questions": "Can you describe a recent interaction with your partner that was challenging? What would you like to be different in this relationship?",
+                },
+                "conflict": {  # General conflict
+                    "name": "problem_solving_therapy",  # Or interpersonal if relationship-focused
+                    "primary_technique": "problem_solving",
+                    "redirection_strategy": "Identify the core issues of the conflict, explore different perspectives, and brainstorm solutions.",
+                    "exploration_questions": "What is the main point of disagreement in this conflict? What outcomes are you hoping for?",
+                },
+                "alone": {
+                    "name": "attachment_based_therapy",
+                    "primary_technique": "attachment",
+                    "redirection_strategy": "Explore feelings of loneliness, attachment patterns, and fears of abandonment or disconnection.",
+                    "exploration_questions": "What does being alone bring up for you? Can you describe your typical patterns in close relationships?",
+                },
+                "lonely": {
+                    "name": "attachment_based_therapy",
+                    "primary_technique": "attachment",
+                    "redirection_strategy": "Validate feelings of loneliness and explore underlying needs for connection and belonging.",
+                    "exploration_questions": "In what situations do you feel most lonely? What kind of connections are you seeking?",
                 },
                 "failure": {
-                    "name": "self-criticism",
-                    "primary_technique": "compassion_focused_therapy",
-                    "redirection_strategy": "Develop self-compassion practice and examine inner critic",
-                    "exploration_questions": "How would you respond to a friend who felt this way? What might self-compassion look like here?",
+                    "name": "compassion_focused_therapy",
+                    "primary_technique": "cft",
+                    "redirection_strategy": "Challenge self-critical thoughts related to perceived failure and cultivate self-compassion.",
+                    "exploration_questions": "How do you typically respond to yourself when you feel you've failed? What would a compassionate perspective be?",
                 },
-                "trauma": {
-                    "name": "trauma",
-                    "primary_technique": "trauma",
-                    "redirection_strategy": "Focus on safety and grounding before processing traumatic content",
-                    "exploration_questions": "What helps you feel safe in the present moment? How can we work on grounding techniques?",
+                "self-esteem": {
+                    "name": "compassion_focused_therapy",  # Or strengths_based
+                    "primary_technique": "cft",
+                    "redirection_strategy": "Identify and challenge negative self-beliefs, focus on strengths, and practice self-acceptance.",
+                    "exploration_questions": "What are some qualities you value in yourself? When do you feel most confident or capable?",
+                },
+                "worthless": {
+                    "name": "compassion_focused_therapy",
+                    "primary_technique": "cft",
+                    "redirection_strategy": "Address core beliefs of worthlessness with self-compassion and by examining evidence.",
+                    "exploration_questions": "Where do you think this feeling of worthlessness comes from? Can you think of times you've acted in line with your values despite these feelings?",
+                },
+                "guilt": {
+                    "name": "cognitive_behavioral_therapy_guilt",  # Or CFT
+                    "primary_technique": "cbt",
+                    "redirection_strategy": "Explore the source of guilt, differentiate appropriate vs. inappropriate guilt, and work towards self-forgiveness or making amends.",
+                    "exploration_questions": "What specific actions or inactions are you feeling guilty about? What are your values related to this situation?",
+                },
+                "shame": {
+                    "name": "compassion_focused_therapy",
+                    "primary_technique": "cft",
+                    "redirection_strategy": "Normalize shame as a human emotion, reduce self-criticism, and build shame resilience through self-compassion.",
+                    "exploration_questions": "Shame can be a very powerful emotion. How does it show up for you? What might help you meet this feeling with kindness?",
+                },
+                "stress": {
+                    "name": "mindfulness_based_stress_reduction",
+                    "primary_technique": "mindfulness",
+                    "redirection_strategy": "Identify stressors, develop mindfulness skills to manage stress, and increase awareness of present moment reactions.",
+                    "exploration_questions": "What are your main stressors currently? Have you explored mindfulness or relaxation techniques before?",
+                },
+                "overwhelmed": {
+                    "name": "problem_solving_therapy",  # Or mindfulness
+                    "primary_technique": "problem_solving",
+                    "redirection_strategy": "Break down overwhelming situations into manageable parts, prioritize, and brainstorm coping strategies.",
+                    "exploration_questions": "What specific things are contributing to this feeling of being overwhelmed? What's one small thing you could address first?",
+                },
+                "work": {  # General work-related stress
+                    "name": "workplace_stress_management",
+                    "primary_technique": "problem_solving",  # Or CBT
+                    "redirection_strategy": "Identify specific workplace challenges, explore coping strategies, problem-solving, or boundary setting.",
+                    "exploration_questions": "Can you describe the specific situations at work causing distress? What aspects are within your control to change or influence?",
+                },
+                "job": {  # Similar to "work"
+                    "name": "workplace_stress_management",
+                    "primary_technique": "problem_solving",
+                    "redirection_strategy": "Focus on job-specific stressors, career satisfaction, and work-life balance.",
+                    "exploration_questions": "What aspects of your job are most challenging right now? What would make your work life feel more manageable or fulfilling?",
+                },
+                "boss": {  # Specific to authority figures at work
+                    "name": "workplace_conflict_resolution",
+                    "primary_technique": "communication_skills",  # Or assertiveness training
+                    "redirection_strategy": "Explore dynamics with the boss, develop communication strategies, and address power imbalances if relevant.",
+                    "exploration_questions": "Can you describe a recent interaction with your boss that was difficult? What are your communication goals in these situations?",
+                },
+                "addiction": {
+                    "name": "motivational_interviewing",
+                    "primary_technique": "mi",
+                    "redirection_strategy": "Explore ambivalence about change, build motivation, support self-efficacy, and discuss harm reduction or recovery goals.",
+                    "exploration_questions": "What are some of the reasons you're considering a change regarding this? What does a positive change look like to you?",
+                },
+                "substance": {
+                    "name": "motivational_interviewing",
+                    "primary_technique": "mi",
+                    "redirection_strategy": "Non-judgmentally explore substance use patterns, motivations, and potential impacts on life goals.",
+                    "exploration_questions": "How does substance use fit into your life right now? What are your thoughts about its role?",
+                },
+                "craving": {
+                    "name": "relapse_prevention_cbt",
+                    "primary_technique": "cbt",
+                    "redirection_strategy": "Identify triggers for cravings, develop coping strategies, and create a relapse prevention plan.",
+                    "exploration_questions": "What situations or feelings usually lead to cravings? What strategies have helped you manage them in the past, or what new ones could you try?",
                 },
                 # Add more specific keywords and approaches as needed
             }
@@ -2376,7 +2458,7 @@ class DatabaseManager:
             Dictionary with emotional signals and their frequencies
         """
         try:
-            # Ensure we have a valid session
+            # Ensure session is valid
             if not session_id:
                 return {"error": "No session ID provided"}
 

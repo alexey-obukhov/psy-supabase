@@ -2,7 +2,6 @@
 """ Setup script for psy-supabase package."""
 import os
 
-import spacy
 from setuptools import find_packages, setup
 from setuptools.command.install import install
 
@@ -11,6 +10,8 @@ from setuptools.command.install import install
 def download_spacy_model() -> None:
     """Download the spaCy English language model."""
     try:
+        import spacy
+
         spacy.load("en_core_web_sm")
         print("Downloaded spaCy English language model")
     except ImportError:

@@ -128,7 +128,7 @@ else:
 
 # Memory management variables
 last_memory_cleanup = time.time()
-REQUEST_COUNTER = 0  # Changed to uppercase for constant
+REQUEST_COUNTER = 0
 CLEANUP_THRESHOLD = 10  # Clean up after 10 requests
 CLEANUP_TIME_THRESHOLD = 300  # Clean up after 5 minutes
 
@@ -167,10 +167,10 @@ if not supabase_url or not supabase_key:
     logger.critical("Error: Please set SUPABASE_URL and SUPABASE_KEY environment variables.")
     # Don't exit here, as it would prevent module import
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"  # Changed to uppercase for constant
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Define model name at module level for consistency
-MODEL_NAME = "rasyosef/Phi-1_5-Instruct-v0.1"  # Changed to uppercase for constant
+MODEL_NAME = "rasyosef/Phi-1_5-Instruct-v0.1"
 
 app = Flask(__name__)
 

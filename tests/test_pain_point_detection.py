@@ -1,10 +1,9 @@
+""" Test cases for pain point detection, topic identification, and therapeutic approach selection."""
+
 import json
-import os
 import time
-import unittest
 import uuid
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from prismalog.log import get_logger
@@ -15,11 +14,74 @@ from psy_supabase.core.response_generator import ResponseGenerator
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
+
+# If DatabaseTestBase depends on unittest, remove or refactor it.
+# Otherwise, ensure it doesn't import unittest.TestCase.
 from tests.helpers.database_test_base import DatabaseTestBase
 
 logger = get_logger(__name__)
 
 
+@pytest.fixture
+def db_manager_fixture():
+    # Provide a mock or a real DatabaseManager instance
+    mock_db_manager = MagicMock(spec=DatabaseManager)
+    mock_db_manager.get_conversation_history.return_value = []
+    mock_db_manager.save_interaction.return_value = True
+    mock_db_manager.identify_potential_pain_points.return_value = {"detected": False}
+    return mock_db_manager
+
+
+@pytest.fixture(autouse=True)
+def setup_and_teardown_for_each_test(request, db_manager_fixture):
+    """
+    This fixture automatically runs before and after each test in the class.
+    Replaces setUp/tearDown from unittest.
+    """
+    # Attach the db_manager fixture to the test class
+    request.cls.db_manager = db_manager_fixture
+
+    # Start patchers, mocks, etc.
+    request.cls.toxic_patcher = patch("psy_supabase.core.text_generator.TextGenerator.is_toxic", return_value=False)
+    request.cls.toxic_patcher.start()
+
+    request.cls.text_generator = MagicMock(spec=TextGenerator)
+    request.cls.text_generator.generate_text.return_value = "Sample therapeutic response"
+    request.cls.text_generator.generate_therapeutic_response.return_value = "Sample therapeutic response"
+
+    request.cls.session_id = f"test_pain_point_{uuid.uuid4().hex[:10]}"
+
+    # Create RAG processor using the newly attached db_manager
+    request.cls.rag_processor = RAGProcessor(
+        db_manager=request.cls.db_manager,
+        generator=request.cls.text_generator,
+        intelligent_processing_enabled=True,
+    )
+
+    # Optionally wrap save_interaction
+    original_save = request.cls.db_manager.save_interaction
+
+    def ensure_save_interaction(**kwargs):
+        if "context" not in kwargs:
+            kwargs["context"] = {}
+        result = original_save(**kwargs)
+        logger.info(f"Saving interaction for session {kwargs.get('session_id')}")
+        return result
+
+    request.cls.db_manager.save_interaction = ensure_save_interaction
+    request.cls.original_save = original_save
+
+    request.cls.mock_retriever_class = MagicMock()
+    request.cls.silent_mock_db_manager = MagicMock()
+
+    yield
+
+    # Teardown logic
+    request.cls.toxic_patcher.stop()
+    request.cls.db_manager.save_interaction = request.cls.original_save
+
+
+@pytest.mark.usefixtures("mock_retriever_class", "mock_text_generator", "silent_mock_db_manager")
 class TestPainPointDetection(DatabaseTestBase):
     """Tests for pain point detection, topic identification, and therapeutic approach selection."""
 
@@ -35,52 +97,71 @@ class TestPainPointDetection(DatabaseTestBase):
     def silent_mock_db_manager(self):
         return MagicMock()
 
-    def setUp(self):
-        """Set up test environment."""
-        super().setUp()
+    def test_pain_point_detection_system(self):
+        """Test the end-to-end pain point detection system."""
+        with patch("psy_supabase.core.model_manager.EmbeddingProviderAdapter") as mock_embedding:
+            mock_instance = MagicMock()
+            mock_instance.generate_embedding.return_value = [0.1] * 768
+            mock_instance.get_embedding_dimension.return_value = 768
+            mock_embedding.return_value = mock_instance
 
-        # Patch the is_toxic method to always return False
-        self.toxic_patcher = patch("psy_supabase.core.text_generator.TextGenerator.is_toxic", return_value=False)
-        self.toxic_patcher.start()
+            text_gen = MagicMock(spec=TextGenerator)
+            text_gen.generate_text.return_value = "Sample therapeutic response"
+            text_gen.generate_therapeutic_response.return_value = "Sample therapeutic response"
+            text_gen.is_toxic.return_value = False
 
-        # Create mocks
-        self.text_generator = MagicMock(spec=TextGenerator)
-        self.text_generator.generate_text.return_value = "Sample therapeutic response"
-        self.text_generator.generate_therapeutic_response.return_value = "Sample therapeutic response"
+            rag_processor = RAGProcessor(
+                db_manager=self.db_manager, generator=text_gen, intelligent_processing_enabled=True
+            )
 
-        # Create session ID
-        self.session_id = f"test_pain_point_{uuid.uuid4().hex[:10]}"
+            def mock_identify_pain_points(*args, **kwargs):
+                return {
+                    "detected": True,
+                    "pain_point_detected": True,
+                    "name": "test_pain_point",
+                    "similarity": 0.95,
+                    "suggested_approach": {
+                        "approach_type": "cognitive_behavioral",
+                        "guidance_question": "How does this make you feel?",
+                    },
+                }
 
-        # Create RAG processor with properly mocked text generator
-        self.rag_processor = RAGProcessor(
-            db_manager=self.db_manager, generator=self.text_generator, intelligent_processing_enabled=True
-        )
+            self.db_manager.identify_potential_pain_points = mock_identify_pain_points
+            rag_processor.response_generator.generate_response_with_template = MagicMock(
+                return_value="Sample therapeutic response"
+            )
 
-        # Store the original save_interaction method
-        self.original_save = self.db_manager.save_interaction
+            rag_processor.embedding_provider = mock_instance
+            test_session = f"test_pain_point_{uuid.uuid4().hex[:8]}"
 
-        # Create a wrapper that ensures interactions are saved
-        def ensure_save_interaction(**kwargs):
-            # Make sure context is present
-            if "context" not in kwargs:
-                kwargs["context"] = {}
-            result = self.original_save(**kwargs)
-            logger.info(f"Saving interaction for session {kwargs.get('session_id')}")
-            return result
+            response = "Sample therapeutic response"
+            self.db_manager.save_interaction(
+                session_id=test_session,
+                question="How can I manage everyday stress?",
+                answer=response,
+                metadata={
+                    "pain_points": [
+                        {
+                            "detected": True,
+                            "name": "test_pain_point",
+                            "similarity": 0.95,
+                            "suggested_approach": {"approach_type": "cognitive_behavioral"},
+                        }
+                    ]
+                },
+                context={},
+            )
 
-        # Apply the wrapper
-        self.db_manager.save_interaction = ensure_save_interaction
+            time.sleep(0.5)
+            history = self.db_manager.get_conversation_history(test_session)
 
-    def tearDown(self):
-        """Clean up after tests."""
-        # Stop all patchers
-        self.toxic_patcher.stop()
+            # Replaced self.assertTrue with a plain assert
+            assert len(history) > 0, f"No history found for session {test_session}"
 
-        # Restore original methods
-        if hasattr(self, "original_save"):
-            self.db_manager.save_interaction = self.original_save
-
-        super().tearDown()
+            # Replaced self.assertEqual with plain assert
+            if history and len(history) > 0:
+                saved_answer = history[0].get("answer", "")
+                assert saved_answer == "Sample therapeutic response"
 
     def test_pain_point_detection_system(self):
         """Test the end-to-end pain point detection system."""
@@ -534,13 +615,17 @@ class TestPainPointDetection(DatabaseTestBase):
                         f"Session ID mismatch: {item['session_id']} != {self.session_id}",
                     )
 
-    def test_dynamic_rag_retriever_integration1(self, mock_retriever_class, rag_processor, mock_text_generator):
+    def test_dynamic_rag_retriever_integration1(self):
         """Test the integration of DynamicRAGRetriever with the RAGProcessor."""
+        # Use the class attributes set by the autouse fixture
+        rag_processor = self.rag_processor
+        mock_text_generator = self.text_generator
+        mock_retriever_class = self.mock_retriever_class
+
         rag_processor.text_generator.is_toxic = MagicMock(return_value=False)
         rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(
             return_value="Response"
         )
-
         rag_processor.response_generator.is_valid_input = MagicMock(return_value=True)
         rag_processor.response_generator.check_toxic_content = MagicMock(return_value=None)
         rag_processor.response_generator.generate_response_with_template = MagicMock(return_value="Response")
@@ -553,18 +638,19 @@ class TestPainPointDetection(DatabaseTestBase):
             response = rag_processor.generate_response("How can I manage anxiety?", "test_session")
             assert response == "Response"
 
-    def test_dynamic_rag_retriever_integration_with_silent_db(
-        self, mock_retriever_class, rag_processor, silent_mock_db_manager
-    ):
+    def test_dynamic_rag_retriever_integration_with_silent_db(self):
         """Test the integration of DynamicRAGRetriever with the RAGProcessor using a silent DB manager."""
-        rag_processor.db_manager = silent_mock_db_manager
+        rag_processor = self.rag_processor
+        mock_retriever_class = self.mock_retriever_class
+        silent_db = self.silent_mock_db_manager
 
-        # Mock out the actual methods to ensure we can set .return_value
+        # Swap out the DB manager
+        rag_processor.db_manager = silent_db
+
         rag_processor.text_generator.is_toxic = MagicMock(return_value=False)
         rag_processor.text_generator.generate_therapeutic_response_with_dynamic_retrieval = MagicMock(
             return_value="Response"
         )
-
         rag_processor.response_generator.is_valid_input = MagicMock(return_value=True)
         rag_processor.response_generator.check_toxic_content = MagicMock(return_value=None)
         rag_processor.response_generator.generate_response_with_template = MagicMock(return_value="Response")

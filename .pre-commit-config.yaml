@@ -39,7 +39,6 @@ repos:
     hooks:
     -   id: mypy
         additional_dependencies: [
-            # Only include type stubs for packages you actually use
             "types-PyYAML>=6.0.12",
             "types-colorama>=0.4.15",
             "types-setuptools>=68.2.0",

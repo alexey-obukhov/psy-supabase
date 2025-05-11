@@ -164,7 +164,7 @@ class ResponseGenerator:
         extracted_topics = []
 
         # Primary topic from question analysis
-        if detected_topic and detected_topic != DEFAULT_TOPIC:
+        if detected_topic and detected_topic != DEFAULT_TOPIC and detected_topic not in extracted_topics:
             extracted_topics.append(detected_topic)
 
         # Add topics from categories (up to 3 total)
@@ -183,7 +183,7 @@ class ResponseGenerator:
             if emotion not in ["confusion", "surprise"]:  # Skip non-therapeutic emotions
                 extracted_topics.append(emotion)
 
-        # Ensure we have at least one topic
+        # Ensure at least one topic
         if not extracted_topics:
             topic_from_text = self.prompt_selector.determine_topic(category_info, user_question)
             if topic_from_text != DEFAULT_TOPIC:
@@ -366,9 +366,9 @@ class ResponseGenerator:
                     conversation_context = dynamic_retriever.get_conversation_context()
                     if conversation_context:
                         generation_context["conversation_context"] = conversation_context
-                        logger.debug(f"Added conversation context from dynamic retriever")
+                        logger.debug("Added conversation context from dynamic retriever")
             except Exception as e:
-                logger.error(f"Error using dynamic retriever: {str(e)}")
+                logger.error("Error using dynamic retriever: %s", str(e))
 
         try:
             # Check if the text generator has the dynamic retrieval method
@@ -472,20 +472,30 @@ class ResponseGenerator:
                 pain_point_results.get("pain_point", {}).get("detected", False)
             )
 
-            approach_type = (
+            # Extract approach_type and ensure it's a string or None
+            approach_type_raw = (
                 pain_point_results.get("approach_type")
                 or pain_point_results.get("suggested_approach", {}).get("approach_type")
                 or standardized_sources["approach"]
                 or "supportive_listening"
             )
 
+            # Convert to proper type for map_approach_to_template
+            approach_type: Optional[str] = None
+            if isinstance(approach_type_raw, (list, tuple)):
+                approach_type = approach_type_raw[0] if approach_type_raw else None
+            elif isinstance(approach_type_raw, str):
+                approach_type = approach_type_raw
+            else:
+                approach_type = "supportive_listening"
+
             template_used = pain_point_results.get("template_used")
-            if not template_used and approach_type:
+            if not template_used and approach_type is not None:
                 template_used = map_approach_to_template(approach_type)
             if not template_used:
                 template_used = "default_template"
 
-            logger.info(f"FINAL: approach_type={approach_type}, template_used={template_used}")
+            logger.info("FINAL: approach_type=%s, template_used=%s", approach_type, template_used)
 
             updated_metadata.update(
                 {
@@ -498,17 +508,17 @@ class ResponseGenerator:
                 }
             )
 
-            logger.info(f"DEBUG: updated_metadata={updated_metadata}")
+            logger.info("DEBUG: updated_metadata=%s", updated_metadata)
             # Add extracted topics to metadata
             if context_sources["from_extracted_topics"]:
                 updated_metadata["extracted_topics"] = context_sources["from_extracted_topics"]
                 updated_metadata["primary_extracted_topic"] = context_sources["from_extracted_topics"][0]
 
-            logger.info(f"Determined context: {context}")
+            logger.info("Determined context: %s", context)
             return context, updated_metadata
 
         except Exception as e:
-            logger.error(f"Error determining context: {str(e)}")
+            logger.error("Error determining context: %s", str(e))
             return "therapeutic_dialogue", metadata or {}
 
     def save_interaction(

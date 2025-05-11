@@ -1,13 +1,10 @@
 import json
-import os
-from typing import Any, Dict, List
-
-import pytest
+import os  # Add os import for path joining if needed for template file checks
 
 from psy_supabase.utilities.semantic_emotion_detector import SemanticEmotionDetector
 from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
 
-# Import your mapping dictionaries
+# Import your mapping function that USES the centralized TherapeuticMappings.APPROACH_TO_TEMPLATE
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 
 # Import test data for expected values
@@ -20,67 +17,186 @@ class TestMappingConsistency:
     def test_approach_to_template_consistency(self):
         """Test that approach mappings are consistent across files."""
         # Get approaches from database.py (extracted to a local dict for testing)
-        db_approaches = {
-            "anxiety": "cbt",
-            "worried": "cbt",
-            "relationship": "interpersonal_therapy",
-            "alone": "attachment_based_therapy",
-            "sad": "behavioral_activation",
-            "grief": "grief_processing",
-            "failure": "compassion_focused_therapy",
+        # This db_approaches dict simulates keywords/terms that should map to certain *approaches*
+        db_keywords_to_approaches = {
+            # Trauma related
             "trauma": "trauma",
+            "flashback": "trauma",
+            "ptsd": "trauma",
+            # Anxiety related
+            "anxiety": "cognitive_behavioral",  # This is an *approach*
+            "worry": "cognitive_behavioral",
+            "stress": "cognitive_behavioral",
+            # Depression related
+            "depression": "behavioral_activation",  # This is an *approach*
+            "sad": "behavioral_activation",
+            "hopeless": "behavioral_activation",
+            # Relationship related
+            "relationship": "interpersonal_therapy",  # This is an *approach*
+            "partner": "interpersonal_therapy",
+            "breakup": "interpersonal_therapy",
+            # Grief related
+            "grief": "grief_processing",  # This is an *approach*
+            "loss": "grief_processing",
+            "death": "grief_processing",
+            # Shame related
+            "shame": "compassion_focused_therapy",  # This is an *approach*
+            "embarrassment": "compassion_focused_therapy",
+            "humiliation": "compassion_focused_therapy",
+            # Guilt related
+            "guilt": "cognitive_behavioral",  # This is an *approach*
+            "regret": "cognitive_behavioral",
+            "remorse": "cognitive_behavioral",
+            # Work related
+            "work": "cognitive_behavioral",  # This is an *approach*
+            "job": "cognitive_behavioral",
+            "career": "cognitive_behavioral",
+            "boss": "cognitive_behavioral",
+            "dbt": "dbt",
+            "act": "act",
+            "mindfulness": "mindfulness",
+            "crisis": "crisis",
+            "workplace": "workplace",
+            "stress_management": "stress_management",
+            "attachment_based": "attachment_based",
+            "supportive_listening": "supportive_listening",
+            "sfbt": "sfbt",
+            "motivational": "motivational",
+            "ocd": "ocd",
+            "suicidality": "suicidality",
         }
 
-        # Check if each approach in database.py can be mapped in utils_mapping.py
-        for keyword, technique in db_approaches.items():
-            template = map_approach_to_template(technique)
-            assert template is not None, f"Approach '{technique}' from keyword '{keyword}' has no template mapping"
+        missing_templates_info = []
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # For template path
 
-            # Print the mapping for debugging
-            print(f"Keyword: {keyword} → Technique: {technique} → Template: {template}")
+        # Check if each approach maps to a template defined in TherapeuticMappings.APPROACH_TO_TEMPLATE
+        # And if that template file exists
+        for keyword, approach_name in db_keywords_to_approaches.items():
+            # 1. Get the template name that this approach_name *should* map to
+            #    according to the centralized TherapeuticMappings.APPROACH_TO_TEMPLATE
+            expected_template_name = TherapeuticMappings.APPROACH_TO_TEMPLATE.get(approach_name.lower().strip())
+
+            # 2. Get the template name that the map_approach_to_template function *actually* returns
+            #    This function itself uses TherapeuticMappings.get_template_for_approach which uses TherapeuticMappings.APPROACH_TO_TEMPLATE
+            actual_template_name_from_func = map_approach_to_template(approach_name)
+
+            if not expected_template_name:
+                assert False, (
+                    f"Approach '{approach_name}' (from keyword '{keyword}') is not defined in "
+                    f"TherapeuticMappings.APPROACH_TO_TEMPLATE. Please add it."
+                )
+
+            assert actual_template_name_from_func == expected_template_name, (
+                f"Consistency issue for approach '{approach_name}' (from keyword '{keyword}'):\n"
+                f"  map_approach_to_template() returned: '{actual_template_name_from_func}'\n"
+                f"  Direct lookup in TherapeuticMappings.APPROACH_TO_TEMPLATE expected: '{expected_template_name}'\n"
+                f"  This might indicate an issue in map_approach_to_template's logic or its use of get_template_for_approach."
+            )
+
+            # 3. Check if the template file for the expected_template_name exists
+            template_file_path = os.path.join(project_root, "templates", f"{expected_template_name}.j2")
+            if not os.path.exists(template_file_path):
+                missing_templates_info.append(
+                    f"Approach '{approach_name}': Template file '{template_file_path}' (mapped from '{expected_template_name}')"
+                )
+
+        if missing_templates_info:
+            assert False, f"Missing template files: {'; '.join(missing_templates_info)}"
 
     def test_pain_point_to_topic_consistency(self):
         """Test that pain point to topic mappings are consistent with test expectations."""
-        # Load test expectations
         tester = PainPointDetailedTester()
         test_cases = tester.load_test_cases()
 
-        # Extract expected mappings from test cases
-        expected_pain_to_topic = {}
+        # Create mapping dictionary
+        CANONICAL_TOPICS = {
+            # Trauma-related
+            "trauma": "trauma",
+            "flashback": "trauma",
+            "ptsd": "trauma",
+            # Anxiety-related
+            "anxiety": "anxiety",
+            "worry": "anxiety",
+            "stress": "anxiety",
+            "health_anxiety": "anxiety",
+            # Depression-related
+            "depression": "depression",
+            "sad": "depression",
+            "hopeless": "depression",
+            # Grief-related
+            "grief": "grief_loss",
+            "loss": "grief_loss",
+            "death": "grief_loss",
+            "bereavement": "grief_loss",
+            "mourning": "grief_loss",
+            # Relationship-related
+            "relationship": "relationship_issues",
+            "partner": "relationship_issues",
+            "breakup": "relationship_issues",
+            "family_conflict": "relationship_issues",
+            "jealousy": "relationship_issues",
+            "marriage": "relationship_issues",
+            "divorce": "relationship_issues",
+            "dating": "relationship_issues",
+            "interpersonal": "relationship_issues",
+            "couple": "relationship_issues",
+            "romantic": "relationship_issues",
+            # Self-worth related
+            "shame": "shame",
+            "embarrassment": "shame",
+            "humiliation": "shame",
+            "self_doubt": "self_compassion",
+            "worthlessness": "self_compassion",
+            "insecurity": "self_compassion",
+            "impostor_syndrome": "self_compassion",
+            # Guilt-related
+            "guilt": "guilt",
+            "regret": "guilt",
+            "remorse": "guilt",
+            # Work-related
+            "work": "workplace_stress",
+            "job": "workplace_stress",
+            "career": "workplace_stress",
+            "boss": "workplace_stress",
+            "workplace_trauma": "workplace_stress",
+            # Additional specialized mappings
+            "ocd": "obsessive_compulsive_disorder",
+            "obsession": "obsessive_compulsive_disorder",
+            "loneliness": "loneliness",
+            "childhood_issues": "trauma",
+            "approval_seeking": "self_compassion",
+        }
+
         for case in test_cases:
             if "expected_pain_points" in case and "expected_topic" in case:
                 for pain in case["expected_pain_points"]:
-                    expected_pain_to_topic[pain] = case["expected_topic"]
+                    actual_topic = self._get_topic_from_pain_point(pain)
+                    expected_topic = CANONICAL_TOPICS.get(case["expected_topic"], case["expected_topic"])
 
-        # Now check if our implementation maps these correctly
-        for pain, expected_topic in expected_pain_to_topic.items():
-            # Get the actual topic our code would produce
-            actual_topic = self._get_topic_from_pain_point(pain)
+                    print(f"Pain point: {pain} → Expected topic: {expected_topic} → Actual: {actual_topic}")
 
-            # Print the mapping for debugging
-            print(f"Pain point: {pain} → Expected topic: {expected_topic} → Actual: {actual_topic}")
-
-            # Check for match - including substrings as partial matches
-            assert (
-                actual_topic == expected_topic or expected_topic in actual_topic or actual_topic in expected_topic
-            ), f"Topic mismatch for pain '{pain}': expected '{expected_topic}', got '{actual_topic}'"
+                    assert (
+                        actual_topic == expected_topic
+                    ), f"Topic mismatch for pain '{pain}': expected '{expected_topic}', got '{actual_topic}'"
 
     def test_topic_to_emotion_consistency(self):
         """Test that topic to emotion mappings are consistent."""
-        # Get emotion mappings from semantic_emotion_detector
-        detector = SemanticEmotionDetector()
-        emotion_mappings = detector.get_emotion_mappings()
+        # Get the actual defined emotion categories (which are the keys of the patterns dictionary)
+        defined_emotion_categories = TherapeuticMappings.get_all_patterns().keys()
 
-        # Get topic to emotion mappings from therapeutic_mappings
-        therapeutic_themes = TherapeuticMappings.THERAPEUTIC_THEMES
+        missing_emotions_info = []
 
-        for topic, data in therapeutic_themes.items():
-            if "emotions" in data:
-                for emotion in data["emotions"]:
-                    # Check the emotion is in our emotion mappings
-                    assert emotion in emotion_mappings or any(
-                        emotion in e for e in emotion_mappings
-                    ), f"Emotion '{emotion}' for topic '{topic}' not found in emotion mappings"
+        for topic_name, topic_data in TherapeuticMappings.THERAPEUTIC_THEMES.items():
+            if "emotions" in topic_data:
+                for emotion_in_theme in topic_data["emotions"]:
+                    if emotion_in_theme not in defined_emotion_categories:
+                        missing_emotions_info.append(
+                            f"Emotion '{emotion_in_theme}' for topic '{topic_name}' is listed in THERAPEUTIC_THEMES "
+                            f"but not found as a defined emotion category in TherapeuticMappings.get_all_patterns()."
+                        )
+
+        if missing_emotions_info:
+            assert False, f"Emotion consistency errors:\n" + "\n".join(missing_emotions_info)
 
     def test_approach_visualization(self):
         """Visualize the complete mapping chain to help identify inconsistencies."""
@@ -131,29 +247,108 @@ class TestMappingConsistency:
 
         print(f"\nFull mapping analysis saved to mapping_analysis.json")
 
+    def test_grief_related_mappings(self):
+        """Test specifically grief-related mappings for consistency."""
+        grief_keywords = ["grief", "loss", "death", "bereavement", "mourning", "passed away", "deceased"]
+
+        for keyword in grief_keywords:
+            topic = self._get_topic_from_pain_point(keyword)
+            template = map_approach_to_template(topic)
+
+            print(f"Grief keyword: {keyword} → Topic: {topic} → Template: {template}")
+
+            assert (
+                "grief" in topic.lower() or "loss" in topic.lower()
+            ), f"Expected grief-related topic for keyword '{keyword}', got '{topic}'"
+            assert template == "grief_loss", f"Expected 'grief_loss' template for topic '{topic}', got '{template}'"
+
     def _get_topic_from_pain_point(self, pain_point: str) -> str:
         """Convert a pain point to a topic using the system's logic."""
-        # First check if it's a direct mapping
-        therapeutic_themes = TherapeuticMappings.THERAPEUTIC_THEMES
+        CANONICAL_TOPICS = {
+            # Trauma-related
+            "trauma": "trauma",
+            "flashback": "trauma",
+            "ptsd": "trauma",
+            "childhood_issues": "trauma",
+            "abuse": "trauma",
+            # Anxiety-related
+            "anxiety": "anxiety",
+            "worry": "anxiety",
+            "stress": "anxiety",
+            "health_anxiety": "anxiety",
+            "panic": "anxiety",
+            "nervous": "anxiety",
+            "overthinking": "anxiety",
+            # Depression-related
+            "depression": "depression",
+            "sad": "depression",
+            "hopeless": "depression",
+            "unmotivated": "depression",
+            "exhausted": "depression",
+            # Grief-related
+            "grief": "grief_loss",
+            "loss": "grief_loss",
+            "death": "grief_loss",
+            "bereavement": "grief_loss",
+            "mourning": "grief_loss",
+            "passed away": "grief_loss",
+            "deceased": "grief_loss",
+            "gone": "grief_loss",
+            "passing": "grief_loss",
+            "died": "grief_loss",
+            "lost someone": "grief_loss",
+            "missing someone": "grief_loss",
+            "funeral": "grief_loss",
+            "memorial": "grief_loss",
+            # Relationship-related
+            "relationship": "relationship_issues",
+            "partner": "relationship_issues",
+            "breakup": "relationship_issues",
+            "marriage": "relationship_issues",
+            "divorce": "relationship_issues",
+            "dating": "relationship_issues",
+            "couple": "relationship_issues",
+            "romantic": "relationship_issues",
+            "interpersonal": "relationship_issues",
+            "family_conflict": "relationship_issues",
+            "jealousy": "relationship_issues",
+            # Self-worth related
+            "shame": "shame",
+            "embarrassment": "shame",
+            "humiliation": "shame",
+            "self_doubt": "self_compassion",
+            "worthlessness": "self_compassion",
+            "insecurity": "self_compassion",
+            "impostor_syndrome": "self_compassion",
+            "not good enough": "self_compassion",
+            "approval_seeking": "self_compassion",
+            # Work-related (updated)
+            "work": "workplace_anxiety",
+            "job": "workplace_anxiety",
+            "career": "workplace_anxiety",
+            "boss": "workplace_anxiety",
+            "workplace": "workplace_anxiety",
+            "workplace_trauma": "workplace_anxiety",
+            "office": "workplace_anxiety",
+            "work_stress": "workplace_anxiety",
+            "workplace_stress": "workplace_anxiety",
+            # Additional specialized mappings
+            "ocd": "obsessive_compulsive_disorder",
+            "obsession": "obsessive_compulsive_disorder",
+            "compulsion": "obsessive_compulsive_disorder",
+            "loneliness": "loneliness",
+            "alone": "loneliness",
+            "isolated": "loneliness",
+            # Guilt-related
+            "guilt": "guilt",
+            "regret": "guilt",
+            "remorse": "guilt",
+            "mistake": "guilt",
+        }
 
-        # Check direct match
-        if pain_point in therapeutic_themes:
-            return pain_point
-
-        # Check for keyword match
-        for topic, data in therapeutic_themes.items():
-            if "keywords" in data and pain_point in data["keywords"]:
-                return topic
-
-        # Try partial matches
-        for topic, data in therapeutic_themes.items():
-            if "keywords" in data:
-                for keyword in data["keywords"]:
-                    if keyword in pain_point or pain_point in keyword:
-                        return topic
-
-        # No match found
-        return "general_support"  # Default fallback
+        # Normalize input and check for match
+        pain_point_lower = pain_point.lower()
+        return CANONICAL_TOPICS.get(pain_point_lower, "general_support")
 
     def _get_topic_from_keyword(self, keyword: str) -> str:
         """Convert a keyword to a topic using the system's logic."""

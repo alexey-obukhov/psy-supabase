@@ -74,6 +74,7 @@ from psy_supabase.rag.context_determination import create_context_from_similar_i
 from psy_supabase.utilities.embedding_utils import format_embedding_for_db
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.utilities.safety_handler import SafetyHandler
+from psy_supabase.utilities.utils_mapping import map_approach_to_template
 
 # Set up logging
 logger = get_logger(__name__)
@@ -239,8 +240,6 @@ class RAGProcessor:
                 approach_type = pain_point_results.get("approach_type", DEFAULT_APPROACH)
 
                 # Map approach to template using your existing utility
-                from psy_supabase.utilities.utils_mapping import map_approach_to_template
-
                 template_name = map_approach_to_template(approach_type)
 
                 # Store in metadata for use by text generator
@@ -329,6 +328,117 @@ class RAGProcessor:
             logger.error("Error generating response: %s", e)
             logger.error("Traceback (most recent call last):", exc_info=True)
             return "I apologize, but I'm having trouble generating a response right now. Please try again later."
+
+    def _identify_hot_topics(self, user_question: str, query_embedding: List[float]) -> List[Dict[str, Any]]:
+        """
+        Identify hot topics in the user's question using vector similarity.
+
+        Args:
+            user_question: The user's question
+            query_embedding: The embedding of the user's question
+
+        Returns:
+            List[Dict]: Hot topics with relevance scores
+        """
+        try:
+            # Use a specialized "hot topics" search
+            hot_topics = []
+
+            # Focus on specific psychological themes
+            themes = ["anxiety", "depression", "stress", "relationships", "trauma", "grief", "self-esteem", "identity"]
+
+            # Check if any of these themes are directly mentioned
+            user_question_lower = user_question.lower()
+
+            for theme in themes:
+                if theme in user_question_lower:
+                    hot_topics.append(
+                        {
+                            "topic": theme,
+                            "relevance": 0.95,  # High relevance for direct mentions
+                            "source": "direct_mention",
+                        }
+                    )
+
+            # If we found direct mentions, return those
+            if hot_topics:
+                return hot_topics
+
+            # Otherwise, try vector search
+            if query_embedding:
+                # Only include relevant hot topics (above threshold)
+                threshold = 0.75  # Higher threshold for hot topics
+
+                # Format embedding for PostgreSQL vector format
+                vector_str = format_embedding_for_db(query_embedding)
+
+                # SQL to find hot topics
+                query = f"""
+                WITH hot_topic_embeddings AS (
+                    SELECT
+                        id,
+                        content,
+                        embedding,
+                        1 - (embedding <=> '{vector_str}'::vector) as similarity
+                    FROM
+                        public.hot_topics
+                    WHERE
+                        1 - (embedding <=> '{vector_str}'::vector) > {threshold}
+                    ORDER BY
+                        similarity DESC
+                    LIMIT 2
+                )
+                SELECT
+                    id,
+                    content as topic,
+                    similarity as relevance
+                FROM
+                    hot_topic_embeddings;
+                """
+
+                try:
+                    # Check if hot_topics table exists first
+                    check_query = (
+                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'hot_topics');"
+                    )
+                    check_result = self.db_manager.supabase.rpc("sql", {"command": check_query}).execute()
+
+                    if check_result.data and (check_result.data[0] == "t" or check_result.data[0] is True):
+                        # Table exists, query it
+                        result = self.db_manager.supabase.rpc("sql", {"command": query}).execute()
+
+                        if result.data:
+                            for row in result.data:
+                                if isinstance(row, dict):
+                                    hot_topics.append(
+                                        {
+                                            "topic": row.get("topic", ""),
+                                            "relevance": row.get("relevance", 0),
+                                            "source": "vector_similarity",
+                                        }
+                                    )
+                                elif isinstance(row, str):
+                                    # Parse CSV-formatted response
+                                    parts = row.split(",")
+                                    if len(parts) >= 3:
+                                        hot_topics.append(
+                                            {
+                                                "topic": parts[1],
+                                                "relevance": (
+                                                    float(parts[2]) if parts[2].replace(".", "", 1).isdigit() else 0
+                                                ),
+                                                "source": "vector_similarity",
+                                            }
+                                        )
+                except Exception as inner_e:
+                    logger.warning("Error finding hot topics: %s", inner_e)
+                    # Continue without hot topics
+
+            return hot_topics
+
+        except Exception as e:
+            logger.error("Error identifying hot topics: %s", e)
+            return []
 
     def generate_simple_response(self, user_question: str) -> str:
         """Generates a simple response without any preprocessing or context."""
@@ -750,8 +860,9 @@ class RAGProcessor:
         self, user_question: str, embedding: List[float], session_id: str, metadata: Optional[dict] = None
     ) -> Dict[str, Any]:
         """Detect potential pain points from question embedding with proper error handling."""
-        # Default response structure with ALL required keys
-        default_response = {
+        # Default response structure, especially for when no pain point is detected.
+        # 'template_used' is set to 'dynamic_rag_therapy' to align with previous test fixes.
+        default_response: Dict[str, Any] = {
             "pain_point_detected": False,
             "template_used": "dynamic_rag_therapy",
             "approach_type": DEFAULT_APPROACH,
@@ -760,34 +871,46 @@ class RAGProcessor:
         }
 
         try:
-            pain_point = self.db_manager.identify_potential_pain_points(
+            # Fetch pain point data from the database manager
+            pain_point_data_from_db = self.db_manager.identify_potential_pain_points(
                 question_text=user_question, question_embedding=embedding, session_id=session_id, pain_threshold=0.85
             )
 
-            if pain_point:
-                # Process pain point for normal case
+            # Check if a pain point was genuinely detected and data is available
+            if pain_point_data_from_db and pain_point_data_from_db.get("detected", False):
+                # A pain point IS detected.
+
+                # Extract the 'suggested_approach' dictionary from the pain point data.
+                # Defaults to an empty dict if 'suggested_approach' is not found.
+                suggested_approach_info = pain_point_data_from_db.get("suggested_approach", {})
+
+                # Determine 'approach_type' using your specified logic:
+                # If 'suggested_approach_info' is a dictionary and contains 'approach_type', use it.
+                # Otherwise, fall back to DEFAULT_APPROACH.
+                approach_type = (
+                    suggested_approach_info.get("approach_type")
+                    if isinstance(suggested_approach_info, dict)
+                    else DEFAULT_APPROACH
+                )
+
+                # Map the determined 'approach_type' to a specific template name.
+                # Ensure 'map_approach_to_template' is imported (usually at the module level).
+                template_used = map_approach_to_template(approach_type)
+
+                # Construct the result dictionary for a detected pain point.
                 result = {
-                    "pain_point_detected": pain_point.get("detected", False),
-                    "template_used": "dynamic_rag_therapy",
-                    "approach_type": DEFAULT_APPROACH,
-                    "similarity": pain_point.get("similarity", 0.0),
-                    "pain_point": pain_point,
+                    "pain_point_detected": True,
+                    "template_used": template_used,
+                    "approach_type": approach_type,
+                    "similarity": pain_point_data_from_db.get("similarity", 0.0),
+                    "pain_point": pain_point_data_from_db,  # Include the full pain point data from DB
                 }
 
-                # Add suggested approach if available
-                suggested_approach = pain_point.get("suggested_approach")
-                if (
-                    suggested_approach
-                    and isinstance(suggested_approach, dict)
-                    and "approach_type" in suggested_approach
-                ):
-                    result["approach_type"] = suggested_approach["approach_type"]
+                # If a repetition pattern is part of the pain point data, add it to the result.
+                if pain_point_data_from_db.get("repetition_pattern"):
+                    result["repetition_pattern"] = pain_point_data_from_db.get("repetition_pattern")
 
-                # Add repetition pattern if available
-                if pain_point.get("repetition_pattern"):
-                    result["repetition_pattern"] = pain_point.get("repetition_pattern")
-
-                # Update metadata if provided
+                # If metadata is provided, update it with the pain point detection details.
                 if metadata is not None and isinstance(metadata, dict):
                     if "pain_points" not in metadata:
                         metadata["pain_points"] = []
@@ -796,128 +919,51 @@ class RAGProcessor:
                             "question": user_question,
                             "detected": result["pain_point_detected"],
                             "similarity": result["similarity"],
+                            "template_used": result["template_used"],
                         }
                     )
                 return result
-            # pain_point was None
-            logger.warning("No pain point detected (None returned from DB manager)")
-            return default_response
-
-        except Exception as e:
-            logger.error("Error in pain point detection: %s", e)
-            logger.error(traceback.format_exc())
-            return default_response
-
-    def _identify_hot_topics(self, user_question: str, query_embedding: List[float]) -> List[Dict[str, Any]]:
-        """
-        Identify hot topics in the user's question using vector similarity.
-
-        Args:
-            user_question: The user's question
-            query_embedding: The embedding of the user's question
-
-        Returns:
-            List[Dict]: Hot topics with relevance scores
-        """
-        try:
-            # Use a specialized "hot topics" search
-            hot_topics = []
-
-            # Focus on specific psychological themes
-            themes = ["anxiety", "depression", "stress", "relationships", "trauma", "grief", "self-esteem", "identity"]
-
-            # Check if any of these themes are directly mentioned
-            user_question_lower = user_question.lower()
-
-            for theme in themes:
-                if theme in user_question_lower:
-                    hot_topics.append(
-                        {
-                            "topic": theme,
-                            "relevance": 0.95,  # High relevance for direct mentions
-                            "source": "direct_mention",
-                        }
-                    )
-
-            # If we found direct mentions, return those
-            if hot_topics:
-                return hot_topics
-
-            # Otherwise, try vector search
-            if query_embedding:
-                # Only include relevant hot topics (above threshold)
-                threshold = 0.75  # Higher threshold for hot topics
-
-                # Format embedding for PostgreSQL vector format
-                vector_str = format_embedding_for_db(query_embedding)
-
-                # SQL to find hot topics
-                query = f"""
-                WITH hot_topic_embeddings AS (
-                    SELECT
-                        id,
-                        content,
-                        embedding,
-                        1 - (embedding <=> '{vector_str}'::vector) as similarity
-                    FROM
-                        public.hot_topics
-                    WHERE
-                        1 - (embedding <=> '{vector_str}'::vector) > {threshold}
-                    ORDER BY
-                        similarity DESC
-                    LIMIT 2
+            # This block handles cases where:
+            # 1. pain_point_data_from_db is None or empty.
+            # 2. pain_point_data_from_db.get("detected") is False.
+            log_message_db_resp = str(pain_point_data_from_db)[:100] if pain_point_data_from_db is not None else "None"
+            logger.info(
+                f"No pain point detected or data unavailable for question: '{user_question[:50]}...'. "
+                f"DB response: {log_message_db_resp}. Returning default response."
+            )
+            # Update metadata for the "no pain point" case as well.
+            if metadata is not None and isinstance(metadata, dict):
+                if "pain_points" not in metadata:
+                    metadata["pain_points"] = []
+                metadata["pain_points"].append(
+                    {
+                        "question": user_question,
+                        "detected": False,
+                        "similarity": (
+                            pain_point_data_from_db.get("similarity", 0.0) if pain_point_data_from_db else 0.0
+                        ),
+                        "template_used": default_response["template_used"],
+                    }
                 )
-                SELECT
-                    id,
-                    content as topic,
-                    similarity as relevance
-                FROM
-                    hot_topic_embeddings;
-                """
-
-                try:
-                    # Check if hot_topics table exists first
-                    check_query = (
-                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'hot_topics');"
-                    )
-                    check_result = self.db_manager.supabase.rpc("sql", {"command": check_query}).execute()
-
-                    if check_result.data and (check_result.data[0] == "t" or check_result.data[0] is True):
-                        # Table exists, query it
-                        result = self.db_manager.supabase.rpc("sql", {"command": query}).execute()
-
-                        if result.data:
-                            for row in result.data:
-                                if isinstance(row, dict):
-                                    hot_topics.append(
-                                        {
-                                            "topic": row.get("topic", ""),
-                                            "relevance": row.get("relevance", 0),
-                                            "source": "vector_similarity",
-                                        }
-                                    )
-                                elif isinstance(row, str):
-                                    # Parse CSV-formatted response
-                                    parts = row.split(",")
-                                    if len(parts) >= 3:
-                                        hot_topics.append(
-                                            {
-                                                "topic": parts[1],
-                                                "relevance": (
-                                                    float(parts[2]) if parts[2].replace(".", "", 1).isdigit() else 0
-                                                ),
-                                                "source": "vector_similarity",
-                                            }
-                                        )
-                except Exception as inner_e:
-                    logger.warning("Error finding hot topics: %s", inner_e)
-                    # Continue without hot topics
-
-            return hot_topics
+            return default_response
 
         except Exception as e:
-            logger.error("Error identifying hot topics: %s", e)
-            return []
+            logger.error(
+                f"Error in detect_pain_points_from_embedding for question '{user_question[:50]}...': {e}", exc_info=True
+            )
+            # Update metadata for the error case.
+            if metadata is not None and isinstance(metadata, dict):
+                if "pain_points" not in metadata:
+                    metadata["pain_points"] = []
+                metadata["pain_points"].append(
+                    {
+                        "question": user_question,
+                        "detected": False,
+                        "error": str(e),
+                        "template_used": default_response["template_used"],  # Use default template on error
+                    }
+                )
+            return default_response
 
     @typechecked
     def get_relevant_documents(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:

@@ -1,10 +1,72 @@
-""" Utility functions for therapeutic mappings. """
+"""
+This module provides centralized mappings for therapeutic concepts,
+including themes, keywords, emotions, and their interrelationships.
+It is designed to ensure consistency in how various psychological
+constructs are identified, categorized, and utilized across the application,
+particularly in topic detection, emotion analysis, and response generation.
 
-from typing import Any, Dict, Final, List, Optional, Tuple
+The `TherapeuticMappings` class serves as a static container for these
+mappings, offering methods to retrieve specific data points like keywords
+for a theme, a therapeutic approach for a given theme, or a response
+template for a particular approach. This centralization helps in maintaining
+and updating the knowledge base of the application in a structured manner.
+"""
+
+import logging
+from typing import Any, Dict, Final, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 
 class TherapeuticMappings:
-    """Centralized therapeutic mappings for consistent theme/keyword handling."""
+    """
+    Centralized repository for therapeutic mappings.
+
+    This class holds various dictionaries and provides class methods
+    to access and interpret them. These mappings are crucial for:
+    - Identifying psychological themes from user input.
+    - Detecting emotions and their intensity.
+    - Mapping themes to appropriate therapeutic approaches.
+    - Mapping approaches to specific response templates.
+
+    Attributes:
+        ENHANCED_TAXONOMY (Dict[str, List[str]]):
+            A detailed taxonomy mapping broad psychological categories (e.g., "depression",
+            "anxiety", "workplace_trauma") to extensive lists of related keywords and phrases.
+            This is primarily used for keyword-based topic spotting and understanding
+            the nuances within a category.
+
+        THERAPEUTIC_THEMES (Dict[str, Dict[str, Any]]):
+            Maps core therapeutic themes (e.g., "trauma", "anxiety", "grief_loss",
+            "workplace_anxiety") to their associated keywords, common emotions,
+            and suggested therapeutic approaches. This helps in a more holistic
+            understanding of a user's expressed issue.
+
+        APPROACH_TO_TEMPLATE (Dict[str, str]):
+            Maps specific therapeutic approaches (e.g., "cbt", "trauma_informed",
+            "supportive_listening") to corresponding response template names. This
+            enables the system to select an appropriate conversational flow or
+            response structure based on the identified therapeutic strategy.
+
+        EMOTION_PATTERNS (Dict[str, List[Tuple[str, float]]]):
+            A comprehensive collection of regular expression patterns for detecting
+            various emotions and their intensity (weights). This was the original
+            combined list. (Legacy, see CORE_EMOTIONS, etc.)
+
+        CORE_EMOTIONS (Dict[str, List[Tuple[str, float]]]):
+            Defines regex patterns and weights specifically for detecting fundamental
+            affect states or "pure" emotions like anger, fear, sadness, joy.
+
+        CLINICAL_PATTERNS (Dict[str, List[Tuple[str, float]]]):
+            Defines regex patterns and weights for detecting terms and phrases
+            associated with clinical or diagnostic categories like anxiety disorders,
+            depression, trauma, and stress.
+
+        INTERPERSONAL_PATTERNS (Dict[str, List[Tuple[str, float]]]):
+            Defines regex patterns and weights for detecting themes related to
+            interpersonal relationships (e.g., "relationships", "loneliness") and
+            self-concept (e.g., "self-esteem", "identity").
+    """
 
     ENHANCED_TAXONOMY: Dict[str, List[str]] = {
         "depression": [
@@ -109,6 +171,37 @@ class TherapeuticMappings:
             "abused",
             "victimized",
             "detached",
+        ],
+        "control": [
+            "control",
+            "controlling",
+            "loss of control",
+            "need control",
+            "powerless",
+            "micromanage",
+            "manipulate",
+            "dominate",
+            "overpower",
+            "helpless to stop",
+            "can't manage",
+            "grip",
+            "handle",
+            "let go",  # Also related to control (or lack thereof)
+            "surrender",  # Related to letting go of control
+            "accept",  # Related to accepting lack of control
+            "influence",
+            "authority",
+            "discipline",
+            "order",
+            "structure",
+            "boundaries",  # Can be related to control
+            "freedom",  # Lack of control or freedom from control
+            "autonomy",
+            "independence",
+            "dependence",  # Can be related to control dynamics
+            "compulsion",  # Feeling out of control
+            "obsession",  # Can be about controlling thoughts/actions
+            "perfectionism",
         ],
         # workplace trauma and abuse
         "workplace_trauma": [
@@ -474,174 +567,643 @@ class TherapeuticMappings:
             "overwhelming",
         ],
         "emotional_support": ["help", "support", "understand", "listen", "care", "concern"],
+        "family_dynamics": [
+            # Core family terms
+            "family dynamics",
+            "family issues",
+            "family problems",
+            "family relationship",
+            "family tension",
+            "family conflict",
+            "family drama",
+            "family situation",
+            "family stress",
+            # Parent-child relationships
+            "parent child",
+            "parental",
+            "parents",
+            "mother",
+            "father",
+            "mom",
+            "dad",
+            "parent relationship",
+            "parenting style",
+            "strict parents",
+            "controlling parents",
+            "distant parents",
+            # Sibling relationships
+            "sibling rivalry",
+            "brother",
+            "sister",
+            "siblings",
+            "favorite child",
+            "golden child",
+            "scapegoat",
+            # Extended family
+            "grandparent",
+            "aunt",
+            "uncle",
+            "cousin",
+            "in-laws",
+            "extended family",
+            "family gathering",
+            # Family roles and patterns
+            "family role",
+            "black sheep",
+            "peacemaker",
+            "mediator",
+            "caretaker role",
+            "parentification",
+            "family rules",
+            "family expectations",
+            "family pressure",
+            # Childhood experiences
+            "childhood",
+            "growing up",
+            "upbringing",
+            "raised",
+            "family history",
+            "family background",
+            "childhood memories",
+            "childhood trauma",
+            "childhood experiences",
+            # Family behaviors
+            "favoritism",
+            "rejection",
+            "comparison",
+            "criticism",
+            "approval seeking",
+            "validation seeking",
+            "emotional neglect",
+            "conditional love",
+            "family boundaries",
+            "family communication",
+            # Family emotions
+            "family disappointment",
+            "family shame",
+            "family guilt",
+            "family pride",
+            "family loyalty",
+            "family obligation",
+            "family resentment",
+            "family jealousy",
+            "family anger",
+        ],
+        "childhood_issues": [
+            # Core childhood terms
+            "childhood issues",
+            "childhood problems",
+            "childhood trauma",
+            "early experiences",
+            "growing up",
+            "young age",
+            # Development periods
+            "early childhood",
+            "middle childhood",
+            "adolescence",
+            "teenage years",
+            "youth",
+            "developmental",
+            # Childhood environments
+            "home environment",
+            "school experiences",
+            "neighborhood",
+            "community",
+            "cultural background",
+            "religious upbringing",
+            # Childhood relationships
+            "childhood friends",
+            "peer relationships",
+            "bullying",
+            "social inclusion",
+            "social exclusion",
+            "friendship issues",
+            # Educational experiences
+            "school problems",
+            "academic pressure",
+            "learning difficulties",
+            "school anxiety",
+            "teacher relationships",
+            "education stress",
+        ],
+        "approval_seeking": [
+            # Core approval terms
+            "need approval",
+            "seeking approval",
+            "validation seeking",
+            "people pleasing",
+            "perfectionism",
+            "fear of rejection",
+            # Behavioral patterns
+            "trying to please",
+            "cant say no",
+            "overachiever",
+            "perfectionist",
+            "overcompensating",
+            "prove myself",
+            # Related emotions
+            "fear of disappointment",
+            "fear of criticism",
+            "fear of judgment",
+            "need to be perfect",
+            "fear of failure",
+            "fear of abandonment",
+        ],
+        "favoritism": [
+            # Direct terms
+            "favorite",
+            "favorites",
+            "favoritism",
+            "preferred",
+            "preference",
+            "preferential",
+            # Common phrases about favoritism
+            "plays favorites",
+            "pick favorites",
+            "choosing favorites",
+            "clear favorite",
+            "obvious favorite",
+            "always liked better",
+            "treat differently",
+            "different treatment",
+            "unfair treatment",
+            # Family roles indicating favoritism
+            "golden child",
+            "scapegoat",
+            "black sheep",
+            "favorite child",
+            "least favorite",
+            "favorite son",
+            "favorite daughter",
+            # Parent-specific favoritism
+            "mom's favorite",
+            "dad's favorite",
+            "parents prefer",
+            "mommy's boy",
+            "daddy's girl",
+            # Comparison phrases
+            "loves more than",
+            "cares more about",
+            "pays more attention to",
+            "spends more time with",
+            "gives more to",
+            "always takes their side",
+            # Impact phrases
+            "never measure up",
+            "always second best",
+            "not the favorite",
+            "less important",
+            "valued less",
+            "treated better",
+            # Behavioral indicators
+            "gets away with everything",
+            "can do no wrong",
+            "never gets in trouble",
+            "always gets what they want",
+            "special privileges",
+            "special treatment",
+            # Emotional experiences
+            "feeling less than",
+            "feeling inferior",
+            "feeling left out",
+            "jealous of sibling",
+            "sibling rivalry",
+            "sibling comparison",
+            # Family dynamics
+            "parental preference",
+            "family competition",
+            "unequal treatment",
+            "different standards",
+            "double standards",
+            # Additional everyday phrases
+            "always chooses them",
+            "always takes their side",
+            "gets special attention",
+            "gets better treatment",
+            "shows more love to",
+            "more affectionate with",
+            "clearly prefers",
+            "obviously favors",
+        ],
+        "family": [
+            # Core family terms
+            "family",
+            "families",
+            "familial",
+            "parent",
+            "parents",
+            "parental",
+            "mother",
+            "father",
+            "mom",
+            "dad",
+            "sibling",
+            "siblings",
+            "brother",
+            "sister",
+            # Extended family
+            "grandparent",
+            "aunt",
+            "uncle",
+            "cousin",
+            "in-law",
+            "in-laws",
+            "extended family",
+            # Family relationships
+            "family relationship",
+            "family dynamic",
+            "family issue",
+            "family problem",
+            "family conflict",
+            "family tension",
+            # Common phrases
+            "my family",
+            "our family",
+            "the family",
+            "family member",
+            "family situation",
+            "within the family",
+            "in my family",
+        ],
+        "approval": [
+            # Direct terms
+            "approval",
+            "approve",
+            "approved",
+            "validation",
+            "validate",
+            "validated",
+            "acceptance",
+            "accept",
+            "accepted",
+            # Seeking patterns
+            "need approval",
+            "seeking approval",
+            "want approval",
+            "looking for approval",
+            "need validation",
+            "seeking validation",
+            "want validation",
+            "looking for validation",
+            # Common phrases
+            "want them to approve",
+            "makes them happy",
+            "please others",
+            "make proud",
+            "live up to",
+            "meet expectations",
+            "prove myself",
+            "gain acceptance",
+            "earn love",
+        ],
+        "rejection": [
+            # Direct terms
+            "reject",
+            "rejected",
+            "rejection",
+            "exclude",
+            "excluded",
+            "exclusion",
+            "abandon",
+            "abandoned",
+            "abandonment",
+            # Feelings and experiences
+            "left out",
+            "pushed away",
+            "not wanted",
+            "unwanted",
+            "cast aside",
+            "pushed aside",
+            "ignored",
+            "overlooked",
+            "dismissed",
+            "shut out",
+            "not included",
+            "don't belong",
+            "doesn't want me",
+            "don't want me",
+            # Family-specific
+            "family rejection",
+            "parental rejection",
+            "sibling rejection",
+            "rejected by family",
+            "family abandonment",
+        ],
+        "childhood": [
+            # Direct terms
+            "child",
+            "childhood",
+            "children",
+            "kid",
+            "kids",
+            "young",
+            # Time periods
+            "growing up",
+            "grew up",
+            "when I was young",
+            "as a child",
+            "as kids",
+            "early years",
+            "younger years",
+            # Experiences
+            "raised",
+            "upbringing",
+            "childhood experience",
+            "childhood memory",
+            "childhood trauma",
+            # Family context
+            "family history",
+            "family background",
+            "family upbringing",
+            "childhood home",
+            "childhood family",
+        ],
     }
 
     THERAPEUTIC_THEMES: Dict[str, Dict[str, Any]] = {
-        "abandonment": {
-            "keywords": ["abandon", "left me", "alone", "desert"],
-            "approach": "abandonment",
-            "template": "attachment_based_therapy",
-            "human_readable": "abandonment_support",
+        # Trauma & PTSD
+        "trauma": {
+            "keywords": ["trauma", "flashback", "ptsd", "abuse", "childhood_issues"],
+            "emotions": ["fear", "anxiety", "helplessness"],
+            "approaches": ["trauma", "cognitive_behavioral"],
         },
-        "rejection": {
-            "keywords": ["reject", "unwanted", "excluded", "cast aside"],
-            "approach": "self-compassion",
-            "template": "empathy_validation",
-            "human_readable": "rejection_support",
+        # Anxiety
+        "anxiety": {
+            "keywords": ["anxiety", "worry", "stress", "panic", "nervous", "overthinking", "health_anxiety"],
+            "emotions": ["anxiety", "fear", "tension"],
+            "approaches": ["cognitive_behavioral", "mindfulness"],
         },
         "control": {
-            "keywords": ["control", "helpless", "powerless", "manipulation"],
-            "approach": "cbt",
-            "template": "cognitive_behavioral_therapy",
-            "human_readable": "control_support",
+            "keywords": [
+                "control",
+                "controlling",
+                "loss of control",
+                "powerless",
+                "manage",
+                "grip",
+                "handle",
+                "micromanage",
+                "let go",
+                "can't stop",
+                "need to control",
+                "out of control",
+            ],
+            "emotions": ["anxiety", "frustration", "helplessness", "anger", "fear"],  # Example emotions
+            "approaches": [
+                "cognitive_behavioral_therapy",
+                "acceptance_commitment_therapy",
+                "mindfulness_relaxation",
+                "dialectical_behavior_therapy",
+            ],  # Example approaches
+            "description": "Issues related to the need to control, feeling out of control, or being controlled.",
+            "human_readable_name": "Control and Empowerment",
         },
-        "anxiety": {
-            "keywords": ["anxiety", "anxious", "worry", "panic", "nervous", "stress"],
-            "approach": "cbt",
-            "template": "cognitive_behavioral_therapy",
-            "human_readable": "anxiety",
-        },
+        # Depression
         "depression": {
-            "keywords": ["depression", "depressed", "sad", "unmotivated", "hopeless"],
-            "approach": "behavioral_activation",
-            "template": "depression",
-            "human_readable": "depression_support",
+            "keywords": [
+                "depression",
+                "depressed",
+                "sad",
+                "hopeless",
+                "unmotivated",
+                "empty",
+                "loss of interest",
+                "exhausted",
+                "no point",
+                "anhedonia",
+            ],
+            "emotions": ["sadness", "hopelessness", "fatigue", "emptiness", "guilt"],
+            "approaches": ["behavioral_activation", "cognitive_behavioral", "self_compassion", "motivation_support"],
+            "description": "Persistent feelings of sadness, loss of interest, and other mood-related symptoms.",
+            "human_readable_name": "Support for Depression",
         },
-        "relationship": {
+        # Grief & Loss
+        "grief_loss": {
+            "keywords": [
+                "grief",
+                "loss",
+                "grief_loss",
+                "death",
+                "bereavement",
+                "mourning",
+                "passed away",
+                "deceased",
+                "gone",
+                "passing",
+                "died",
+                "lost someone",
+                "missing someone",
+                "funeral",
+                "memorial",
+            ],
+            "emotions": ["sadness", "longing", "emptiness"],
+            "approaches": ["grief_processing", "supportive_listening"],
+        },
+        # Workplace Anxiety
+        "workplace_anxiety": {
+            "keywords": [
+                "work",
+                "job",
+                "career",
+                "boss",
+                "workplace",
+                "office",
+                "work_stress",
+                "workplace_stress",
+                "workplace_trauma",
+                "panic at work",
+                "anxious about work",
+            ],
+            "emotions": ["anxiety", "stress", "frustration", "fear"],
+            "approaches": ["cognitive_behavioral", "stress_management"],
+            "description": "Anxiety and stress related to the workplace, job, or career.",
+            "human_readable_name": "Workplace Anxiety Support",
+        },
+        # General Work Support
+        "work": {
+            "keywords": ["work", "job", "career", "boss", "office", "employment", "colleague"],
+            "emotions": ["stress", "anxiety", "frustration", "pressure"],
+            "approaches": ["cognitive_behavioral", "stress_management", "solution_focused"],
+            "description": "General issues related to work, career, and the professional environment.",
+            "human_readable_name": "Work-Related Support",
+        },
+        # Relationships
+        "relationship_issues": {
             "keywords": [
                 "relationship",
-                "breakup",
                 "partner",
-                "husband",
-                "wife",
-                "girlfriend",
-                "boyfriend",
-                "friend",
-                "family",
+                "breakup",
+                "marriage",
+                "divorce",
+                "dating",
+                "couple",
+                "romantic",
+                "interpersonal",
+                "family_conflict",
+                "jealousy",
             ],
-            "approach": "interpersonal_therapy",
-            "template": "relationship_issues",
-            "human_readable": "relationship_guidance",
+            "emotions": ["hurt", "confusion", "loneliness"],
+            "approaches": ["interpersonal_therapy", "attachment_based"],
         },
-        "self-worth": {
+        # General Emotional Support
+        "general_support": {
+            "keywords": ["support", "help", "listen", "understand", "talk", "struggling", "stuck"],
+            "emotions": ["sadness", "distress", "neutral"],
+            "approaches": ["self_compassion", "supportive_listening", "motivation_support"],
+            "description": "General need for support, understanding, and a compassionate presence.",
+            "human_readable_name": "General Emotional Support",
+        },
+        # Self-Compassion
+        "self_compassion": {
             "keywords": [
-                "worthless",
-                "undeserving",
-                "inadequate",
-                "unworthy",
-                "failure",
-                "confidence",
-                "self-esteem",
-                "worth",
+                "self_doubt",
+                "worthlessness",
+                "insecurity",
+                "impostor_syndrome",
+                "not good enough",
+                "approval_seeking",
+                "self-criticism",
+                "hard on myself",
             ],
-            "approach": "self-compassion",
-            "template": "empathy_validation",
-            "human_readable": "self-worth-enhancement",
-        },
-        "trauma": {
-            "keywords": ["trauma", "ptsd", "flashback", "abuse", "assault"],
-            "approach": "trauma",
-            "template": "trauma",
-            "human_readable": "trauma_support",
-        },
-        "loneliness": {
-            "keywords": ["lonely", "alone", "isolated", "connection", "abandoned", "desert"],
-            "approach": "connection_building",
-            "template": "others",
-            "human_readable": "connection_building",
-        },
-        "grief": {
-            "keywords": ["grief", "loss", "death", "died"],
-            "approach": "grief_processing",
-            "template": "grief_loss",
-            "human_readable": "grief_processing",
-        },
-        "trust": {
-            "keywords": ["trust", "betrayal", "suspicious", "faith", "rely"],
-            "approach": "interpersonal_therapy",
-            "template": "relationship_issues",
-            "human_readable": "trust_building",
-        },
-        "emotional_regulation": {
-            "keywords": ["overwhelm", "regulate", "emotion", "feelings", "manage"],
-            "approach": "dbt",
-            "template": "dialectical_behavior_therapy",
-            "human_readable": "emotional_regulation",
-        },
-        "guilt": {
-            "keywords": [
-                "feel guilty",
-                "guilt",
-                "remorse",
-                "feeling guilty",
-                "guilt about",
-                "guilty about",
-                "regret doing",
-                "wrongdoing",
-                "did something wrong",
-            ],
-            "approach": "self-compassion",
-            "template": "guilt",
-            "human_readable": "Guilt Processing",
-        },
-        "shame": {
-            "keywords": [
-                "feel ashamed",
-                "feeling ashamed",
-                "shame about",
-                "ashamed of",
-                "embarrassment",
-                "humiliated",
-                "humiliation",
-                "embarrassed",
-                "feel worthless",
-                "feel defective",
-                "feel inadequate",
-            ],
-            "approach": "self-compassion",
-            "template": "shame",
-            "human_readable": "Shame Processing",
-        },
-        "workplace_anxiety": {
-            "keywords": ["work", "job", "career", "boss", "workplace", "office", "coworker", "colleague"],
-            "approach": "cognitive_behavioral",
-            "template": "cognitive_behavioral_therapy",
-            "human_readable": "Workplace Anxiety Support",
+            "emotions": ["shame", "inadequacy", "self-criticism"],
+            "approaches": ["compassion_focused_therapy", "cognitive_behavioral"],
+            "description": "Developing self-kindness and understanding towards oneself.",
+            "human_readable_name": "Self-Compassion Building",
         },
     }
 
-    APPROACH_TO_TEMPLATE = {
-        "cbt": "cognitive_behavioral_therapy",
-        "behavioral_activation": "depression",
-        "interpersonal_therapy": "relationship_issues",
-        "self-compassion": "empathy_validation",
-        "trauma": "trauma",
-        "connection_building": "others",
-        "grief_processing": "grief_loss",
-        "supportive_listening": "empathy_validation",
-        "dbt": "dialectical_behavior_therapy",
-        "abandonment": "attachment_based_therapy",
-        "anxiety": "cognitive_behavioral_therapy",
-        "mindfulness": "mindfulness_relaxation",
-        "crisis": "crisis_support",
-        "workplace": "workplace_trauma",
-        "heartbreak": "heartbreak",
-        "information": "information",
-        "acceptance": "acceptance_commitment_therapy",
-        "sfbt": "solution_focused_brief_therapy",
-        "motivational": "motivational_interviewing",
-        "empathy_validation": "empathy_validation",
-        "others": "others",
+    APPROACH_TO_TEMPLATE: Dict[str, str] = {
+        # Core emotions and conditions
+        "anxiety": "anxiety",
         "depression": "depression",
-        "grief_loss": "grief_loss",
-        "grief_reflection": "grief_loss",
-        "self-criticism": "self-compassion",
-        "guilt": "guilt",
+        "loneliness": "loneliness",
+        "trauma": "trauma",
+        "grief": "grief_loss",
         "shame": "shame",
+        "guilt": "guilt",
+        "heartbreak": "heartbreak",
+        "control": "control",
+        # Control-related variations
+        "controlling": "control",
+        "need_control": "control",
+        "loss_of_control": "control",
+        "out_of_control": "control",
+        # Heartbreak-related variations
+        "broken_heart": "heartbreak",
+        "breakup": "heartbreak",
+        "relationship_loss": "heartbreak",
+        "love_loss": "heartbreak",
+        # Add connection-building to loneliness mapping
+        "connection_building": "loneliness",
+        "connection": "loneliness",
+        "social_connection": "loneliness",
+        "isolation": "loneliness",
+        # Core therapeutic approaches
+        "cbt": "cognitive_behavioral_therapy",
+        "cognitive_behavioral": "cognitive_behavioral_therapy",
+        "cognitive behavioral": "cognitive_behavioral_therapy",
+        "cognitive-behavioral": "cognitive_behavioral_therapy",
+        "behavioral_activation": "depression",  # Maps approach to a theme-named template
+        "behavioral activation": "depression",
+        "interpersonal_therapy": "relationship_issues",
+        "interpersonal therapy": "relationship_issues",
+        "ipt": "relationship_issues",
+        # Acceptance and mindfulness approaches
+        "act": "acceptance_commitment_therapy",
+        "acceptance": "acceptance_commitment_therapy",
+        "acceptance_commitment": "acceptance_commitment_therapy",
+        "acceptance and commitment": "acceptance_commitment_therapy",
+        "mindfulness": "mindfulness_relaxation",
+        "meditation": "mindfulness_relaxation",
+        # Grief and loss approaches
+        "grief_loss": "grief_loss",
+        "grief loss": "grief_loss",
+        "grief-loss": "grief_loss",
+        "grief_processing": "grief_loss",
+        "grief_reflection": "grief_loss",
+        "bereavement": "grief_loss",
+        "loss": "grief_loss",
+        "mourning": "grief_loss",
+        # Empathy, validation and compassion (unified)
+        "empathy": "empathy_validation",
+        "validation": "empathy_validation",
+        "supportive": "empathy_validation",
+        "supportive_listening": "empathy_validation",
+        "emotional_support": "empathy_validation",
+        "general": "empathy_validation",
+        "general_support": "empathy_validation",
+        "listening": "empathy_validation",
+        "understanding": "empathy_validation",
+        "compassion": "empathy_validation",
+        # Compassion-focused therapy (specific)
+        "self-compassion": "self_compassion",
+        "self_compassion": "self_compassion",
+        "cft": "self_compassion",
+        "compassion_focused": "self_compassion",
+        "compassion-focused": "self_compassion",
+        "compassion_focused_therapy": "self_compassion",
+        "self-criticism": "self_compassion",
+        "inner_kindness": "self_compassion",
+        "inner_critic": "self_compassion",
+        # Solution-focused approaches
+        "solution": "solution_focused_brief_therapy",
+        "solution_focused": "solution_focused_brief_therapy",
+        "solution-focused": "solution_focused_brief_therapy",
+        "sfbt": "solution_focused_brief_therapy",
+        "brief_therapy": "solution_focused_brief_therapy",
+        "goal_focused": "solution_focused_brief_therapy",
+        "abandonment": "attachment_based_therapy",
+        # Information and education
+        "information": "information",
+        "education": "information",
+        "psychoeducation": "information",
+        "explain": "information",
+        "clarify": "information",
+        "learn": "information",
+        # DBT and variants
+        "dbt": "dialectical_behavior_therapy",
+        "dialectical": "dialectical_behavior_therapy",
+        "dialectical_behavioral": "dialectical_behavior_therapy",
+        # Workplace-related (maps to a specific template, not a general theme here)
+        "workplace": "workplace_anxiety",  # Assuming workplace_anxiety.j2 template
+        "work": "workplace_anxiety",
+        "career": "workplace_anxiety",
+        "job": "workplace_anxiety",
+        "workplace_trauma": "workplace_anxiety",
+        "workplace_stress": "workplace_anxiety",
+        "work_stress": "workplace_anxiety",
+        "workplace_anxiety": "workplace_anxiety",
+        "work_anxiety": "workplace_anxiety",
+        # Specialized conditions
         "ocd": "obsessive_compulsive_disorder",
+        "obsessive": "obsessive_compulsive_disorder",
+        "compulsive": "obsessive_compulsive_disorder",
+        "obsessive_compulsive": "obsessive_compulsive_disorder",
+        # Crisis and support
+        "crisis": "crisis_support",
+        "emergency": "crisis_support",
+        "urgent": "crisis_support",
+        "immediate": "crisis_support",
+        "suicidal": "crisis_support",
+        "crisis_intervention": "crisis_support",
+        "suicidality": "suicidality_self_harm",
         "suicidality_self_harm": "suicidality_self_harm",
-        "emotional_support": "emotional_support",
-        "workplace_trauma": "workplace_trauma",
+        # Motivational Interviewing approaches
+        "motivational": "motivational_interviewing",
+        "motivational_interviewing": "motivational_interviewing",
+        "mi": "motivational_interviewing",
+        "change_talk": "motivational_interviewing",
+        "ambivalence": "motivational_interviewing",
+        "readiness": "motivational_interviewing",
+        # General Motivation Support
+        "motivation_support": "motivation_support",
+        "procrastination": "motivation_support",
+        "feeling_stuck": "motivation_support",
+        "unmotivated": "motivation_support",
+        "lack_of_motivation": "motivation_support",
+        "get_started": "motivation_support",
+        "task_initiation": "motivation_support",
+        # Mindfulness and relaxation
         "identity": "identity",
         "adjustment": "adjustment",
         "behavior": "behavior",
@@ -651,7 +1213,13 @@ class TherapeuticMappings:
         "self-worth": "self-worth",
         "relationship": "relationship_issues",
         "interpersonal": "interpersonal_therapy",
-        "self-esteem": "self-compassion",
+        "self-esteem": "self_compassion",
+        "cognitive_behavioral": "cognitive_behavioral_therapy",
+        "trauma_informed": "trauma",
+        "stress_management": "stress_management",
+        "attachment_based": "attachment_based_therapy",
+        # General fallback for "issues"
+        "issues": "general_support",
     }
 
     EMOTION_PATTERNS: Final[Dict[str, List[Tuple[str, float]]]] = {
@@ -932,6 +1500,11 @@ class TherapeuticMappings:
             (r"\bself[- ]?blame\b", 1.5),
             (r"\bembarrass(ed|ment)?\b", 1.2),
         ],
+        "frustration": [
+            (r"\bfrustrat(ed|ing|ion)\b", 1.8),
+            (r"\bannoy(ed|ing)\b", 1.5),
+            (r"\birritat(ed|ing)\b", 1.5),
+        ],
         "joy": [
             (r"\bhappy\b", 2.0),
             (r"\bjoy(ful)?\b", 2.0),
@@ -976,6 +1549,29 @@ class TherapeuticMappings:
             (r"\bsoothe(d|ing)?\b", 1.2),
             (r"\bpeaceful\b", 1.2),
         ],
+        "neutral": [
+            (r"\bneutral\b", 1.0),
+            (r"\bneither good nor bad\b", 1.0),
+            (r"\b(don't|do not) feel much\b", 1.0),
+        ],
+        "hurt": [
+            (r"\bhurt\b", 2.0),
+            (r"\bpain(ed)?\b", 1.5),
+            (r"\bwound(ed)?\b", 1.5),
+            (r"\baching\b", 1.2),
+        ],
+        "longing": [
+            (r"\blong(ing)? for\b", 2.0),
+            (r"\byearn(ing)?\b", 1.8),
+            (r"\bmiss(ing)? (him|her|them|it|someone)\b", 1.5),  # More specific
+            (r"\bcrave\b", 1.2),
+        ],
+        "tension": [
+            (r"\bten(se|sion)\b", 2.0),
+            (r"\bstrain(ed)?\b", 1.5),
+            (r"\bkeyed up\b", 1.2),
+            (r"\bfeel tight\b", 1.2),
+        ],
     }
 
     # 2. CLINICAL PATTERNS - clinical/diagnostic categories
@@ -995,7 +1591,7 @@ class TherapeuticMappings:
         "depression": [
             (r"\bdepress(ed|ion)\b", 2.0),
             (r"\blow\b", 1.2),
-            (r"\bhopeless\b", 1.8),
+            # (r"\bhopeless\b", 1.8),
             (r"\bunmotivated\b", 1.5),
             (r"\bexhausted\b", 1.2),
             (r"\bdon\'t enjoy\b", 1.5),
@@ -1004,6 +1600,40 @@ class TherapeuticMappings:
             (r"\bno energy\b", 1.2),
             (r"\bfeel empty\b", 1.5),
             (r"\bworthless\b", 1.8),
+        ],
+        "pressure": [
+            (r"\bpressure(d)?\b", 1.8),
+            (r"\bunder pressure\b", 2.0),
+            (r"\bfeel the heat\b", 1.5),
+            (r"\bdeadline pressure\b", 1.5),
+        ],
+        "helplessness": [
+            (r"\bhelpless(ness)?\b", 2.0),
+            (r"\bpowerless\b", 1.8),
+            (r"\bcan't do anything\b", 1.5),
+            (r"\bno control over\b", 1.5),
+            (r"\bfeel stuck\b", 1.2),  # Can also indicate helplessness
+        ],
+        "hopelessness": [
+            (r"\bhopeless(ness)?\b", 2.0),
+            (r"\bdespair(ing)?\b", 1.8),
+            (r"\bno hope\b", 1.8),
+            (r"\bsee no way out\b", 1.5),
+            (r"\bgiven up\b", 1.5),
+            (r"\bwhat's the point\b", 1.5),
+        ],
+        "fatigue": [
+            (r"\bfatigue(d)?\b", 2.0),
+            (r"\btired all the time\b", 1.8),
+            (r"\bworn out\b", 1.5),
+            (r"\bletharg(y|ic)\b", 1.5),
+            (r"\bno physical energy\b", 1.2),
+        ],
+        "distress": [
+            (r"\bdistress(ed)?\b", 2.0),
+            (r"\bupset\b", 1.5),  # General term
+            (r"\btroubled\b", 1.2),
+            (r"\bagitated\b", 1.5),
         ],
         "trauma": [
             (r"\btrauma\b", 2.0),
@@ -1023,6 +1653,12 @@ class TherapeuticMappings:
             (r"\bcoping\b", 1.2),
             (r"\btoo much to do\b", 1.5),
             (r"\boverworked\b", 1.8),
+        ],
+        "pressure": [
+            (r"\bpressure(d)?\b", 1.8),
+            (r"\bunder pressure\b", 2.0),
+            (r"\bfeel the heat\b", 1.5),
+            (r"\bdeadline pressure\b", 1.5),
         ],
     }
 
@@ -1071,6 +1707,26 @@ class TherapeuticMappings:
             (r"\blife purpose\b", 1.8),
             (r"\bexistential\b", 1.8),
         ],
+        "emptiness": [
+            (r"\bempty(ness)?\b", 2.0),
+            (r"\bvoid\b", 1.5),
+            (r"\bhollow\b", 1.5),
+            (r"\bfeel(ing)? nothing\b", 1.8),
+        ],
+        "inadequacy": [
+            (r"\binadequate\b", 2.0),
+            (r"\bnot good enough\b", 1.8),
+            (r"\bfeel inferior\b", 1.5),
+            (r"\bcan't measure up\b", 1.2),
+        ],
+        "self-criticism": [  # DEFINING 'self-criticism' (with hyphen)
+            (r"\bself[- ]critic(al|ism)\b", 2.0),
+            (r"\bhard on myself\b", 1.8),
+            (r"\bbeat myself up\b", 1.8),
+            (r"\btoo judgmental of myself\b", 1.5),
+            (r"\bmy own worst critic\b", 1.5),
+            (r"\bshould have done better\b", 1.2),
+        ],
     }
 
     @classmethod
@@ -1079,25 +1735,98 @@ class TherapeuticMappings:
         return cls.THERAPEUTIC_THEMES.get(theme.lower(), {}).get("keywords", [])
 
     @classmethod
-    def get_approach_for_theme(cls, theme: str) -> str:
-        """Get therapeutic approach for a theme."""
-        return cls.THERAPEUTIC_THEMES.get(theme, {}).get("approach", "supportive_listening").lower()
+    def get_approach_for_theme(cls, theme: Optional[str]) -> Union[str, List[str]]:
+        if not theme:
+            logger.warning("get_approach_for_theme called with an empty or None theme. Returning default.")
+            return "supportive_listening"
+
+        theme_lower = theme.lower().strip()
+        logger.debug(f"get_approach_for_theme: Received theme='{theme}', processed to='{theme_lower}'")
+
+        theme_data = cls.THERAPEUTIC_THEMES.get(theme_lower, {})
+        if not theme_data:
+            logger.warning(f"Theme '{theme_lower}' not found in THERAPEUTIC_THEMES. Defaulting approach.")
+            # Fallback: Check if the input theme is directly an approach itself
+            if theme_lower in cls.APPROACH_TO_TEMPLATE or any(
+                theme_lower == key.lower() for key in cls.APPROACH_TO_TEMPLATE
+            ):
+                logger.debug(f"Theme '{theme_lower}' matches a direct approach. Returning it.")
+                return theme_lower
+            return "supportive_listening"
+
+        approaches = theme_data.get("approaches")
+        if approaches and isinstance(approaches, list) and len(approaches) > 0:
+            # Ensure all items in the list are strings and lowercased
+            valid_approaches = [str(app).lower() for app in approaches if isinstance(app, str)]
+            if valid_approaches:
+                logger.debug(f"For theme '{theme_lower}', found approaches: {valid_approaches}")
+                return valid_approaches
+            else:
+                logger.warning(
+                    f"Theme '{theme_lower}' has an empty or invalid 'approaches' list after filtering. Defaulting."
+                )
+                return "supportive_listening"
+        elif isinstance(approaches, str):  # If 'approaches' is a single string
+            logger.debug(f"For theme '{theme_lower}', found single string approach: {approaches.lower()}")
+            return approaches.lower()
+        else:
+            logger.warning(
+                f"No valid 'approaches' defined for theme '{theme_lower}' or format is incorrect. Defaulting. Approaches found: {approaches}"
+            )
+            return "supportive_listening"
 
     @classmethod
-    def get_template_for_approach(cls, approach: Optional[str] = None) -> str:
-        """Get template name for a therapeutic approach."""
-        if not approach:
-            return "empathy_validation"
-        return cls.APPROACH_TO_TEMPLATE.get(approach.lower(), "empathy_validation")
+    def get_template_for_approach(cls, approach_or_approaches: Optional[Union[str, List[str]]]) -> Optional[str]:
+        """
+        Retrieves the template name for a given therapeutic approach or list of approaches
+        using the class's APPROACH_TO_TEMPLATE.
+        If a list is provided, it returns the template for the first valid approach found.
+        Returns None if no template is found.
+        """
+        if not approach_or_approaches:
+            return None
+
+        approaches_to_check: List[str] = []
+        if isinstance(approach_or_approaches, str):
+            approaches_to_check.append(approach_or_approaches)
+        elif isinstance(approach_or_approaches, list):
+            for item in approach_or_approaches:
+                if isinstance(item, str):
+                    approaches_to_check.append(item)
+
+        for approach_str in approaches_to_check:
+            normalized_approach = approach_str.lower().strip().replace("  ", " ")
+            template = cls.APPROACH_TO_TEMPLATE.get(normalized_approach)
+            if template:
+                return template
+
+            normalized_clean = "".join(c for c in normalized_approach if c.isalnum())
+            if not normalized_clean:
+                continue
+            for key, value in cls.APPROACH_TO_TEMPLATE.items():
+                key_clean = "".join(c for c in key if c.isalnum())
+                if key_clean == normalized_clean:
+                    return value
+
+        return None
 
     @classmethod
     def get_template_for_theme(cls, theme: str) -> str:
         """
         Get template for a theme/topic by first getting its approach,
-        then mapping approach to template.
+        then mapping approach to template. Defaults to 'empathy_validation'
+        if no specific template is found.
         """
-        approach = cls.get_approach_for_theme(theme)
-        return cls.get_template_for_approach(approach)
+        approach = cls.get_approach_for_theme(theme)  # This can be str or List[str]
+        template_name = cls.get_template_for_approach(approach)  # This is Optional[str]
+
+        if template_name:
+            return template_name
+        else:
+            logger.debug(
+                f"No specific template found for theme '{theme}' (via approach '{approach}'). Defaulting to 'empathy_validation'."
+            )
+            return "empathy_validation"  # Provide a default string
 
     @classmethod
     def get_human_readable_name(cls, theme: str) -> str:
@@ -1128,11 +1857,6 @@ class TherapeuticMappings:
                 return theme
 
         return "supportive_listening"
-
-    # @classmethod
-    # def get_emotion_pattern(cls, emotion: str) -> List[Tuple[str, float]]:
-    #     """Get emotion detection patterns for a specific emotion."""
-    #     return cls.EMOTION_PATTERNS.get(emotion, [])
 
     @classmethod
     def get_all_emotion_patterns(cls) -> Dict[str, List[Tuple[str, float]]]:

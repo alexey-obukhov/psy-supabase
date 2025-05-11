@@ -375,10 +375,59 @@ class TestTemplateDebugging:
             setup_text_generator_for_testing(fresh_generator)
 
     def test_mapping_consistency(self):
-        for theme, data in TherapeuticMappings.THERAPEUTIC_THEMES.items():
-            approach = data.get("approach")
-            logger.info(approach)
-            logger.info(data)
-            assert approach in TherapeuticMappings.APPROACH_TO_TEMPLATE, f"Missing approach: {approach}"
-            template = data.get("template")
-            assert os.path.exists(f"./templates/{template}.j2"), f"Missing template: {template}.j2"
+        """Test to ensure all therapeutic themes have a corresponding template."""
+        from psy_supabase.config import (  # Ensure DEFAULT_THEME is defined or remove if not used for templates
+            DEFAULT_APPROACH,
+            DEFAULT_THEME,
+        )
+
+        missing_approaches = []
+        missing_templates = []
+
+        for theme_name, theme_data in TherapeuticMappings.THERAPEUTIC_THEMES.items():
+            # Get the list of approaches for the current theme
+            # The key is "approaches" (plural) in your THERAPEUTIC_THEMES data
+            theme_specific_approaches = theme_data.get("approaches")
+
+            if not theme_specific_approaches:
+                logger.warning(
+                    f"Theme '{theme_name}' has no 'approaches' list. Using DEFAULT_APPROACH: {DEFAULT_APPROACH}"
+                )
+                # If no specific approaches, check the default one
+                theme_specific_approaches = [DEFAULT_APPROACH]
+
+            if not isinstance(theme_specific_approaches, list):
+                logger.error(
+                    f"Theme '{theme_name}' has 'approaches' but it's not a list: {theme_specific_approaches}. Skipping."
+                )
+                continue
+
+            for approach in theme_specific_approaches:
+                if approach is None:  # Skip if an approach is None
+                    logger.warning(f"Theme '{theme_name}' contains a None approach. Skipping this specific approach.")
+                    continue
+
+                logger.info(f"Theme: {theme_name}, Checking Approach: {approach}")
+                if approach not in TherapeuticMappings.APPROACH_TO_TEMPLATE:
+                    missing_approaches.append(f"Theme '{theme_name}': Approach '{approach}'")
+
+                # Assuming each approach maps to a template directly via APPROACH_TO_TEMPLATE
+                # and then we check if that template file exists.
+                template_name_for_approach = TherapeuticMappings.APPROACH_TO_TEMPLATE.get(approach)
+
+                if template_name_for_approach:
+                    template_file_path = f"./templates/{template_name_for_approach}.j2"
+                    if not os.path.exists(template_file_path):
+                        missing_templates.append(
+                            f"Approach '{approach}': Template file '{template_file_path}' (mapped from '{template_name_for_approach}')"
+                        )
+                elif (
+                    approach in TherapeuticMappings.APPROACH_TO_TEMPLATE
+                ):  # Approach is mapped, but to None/empty string
+                    logger.warning(
+                        f"Approach '{approach}' is in APPROACH_TO_TEMPLATE but maps to a None or empty template name."
+                    )
+                # If approach is not in APPROACH_TO_TEMPLATE, it's already caught by missing_approaches
+
+        assert not missing_approaches, f"Missing approaches in APPROACH_TO_TEMPLATE: {'; '.join(missing_approaches)}"
+        assert not missing_templates, f"Missing template files: {'; '.join(missing_templates)}"

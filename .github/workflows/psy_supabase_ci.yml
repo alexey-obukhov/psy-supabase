@@ -24,55 +24,13 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Setup NLP environment
-      run: |
-        # Install packages based on Python version
-        if [[ "${{ matrix.python-version }}" == "3.8" ]]; then
-          # For Python 3.8 - use older compatible versions
-          pip install nltk==3.8.1
-          pip install numpy==1.24.4  # Force install compatible numpy first
-          pip install --no-build-isolation --only-binary=:all: spacy==3.5.4
-          pip install text2emotion==0.0.5
-        else
-          # For Python 3.10+ - use newer versions
-          pip install numpy==1.24.4 spacy==3.7.5 nltk text2emotion
-        fi
-
-        # Download required models
-        python -c "import spacy; spacy.cli.download('en_core_web_sm')"
-        python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
-
     - name: Install dependencies (consolidated)
       run: |
         # Set up pip with proper cache
         python -m pip install --upgrade pip wheel setuptools
 
-        # Install pre-built spaCy wheel to avoid compilation issues
-        pip install --no-build-isolation --only-binary=:all: spacy==3.6.1
-
-        # Install remaining dependencies with constraints
-        pip install python-dotenv
-
-        # Install remaining requirements, but skip already installed packages
-        pip install -r requirements.txt
-
         # Install your package in development mode
-        pip install -e .
-
-    - name: Install transformer packages
-      run: |
-        # Clear any cached transformer packages
-        pip uninstall -y transformers sentence-transformers
-
-        # Install the specific versions from your requirements.txt
-        pip install transformers==4.46.3
-        pip install sentence-transformers==3.2.1
-
-        # Verify installed versions
-        python -c "import transformers; import sentence_transformers; print(f'Transformers version: {transformers.__version__}'); print(f'Sentence-transformers version: {sentence_transformers.__version__}')"
-
-        # Check if is_torch_npu_available exists
-        python -c "import transformers; print('is_torch_npu_available exists:', hasattr(transformers, 'is_torch_npu_available'))"
+        pip install -e .[test,dev,doc,ci]
 
     - name: Setup Supabase environment
       run: |
@@ -95,7 +53,6 @@ jobs:
         mkdir -p reports
         mkdir -p reports/html
 
-        # Ensure we're using the correct transformers version (don't downgrade)
         pip install torch==2.0.1 # Install specific PyTorch version
 
         # Check transformers version - don't reinstall to avoid downgrade

@@ -53,7 +53,7 @@ import sys
 import uuid
 from collections import Counter
 from logging import Logger
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
 from prismalog.log import get_logger
 from typeguard import typechecked
@@ -318,7 +318,7 @@ class PainPointDetectionTester:
                         recurring_themes = [pain_point["name"]]
 
                 # Get approach type with multiple fallbacks
-                approach_type: Optional[str] = None
+                approach_type: Optional[Union[str, List[str]]] = None
                 if "approach_type" in metadata:
                     approach_type = metadata.get("approach_type")
                 elif "therapeutic_approach" in metadata:
@@ -515,32 +515,37 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
             logger.info(f"  Detected emotions: {', '.join([f'{e}({c})' for e, c in emotion_counts.most_common()])}")
 
         # 3. Analyze approach types - use "approach_type" or "therapeutic_approach" with consistent naming
-        all_approach_types: List[str] = []
+        flat_all_approach_types: List[str] = []
+        raw_approach_types_from_exchanges: List[Any] = []
+
         for exchange in result["exchanges"]:
-            # First check approach_type, then therapeutic_approach
             approach = exchange.get("approach_type") or exchange.get("therapeutic_approach")
             if approach and approach != "unknown" and approach != "error":
-                all_approach_types.append(approach)
+                raw_approach_types_from_exchanges.append(approach)
 
-        # Only process approach types if we have any
-        if all_approach_types:
-            approach_type_counts: Counter = Counter(all_approach_types)
+        for item in raw_approach_types_from_exchanges:
+            if isinstance(item, str):
+                flat_all_approach_types.append(item)
+            elif isinstance(item, list):
+                for sub_item in item:
+                    if isinstance(sub_item, str):
+                        flat_all_approach_types.append(sub_item)
+
+        if flat_all_approach_types:
+            approach_type_counts: Counter = Counter(flat_all_approach_types)
             logger.info(f"  Approach types: {', '.join([f'{t}({c})' for t, c in approach_type_counts.most_common()])}")
 
-            # Check against expected approach types when available
             expected_conversation: Dict[str, Any] = TEST_CONVERSATIONS[i]
             if (
                 "expected_pain_point" in expected_conversation
                 and "approach_types" in expected_conversation["expected_pain_point"]
             ):
                 expected_types: Set[str] = set(expected_conversation["expected_pain_point"]["approach_types"])
-                detected_types: Set[str] = set(all_approach_types)
+                detected_types_for_comparison: Set[str] = set(flat_all_approach_types)
 
-                # Use simple case normalization for comparison
                 normalized_expected: Set[str] = {t.lower() for t in expected_types}
-                normalized_detected: Set[str] = {(t.lower() if t else "") for t in detected_types}
+                normalized_detected: Set[str] = {(t.lower() if t else "") for t in detected_types_for_comparison}
 
-                # Find matches with simple containment check
                 matches = set()
                 for exp in normalized_expected:
                     for det in normalized_detected:
@@ -548,14 +553,14 @@ def analyze_test_results(results: List[Dict[str, Any]]) -> None:
                             matches.add(exp)
                             break
 
-                misses = normalized_expected - {m for m in matches}
+                misses = normalized_expected - matches
 
                 match_percentage: float = (len(matches) / len(normalized_expected)) * 100 if normalized_expected else 0
                 logger.info(f"  Approach type match: {match_percentage:.2f}%")
                 if matches:
-                    logger.info("    Matched: %s", ", ".join(sorted(matches)))
+                    logger.info("    Matched: %s", ", ".join(sorted(list(matches))))
                 if misses:
-                    logger.info("    Missed: %s", ", ".join(sorted(misses)))
+                    logger.info("    Missed: %s", ", ".join(sorted(list(misses))))
 
         # 4. Analyze recurring themes using "recurring_themes" from exchange results
         all_themes: List[str] = []

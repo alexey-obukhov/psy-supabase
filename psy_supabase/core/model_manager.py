@@ -28,7 +28,6 @@ complexity of model loading and memory management.
 import gc
 import os
 import traceback
-from logging import Logger
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
 import torch

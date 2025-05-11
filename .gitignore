@@ -4,6 +4,7 @@
 security_files/
 test/logging/*
 logging/
+logs/*
 nltk_data/
 tests/nltk_data/
 test_results/

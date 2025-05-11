@@ -24,6 +24,7 @@ from unittest.mock import MagicMock, Mock, patch
 import nltk
 import pytest
 import torch
+from prismalog.config import LoggingConfig
 from prismalog.log import get_logger
 
 from psy_supabase.config import (  # pylint: disable=unused-import
@@ -32,6 +33,11 @@ from psy_supabase.config import (  # pylint: disable=unused-import
     DEFAULT_THEME,
     DEFAULT_TOPIC,
 )
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+config_path = os.path.join(project_root, "psy_supabase", "config.yaml")
+
+LoggingConfig.initialize(config_file=config_path)
 
 logger = get_logger(__name__)
 

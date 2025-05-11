@@ -34,6 +34,7 @@ class SemanticEmotionDetector:
 
             # Initialize emotion examples with their descriptions
             self.emotion_templates = {
+                # Core emotional states
                 "anger": "feeling angry, frustrated, irritated, mad or furious about something that happened",
                 "anxiety": "feeling worried, nervous, anxious, afraid or extremely anxious about what might happen",
                 "depression": "feeling sad, empty, hopeless, depressed, or not enjoying anything anymore",
@@ -42,7 +43,24 @@ class SemanticEmotionDetector:
                 "joy": "feeling happy, excited, pleased, or content about something good",
                 "surprise": "feeling shocked, amazed, or caught off guard by something unexpected",
                 "concern": "feeling uneasy, troubled, or bothered about a situation",
-                # Add greeting category for emotion detection
+                # Additional emotional states
+                "fear": "feeling scared, terrified, frightened, or panicked about a threat or danger",
+                "loneliness": "feeling isolated, alone, disconnected, or lacking meaningful connections",
+                "grief": "feeling deep sorrow, loss, heartache, or mourning someone or something",
+                "helplessness": "feeling powerless, unable to cope, or lacking control over situations",
+                "overwhelm": "feeling too much pressure, stress, or unable to handle multiple demands",
+                "confusion": "feeling uncertain, unclear, or having difficulty understanding situations",
+                "hope": "feeling optimistic, looking forward to possibilities, or seeing potential for positive change",
+                "numbness": "feeling emotionally empty, disconnected, or unable to feel emotions",
+                "exhaustion": "feeling mentally or emotionally drained, depleted, or burnt out",
+                "frustration": "feeling blocked, thwarted, or unable to achieve desired goals",
+                # Social emotions
+                "rejection": "feeling unwanted, excluded, or pushed away by others",
+                "jealousy": "feeling threatened by others' advantages or relationships",
+                "trust": "feeling safe, secure, and able to rely on others",
+                "gratitude": "feeling thankful, appreciative, or grateful for experiences or people",
+                # Neutral states
+                "neutral": "feeling calm, balanced, or emotionally steady",
                 "greeting": "saying hello, hi, good morning, or checking in without expressing a specific emotion",
             }
 
@@ -52,13 +70,13 @@ class SemanticEmotionDetector:
                 "depression": "depression, sad, low mood, hopelessness; don't enjoy anything anymore; lack of interest",
                 "supportive_listening": "listening, support, understanding, validation, empathy",
                 "trauma": "trauma, ptsd, abuse, neglect, painful experiences",
-                "relationship_issues": "relationship, partner, marriage, dating, breakup",
+                "relationship_issues": "relationship, partner, marriage, dating, breakup, divorce, couple, romantic",
                 "self-esteem": "self esteem, confidence, self worth, inadequate, not good enough",
                 "grief_loss": "grief, loss, death, mourning, bereavement",
                 "shame": "shame, embarrassment, humiliation, social rejection",
                 "guilt": "guilt, regret, remorse, responsibility, blame",
                 # Add greeting category for topic detection
-                "greeting": "hello, hi, hey, good morning, good day, greetings, checking in, how are you, what's up, introduction, small talk",
+                "greeting": "hello, hi, hey, good morning, good day, greetings, checking in, how are you, what's up",
             }
 
             # Pre-compute emotion embeddings
@@ -266,13 +284,37 @@ class SemanticEmotionDetector:
         """Return standardized emotion mappings for tests."""
         return {
             "anxiety": ["worry", "concern", "nervous", "anxious"],
-            "sadness": ["sad", "depressed", "down", "hopeless"],
-            "anger": ["angry", "frustrated", "irritated", "mad"],
-            "shame": ["embarrassed", "humiliated", "inadequate"],
+            "sadness": ["sad", "depressed", "down", "hopeless", "despair"],
+            "hopelessness": ["hopeless", "helpless", "despairing", "worthless", "empty"],
+            "anger": ["angry", "frustrated", "irritated", "mad", "furious"],
+            "shame": ["embarrassed", "humiliated", "inadequate", "ashamed"],
             "guilt": ["guilty", "remorseful", "regretful"],
             "happiness": ["happy", "joyful", "excited", "pleased"],
-            "surprise": ["surprised", "shocked", "amazed"],
+            "surprise": ["surprised", "shocked", "amazed", "astonished"],
             "neutral": ["neutral", "calm", "balanced"],
+            "fear": ["afraid", "scared", "terrified", "fearful", "panic", "phobia"],
+            "loneliness": ["isolated", "alone", "disconnected"],
+            "helplessness": ["powerless", "unable to cope", "lacking control"],
+            "overwhelm": ["overwhelmed", "stressed", "unable to handle"],
+            "confusion": ["confused", "unclear", "uncertain"],
+            "hope": ["optimistic", "looking forward", "positive change"],
+            "numbness": ["disconnected", "unable to feel"],
+            "exhaustion": ["drained", "burnt out", "depleted"],
+            "fatigue": ["tired", "exhausted", "worn out", "fatigued", "lethargic"],
+            "frustration": ["frustrated", "blocked", "thwarted", "unable to achieve"],
+            "rejection": ["rejected", "unwanted", "excluded", "pushed away"],
+            "tension": ["tense", "stressed", "strained"],
+            "stress": ["stressed", "pressured", "tense", "overwhelmed", "strained"],
+            "hurt": ["hurt", "wounded", "pained", "injured", "betrayed"],
+            "control": ["control", "controlling", "powerless", "grip", "handle", "manage"],
+            "inadequacy": ["inadequate", "not good enough", "inferior", "less than"],
+            "self-criticism": ["self-critical", "harsh", "judgmental"],
+            "longing": ["yearning", "missing", "craving", "pining", "desire"],
+            "emptiness": ["empty", "void", "hollow", "numb", "nothing"],
+            "grief": ["grief", "loss", "mourning", "bereavement"],
+            "jealousy": ["jealous", "envious", "covetous"],
+            "trust": ["trusting", "secure", "safe"],
+            "gratitude": ["grateful", "thankful", "appreciative"],
         }
 
     def detect_emotion_standardized(self, text: str) -> Tuple[str, float]:

@@ -16,6 +16,7 @@ Usage:
 
 import json
 import os
+import re
 import sys
 import time
 from typing import Any, Dict, List, Optional
@@ -24,6 +25,7 @@ from dotenv import load_dotenv
 from prismalog.log import get_logger
 
 from psy_supabase.utilities.common import is_github_actions
+from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
 from psy_supabase.utilities.utils import cleanup_memory
 
 # Set up logging
@@ -338,45 +340,39 @@ class PainPointDemo:
         return results
 
     def _detect_themes(self, questions: List[str]) -> set:
-        """Detect themes from a list of questions."""
-        # Define common psychological themes and their keyword patterns
-        theme_keywords = {
-            "anxiety": ["anxiety", "anxious", "worry", "nervous", "panic", "stress", "fear"],
-            "depression": ["depression", "depressed", "sad", "hopeless", "unmotivated", "tired"],
-            "trauma": ["trauma", "traumatic", "abuse", "ptsd", "shock", "flashback"],
-            "relationship": ["relationship", "marriage", "partner", "spouse", "boyfriend", "girlfriend"],
-            "family": ["family", "parent", "child", "mother", "father", "sibling"],
-            "work": ["job", "career", "work", "workplace", "boss", "coworker"],
-            "self-esteem": ["confidence", "self-esteem", "worth", "value", "inadequate", "failure"],
-            "identity": ["identity", "who I am", "self", "meaning", "purpose"],
-            "grief": ["grief", "loss", "death", "died", "bereavement"],
-            "addiction": ["addiction", "substance", "alcohol", "drug", "smoking"],
-            "anger": ["anger", "angry", "rage", "frustration", "irritable"],
-            "trust": ["trust", "betrayal", "suspicious", "faith"],
-            "guilt": ["guilt", "shame", "regret", "remorse", "blame"],
-            "criticism": ["criticism", "criticized", "judged", "humiliation"],
-            "rejection": ["rejection", "rejected", "abandoned", "unwanted", "excluded"],
-            "inadequacy": ["inadequate", "not good enough", "incompetent", "failure"],
-            "jealousy": ["jealousy", "jealous", "envy", "possessive"],
-            "loneliness": ["lonely", "alone", "isolated", "connection"],
-            "workplace": ["workplace", "boss", "colleague", "job", "career", "work"],
-            "insecurity": ["insecur", "doubt", "confidence", "uncertain", "hesitant", "unsure"],
-        }
+        """Detect themes from a list of questions using the TherapeuticMappings class."""
+        detected_themes = set()
 
-        # Count theme occurrences
-        theme_counts: Dict[str, int] = {}
         for question in questions:
-            question_lower = question.lower()
-            for theme, keywords in theme_keywords.items():
+            question = question.lower()
+            # Use TherapeuticMappings ENHANCED_TAXONOMY with improved matching
+            for theme, keywords in TherapeuticMappings.ENHANCED_TAXONOMY.items():
+                # Check both exact matches and substring matches
                 for keyword in keywords:
-                    if keyword in question_lower:
-                        theme_counts[theme] = theme_counts.get(theme, 0) + 1
-                        break
+                    keyword = keyword.lower()
+                    # Handle multi-word keywords
+                    if " " in keyword:
+                        if keyword in question:
+                            detected_themes.add(theme)
+                            break
+                    # Handle single word keywords with partial matching
+                    else:
+                        # Add word boundary check to avoid partial word matches
+                        word_pattern = rf"\b{re.escape(keyword)}\b"
+                        if re.search(word_pattern, question):
+                            detected_themes.add(theme)
+                            break
 
-        # Filter to themes that appear in multiple questions
-        recurring_themes = {theme for theme, count in theme_counts.items() if count >= 2}
+                        # Also check for common variations
+                        if (
+                            keyword + "s" in question.split()
+                            or keyword + "ed" in question.split()
+                            or keyword + "ing" in question.split()
+                        ):
+                            detected_themes.add(theme)
+                            break
 
-        return recurring_themes
+        return detected_themes
 
     def analyze_results(self, results: Dict[str, Any]) -> None:
         """

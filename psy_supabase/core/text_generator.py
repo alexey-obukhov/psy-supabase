@@ -563,64 +563,8 @@ class TextGenerator:
                 logger.info("Extracted valid 'Answer:' section. Returning it directly.")
                 return answer_text
 
-        # STAGE 2: CRITICAL PATTERN DETECTION - Educational/instructional content
-        educational_patterns = [
-            # Document structure markers
-            r"title:",
-            r"introduction:",
-            r"chapter \d+:",
-            r"conclusion:",
-            # Educational content markers
-            r"guide for",
-            r"comprehensive guide",
-            r"manual",
-            r"welcome, dear",
-            # Numbered learning sections
-            r"\d+\.\d+",
-            r"\d+ \d+ \d+ \d+ \d+",
-            # Section headers
-            r"what is [a-z\s]+\?",
-            # Exercise patterns
-            r"exercise \d+:",
-            r"exercise:",
-            r"answer:",
-            # Q&A formats
-            r"q\d+[\):]",
-            r"question \d+[\):]",
-            r"true/false",
-            # Instructional patterns
-            r"in this (manual|guide|book)",
-            r"let us embark",
-            r"let's explore",
-        ]
-
-        # Check for educational patterns with logging
-        for pattern in educational_patterns:
-            if re.search(pattern, response.lower(), re.IGNORECASE):
-                logger.warning("Educational pattern detected: %s", pattern)
-                logger.info("[DEBUG] Educational pattern fallback triggered: %s", pattern)
-                return self._get_supportive_fallback()
-
         # STAGE 3: CONTENT TYPE CLASSIFICATION
         # Check for prompt leakage (instructions that should never reach users)
-        instruction_markers = [
-            "your response should",
-            "provide a therapeutic",
-            "write a response",
-            "respond as a therapist",
-            "respond with empathy",
-            "your goal is to",
-            "when responding",
-            "do not include",
-            "following the therapeutic",
-            "use the following",
-        ]
-
-        for marker in instruction_markers:
-            if marker in response.lower():
-                logger.warning("Instruction leakage detected: %s", marker)
-                logger.info("[DEBUG] Instruction marker fallback triggered: %s", marker)
-                return self._get_supportive_fallback()
 
         # STAGE 4: SPECIAL CHARACTER & FORMATTING HANDLING
         # Check if response starts with special characters
@@ -890,7 +834,7 @@ class TextGenerator:
             This method contains hardcoded crisis responses as a safety measure
             to ensure users in crisis always receive appropriate guidance.
         """
-        # If we have the original question, check for critical content
+        # Check for critical content
         if question:
             # Check for suicidal ideation and crisis keywords
             crisis_keywords = [
@@ -1401,12 +1345,6 @@ class TextGenerator:
                     except Exception as clean_error:
                         logger.error("Error cleaning response: %s", str(clean_error))
 
-                # Final validation
-                # if hasattr(self, "_final_validation"):
-                #     response = self._final_validation(response, user_question)
-                # else:
-                #     logger.warning("_final_validation method not found.")
-
                 logger.info("Successfully generated response of length %d", len(response))
                 return response
 
@@ -1502,31 +1440,6 @@ class TextGenerator:
 
         # Simple check if any keyword appears in the user's message
         return any(keyword in text.lower() for keyword in crisis_keywords)
-
-    def _final_validation(self, response: str, question: Optional[str] = None) -> str:
-        """
-        A last-chance validation to catch any instructions or inappropriate content.
-
-        before it reaches the user.
-        """
-        # Check for instructional patterns that should NEVER be sent to users
-        instruction_indicators = [
-            "the key is to",
-            "your goal is to",
-            "when responding",
-            "your task is",
-            "important to note",
-            "the approach here",
-        ]
-
-        if any(indicator in response.lower() for indicator in instruction_indicators):
-            logger.critical("INSTRUCTION LEAK DETECTED in final response!")
-            if question and any(kw in question.lower() for kw in ["suicide", "kill myself", "dont want to live"]):
-                return self._get_crisis_response()
-            return self._get_fallback_response()
-
-        # If no instructions found, return the original
-        return response
 
     def _load_template(self, template_name: str) -> Template:
         """Load template with fallbacks and validation."""

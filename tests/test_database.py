@@ -671,60 +671,6 @@ class TestDatabaseManager:
             # Verify empty result for invalid metadata
             assert result == []
 
-    def test_start_therapy_session(self, db_manager):
-        """Test marking the start of a new therapy session."""
-        # Mock add_interaction to return success
-        with patch.object(db_manager, "add_interaction", return_value=True):
-            # Call method with custom metadata
-            custom_metadata = {"session_theme": "Trust issues", "session_number": 3}
-            result = db_manager.start_therapy_session(TEST_SESSION_ID, custom_metadata)
-
-            # Verify result
-            assert result is True
-
-            # Verify add_interaction was called with proper data
-            expected_data = {
-                "context": "Session Start",
-                "question": "Beginning of therapy session",
-                "answer": "",
-                "metadata": {
-                    "session_theme": "Trust issues",
-                    "session_number": 3,
-                    "session_start": True,
-                    "session_timestamp": ANY,  # We don't know exact timestamp
-                },
-            }
-            db_manager.add_interaction.assert_called_once()
-            call_args = db_manager.add_interaction.call_args[0]
-            assert call_args[0]["context"] == expected_data["context"]
-            assert call_args[0]["question"] == expected_data["question"]
-            assert call_args[0]["answer"] == expected_data["answer"]
-            assert "session_start" in call_args[0]["metadata"]
-            assert call_args[0]["metadata"]["session_start"] is True
-            assert "session_theme" in call_args[0]["metadata"]
-            assert "session_timestamp" in call_args[0]["metadata"]
-            assert call_args[1] == TEST_SESSION_ID
-
-    def test_start_therapy_session_failure(self, db_manager):
-        """Test failure handling when starting a therapy session."""
-        # Mock add_interaction to return failure
-        with patch.object(db_manager, "add_interaction", return_value=False):
-            # Call method
-            result = db_manager.start_therapy_session(TEST_SESSION_ID)
-
-            # Verify result
-            assert result is False
-
-    def test_start_therapy_session_error(self, db_manager):
-        """Test error handling when starting a therapy session."""
-        # Mock add_interaction to raise an exception
-        with patch.object(db_manager, "add_interaction", side_effect=Exception("Database error")):
-            # Call method
-            result = db_manager.start_therapy_session(TEST_SESSION_ID)
-
-            # Verify result
-            assert result is False
-
     def test_mark_therapeutic_insight(self, db_manager):
         """Test marking an interaction as containing a therapeutic insight."""
 

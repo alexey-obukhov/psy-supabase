@@ -1,6 +1,5 @@
 def test_mock_db_manager_with_spy(mock_db_manager_with_spy):
     """Test that our mock_db_manager_with_spy fixture works correctly."""
-    # The fixture is automatically provided by pytest, no need to import it
 
     # Call save_interaction on the mock
     mock_db_manager_with_spy.save_interaction(

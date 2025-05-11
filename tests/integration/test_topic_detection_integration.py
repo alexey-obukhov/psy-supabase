@@ -49,18 +49,15 @@ class TestTopicDetectionIntegration:
             logger.info(f"Detected topic: {topic}")
             logger.info(f"Detected emotion: {emotion}")
 
-            # Use more flexible assertion for topics
+            # Simplify topic matching logic
             if "expected_topics" in case:
-                # Check if any of the expected topics match
-                topic_match = any(
-                    exp_topic in topic.lower() or topic.lower() in exp_topic for exp_topic in case["expected_topics"]
-                )
-                assert topic_match, f"Expected one of {case['expected_topics']}, got '{topic}'"
+                topics_to_check = case["expected_topics"]
+                if isinstance(topics_to_check, str):
+                    topics_to_check = [topics_to_check]
+                assert any(t in topic for t in topics_to_check), f"Expected one of {topics_to_check}, got '{topic}'"
             else:
-                # Check single expected topic with flexible matching
                 expected = case.get("expected_topic", "")
-                topic_match = expected in topic.lower() or topic.lower() in expected
-                assert topic_match, f"Expected topic containing '{expected}', got '{topic}'"
+                assert expected in topic, f"Expected topic '{expected}', got '{topic}'"
 
             # Assert emotion detection - the specific emotion might vary
             assert emotion, f"No emotion detected for input: {case['question'][:30]}..."
