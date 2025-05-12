@@ -15,16 +15,17 @@ jobs:
         python-version: ["3.8", "3.10"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+        cache: 'pip'
 
-    - name: Install dependencies (consolidated)
+    - name: Install dependencies
       run: |
         # Set up pip with proper cache
         python -m pip install --upgrade pip wheel setuptools
@@ -52,47 +53,6 @@ jobs:
         # Create reports directory
         mkdir -p reports
         mkdir -p reports/html
-
-        pip install torch==2.0.1 # Install specific PyTorch version
-
-        # Check transformers version - don't reinstall to avoid downgrade
-        python -c "import transformers; print(f'Using transformers version {transformers.__version__}')"
-
-        # Create HF cache directory
-        mkdir -p ~/.cache/huggingface
-
-        # Setup HF_HUB_OFFLINE and TRANSFORMERS_OFFLINE for fallback
-        echo "HF_HUB_OFFLINE=1" >> $GITHUB_ENV
-        echo "TRANSFORMERS_OFFLINE=1" >> $GITHUB_ENV
-
-        # Try to pre-download common models used in tests
-        echo "Downloading models for offline use..."
-        python -c "from transformers import AutoTokenizer, AutoModel; AutoTokenizer.from_pretrained('roberta-base', local_files_only=False); AutoModel.from_pretrained('roberta-base', local_files_only=False)" || echo "Model download failed, will try to use cached versions"
-
-        # Load patch directly before running tests (more reliable than bashrc approach)
-        echo "Patching transformers for offline testing..."
-        python -c "
-        import os
-        import sys
-        import transformers.utils.hub
-
-        # Store original method
-        original_cached_file = transformers.utils.hub.cached_file
-
-        # Define patched method
-        def patched_cached_file(*args, **kwargs):
-            try:
-                return original_cached_file(*args, **kwargs)
-            except OSError as e:
-                if 'offline mode' in str(e):
-                    print(f'Creating mock data for {args[0]}')
-                    return {'model_type': 'roberta', 'hidden_size': 768}
-                raise e
-
-        # Apply patch immediately
-        transformers.utils.hub.cached_file = patched_cached_file
-        print('Successfully patched transformers.utils.hub.cached_file')
-        " || echo "Failed to patch transformers"
 
         # Run pytest with coverage and generate reports
         echo "Running pytest with coverage..."
@@ -407,7 +367,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Create directories
         run: |
