@@ -11,6 +11,7 @@ test_results/
 
 # Supabase login data
 .env
+.secrets
 
 # Virtual environment
 venv/

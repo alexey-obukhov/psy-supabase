@@ -4,60 +4,63 @@ Generate a function dependency graph for the DynamicRAGRetriever class
 and output as SVG.
 """
 
+import importlib
+import inspect
 import os
 import re
+from typing import Dict, List, Tuple
+
 import pydot
-import inspect
-import importlib
-from typing import List, Dict, Set, Tuple
 
 # Import the class we want to analyze
 from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 
-def extract_method_calls(source_code: str, method_name: str) -> List[str]:
+
+def extract_method_calls(source_code: str, method_name: str) -> Tuple[List[str], List[str]]:
     """Extract method calls from a method's source code."""
     # Get class methods (excluding dunder methods)
-    class_methods = [m for m in dir(DynamicRAGRetriever)
-                     if callable(getattr(DynamicRAGRetriever, m))
-                     and not m.startswith('__')]
+    class_methods = [
+        m for m in dir(DynamicRAGRetriever) if callable(getattr(DynamicRAGRetriever, m)) and not m.startswith("__")
+    ]
 
     # Add self.xxx pattern to match method calls
-    method_patterns = [rf'self\.{method}' for method in class_methods]
+    method_patterns = [rf"self\.{method}" for method in class_methods]
 
     # Find all instances of method calls in the source code
     calls = []
     for pattern in method_patterns:
-        matches = re.findall(pattern + r'\s*\(', source_code)
+        matches = re.findall(pattern + r"\s*\(", source_code)
         if matches:
-            method = pattern.replace('self.', '')
+            method = pattern.replace("self.", "")
             calls.append(method)
 
     # Also find external calls (to other components)
     external_patterns = [
-        r'self\.db_manager\.(\w+)\s*\(',
-        r'self\.associative_memory\.(\w+)\s*\(',
-        r'self\.rag_processor\.(\w+)\s*\('
+        r"self\.db_manager\.(\w+)\s*\(",
+        r"self\.associative_memory\.(\w+)\s*\(",
+        r"self\.rag_processor\.(\w+)\s*\(",
     ]
 
     external_calls = []
     for pattern in external_patterns:
         matches = re.findall(pattern, source_code)
         for match in matches:
-            component = pattern.split('.')[1]  # Get the component name
-            component = component.replace(r'(\w+)', '')  # Remove the regex pattern
+            component = pattern.split(".")[1]  # Get the component name
+            component = component.replace(r"(\w+)", "")  # Remove the regex pattern
             external_calls.append(f"{component}.{match}")
 
     return list(set(calls)), list(set(external_calls))
 
+
 def build_dependency_graph() -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
     """Build a dependency graph of method calls."""
-    internal_dependencies = {}
-    external_dependencies = {}
+    internal_dependencies: Dict[str, List[str]] = {}
+    external_dependencies: Dict[str, List[str]] = {}
 
     # Get all method names
-    methods = [m for m in dir(DynamicRAGRetriever)
-               if callable(getattr(DynamicRAGRetriever, m))
-               and not m.startswith('__')]
+    methods = [
+        m for m in dir(DynamicRAGRetriever) if callable(getattr(DynamicRAGRetriever, m)) and not m.startswith("__")
+    ]
 
     for method in methods:
         # Get the method's source code
@@ -74,32 +77,27 @@ def build_dependency_graph() -> Tuple[Dict[str, List[str]], Dict[str, List[str]]
 
     return internal_dependencies, external_dependencies
 
+
 def generate_graph(internal_deps: Dict[str, List[str]], external_deps: Dict[str, List[str]]) -> pydot.Dot:
     """Generate a pydot graph from the dependency data."""
-    graph = pydot.Dot('dynamic_rag_dependencies', graph_type='digraph', rankdir='LR')
+    graph = pydot.Dot("dynamic_rag_dependencies", graph_type="digraph", rankdir="LR")
 
     # Define node styling
-    graph.set_node_defaults(
-        shape='box',
-        style='filled',
-        fillcolor='#E5F5E0',
-        fontname='Arial',
-        fontsize='12'
-    )
+    graph.set_node_defaults(shape="box", style="filled", fillcolor="#E5F5E0", fontname="Arial", fontsize="12")
 
     # Create method nodes
     method_nodes = {}
     for method in internal_deps.keys():
         # Style nodes based on method type
-        if method.startswith('_'):
+        if method.startswith("_"):
             # Private methods
-            node = pydot.Node(method, fillcolor='#FEE6CE')
-        elif method == 'get_combined_retrieval' or method == 'get_combined_retrieval_workflow':
+            node = pydot.Node(method, fillcolor="#FEE6CE")
+        elif method == "get_combined_retrieval" or method == "get_combined_retrieval_workflow":
             # High-level methods
-            node = pydot.Node(method, fillcolor='#C7E9C0', penwidth='2.0')
+            node = pydot.Node(method, fillcolor="#C7E9C0", penwidth="2.0")
         else:
             # Standard public methods
-            node = pydot.Node(method, fillcolor='#E5F5E0')
+            node = pydot.Node(method, fillcolor="#E5F5E0")
 
         graph.add_node(node)
         method_nodes[method] = node
@@ -111,9 +109,9 @@ def generate_graph(internal_deps: Dict[str, List[str]], external_deps: Dict[str,
         all_external_calls.update(calls)
 
     for call in all_external_calls:
-        component = call.split('.')[0]
+        component = call.split(".")[0]
         if component not in external_component_nodes:
-            node = pydot.Node(component, shape='ellipse', fillcolor='#DEEBF7', style='filled')
+            node = pydot.Node(component, shape="ellipse", fillcolor="#DEEBF7", style="filled")
             graph.add_node(node)
             external_component_nodes[component] = node
 
@@ -126,40 +124,38 @@ def generate_graph(internal_deps: Dict[str, List[str]], external_deps: Dict[str,
     # Add edges for external dependencies
     for method, calls in external_deps.items():
         for external_call in calls:
-            component = external_call.split('.')[0]
+            component = external_call.split(".")[0]
             if component in external_component_nodes:
                 edge = pydot.Edge(
-                    method_nodes[method],
-                    external_component_nodes[component],
-                    style='dashed',
-                    color='#6BAED6'
+                    method_nodes[method], external_component_nodes[component], style="dashed", color="#6BAED6"
                 )
                 graph.add_edge(edge)
 
     # Create legend
-    legend = pydot.Cluster('legend', label='Legend', fontsize='14', color='gray')
+    legend = pydot.Cluster("legend", label="Legend", fontsize="14", color="gray")
 
     legend_items = [
-        ('Public Method', '#E5F5E0'),
-        ('Private Method', '#FEE6CE'),
-        ('High-level Method', '#C7E9C0'),
-        ('External Component', '#DEEBF7')
+        ("Public Method", "#E5F5E0"),
+        ("Private Method", "#FEE6CE"),
+        ("High-level Method", "#C7E9C0"),
+        ("External Component", "#DEEBF7"),
     ]
 
     for i, (label, color) in enumerate(legend_items):
-        if label == 'External Component':
-            node = pydot.Node(f'legend_{i}', label=label, shape='ellipse',
-                             fillcolor=color, style='filled', fontsize='10')
+        if label == "External Component":
+            node = pydot.Node(
+                f"legend_{i}", label=label, shape="ellipse", fillcolor=color, style="filled", fontsize="10"
+            )
         else:
-            node = pydot.Node(f'legend_{i}', label=label, shape='box',
-                             fillcolor=color, style='filled', fontsize='10')
+            node = pydot.Node(f"legend_{i}", label=label, shape="box", fillcolor=color, style="filled", fontsize="10")
         legend.add_node(node)
 
     graph.add_subgraph(legend)
 
     return graph
 
-def main():
+
+def main() -> None:
     """Main function to generate the SVG graph."""
     print("Analyzing DynamicRAGRetriever class...")
     internal_deps, external_deps = build_dependency_graph()
@@ -183,6 +179,7 @@ def main():
     png_path = f"{output_dir}/dynamic_rag_dependencies.png"
     graph.write_png(png_path)
     print(f"PNG graph saved to {png_path}")
+
 
 if __name__ == "__main__":
     main()

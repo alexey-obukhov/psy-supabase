@@ -174,7 +174,7 @@ jobs:
 
     - name: Generate HTML test report index
       run: |
-        cat > reports/html/index.html << 'EOF'
+        cat > reports/html/index.html << EOF
         <!DOCTYPE html>
         <html>
         <head>
@@ -399,17 +399,26 @@ jobs:
           name: html-reports-3.10-${{ github.run_id }}
           path: site/reports/html
 
-      - name: Download coverage HTML
+      - name: Download coverage HTML for Python 3.8
         uses: actions/download-artifact@v4
         with:
-          pattern: test-results-*-${{ github.run_id }}
-          path: site/temp
-          merge-multiple: true
+          name: test-results-3.8-${{ github.run_id }}
+          path: site/temp3.8
+
+      - name: Download coverage HTML for Python 3.10
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results-3.10-${{ github.run_id }}
+          path: site/temp3.10
 
       - name: Move coverage HTML
         run: |
-          if [ -d "site/temp/htmlcov" ]; then
-            cp -r site/temp/htmlcov/* site/htmlcov/
+          mkdir -p site/htmlcov
+          if [ -d "site/temp3.8/htmlcov" ]; then
+            cp -r site/temp3.8/htmlcov/* site/htmlcov/
+          fi
+          if [ -d "site/temp3.10/htmlcov" ]; then
+            cp -r site/temp3.10/htmlcov/* site/htmlcov/
           fi
 
       - name: Create redirect index

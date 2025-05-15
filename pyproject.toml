@@ -44,7 +44,7 @@ dependencies = [
     "jinja2>=3.0.0",
     "detoxify>=0.5.1",
     "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl",
-    "prismalog==0.1.1",
+    "prismalog==0.1.2",
 ]
 
 [project.optional-dependencies]

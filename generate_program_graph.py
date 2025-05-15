@@ -5,59 +5,62 @@ This script analyzes all classes and their relationships, providing
 a comprehensive view of the system architecture.
 """
 
+import importlib
+import inspect
 import os
+import pkgutil
 import re
 import sys
-import pydot
-import inspect
-import importlib
-import pkgutil
-from typing import List, Dict, Set, Tuple, Any
+from typing import Any, Dict, List, Set, Tuple
+
+import pydot  # type: ignore
 
 # Project root package
 import psy_supabase
 
 # Define patterns for finding class attributes and method calls
-CLASS_PATTERN = r'class\s+(\w+)\s*(?:\(\s*(\w+)\s*\))?:'
-METHOD_PATTERN = r'def\s+(\w+)\s*\('
-ATTRIBUTE_PATTERN = r'self\.(\w+)\s*='
-IMPORT_PATTERN = r'from\s+([\w\.]+)\s+import\s+([\w\s,]+)'
-CALL_PATTERN = r'(\w+)\.(\w+)\s*\('
-SELF_CALL_PATTERN = r'self\.(\w+)\s*\('
+CLASS_PATTERN = r"class\s+(\w+)\s*(?:\(\s*(\w+)\s*\))?:"
+METHOD_PATTERN = r"def\s+(\w+)\s*\("
+ATTRIBUTE_PATTERN = r"self\.(\w+)\s*="
+IMPORT_PATTERN = r"from\s+([\w\.]+)\s+import\s+([\w\s,]+)"
+CALL_PATTERN = r"(\w+)\.(\w+)\s*\("
+SELF_CALL_PATTERN = r"self\.(\w+)\s*\("
 
 # Color mapping for different module categories
 COLOR_MAP = {
-    'core': '#E5F5E0',       # Light green
-    'memory': '#FEE8C8',     # Light orange
-    'utilities': '#DEEBF7',  # Light blue
-    'external': '#E5E5E5',   # Light gray
-    'unknown': '#FFFFFF'     # White
+    "core": "#E5F5E0",  # Light green
+    "memory": "#FEE8C8",  # Light orange
+    "utilities": "#DEEBF7",  # Light blue
+    "external": "#E5E5E5",  # Light gray
+    "unknown": "#FFFFFF",  # White
 }
+
 
 def get_module_color(module_name: str) -> str:
     """Determine color based on module category."""
-    if 'core' in module_name:
-        return COLOR_MAP['core']
-    elif 'memory' in module_name:
-        return COLOR_MAP['memory']
-    elif 'utilities' in module_name or 'utils' in module_name:
-        return COLOR_MAP['utilities']
-    elif not module_name.startswith('psy_supabase'):
-        return COLOR_MAP['external']
-    else:
-        return COLOR_MAP['unknown']
+    if "core" in module_name:
+        return COLOR_MAP["core"]
+    if "memory" in module_name:
+        return COLOR_MAP["memory"]
+    if "utilities" in module_name or "utils" in module_name:
+        return COLOR_MAP["utilities"]
+    if not module_name.startswith("psy_supabase"):
+        return COLOR_MAP["external"]
+    return COLOR_MAP["unknown"]
+
 
 def discover_modules(package_name: str) -> List[str]:
     """Recursively discover all modules in a package."""
     package = importlib.import_module(package_name)
     modules = []
 
-    for _, name, is_pkg in pkgutil.iter_modules(package.__path__, package.__name__ + '.'):
+    for _, name, is_pkg in pkgutil.iter_modules(package.__path__, package.__name__ + "."):
         modules.append(name)
         if is_pkg:
             modules.extend(discover_modules(name))
 
     return modules
+
 
 def extract_classes_from_module(module_name: str) -> Dict[str, Dict[str, Any]]:
     """Extract class information from a module."""
@@ -82,7 +85,7 @@ def extract_classes_from_module(module_name: str) -> Dict[str, Dict[str, Any]]:
                 # Get method dependencies
                 method_deps = {}
                 for method_name in methods:
-                    if method_name.startswith('__'):
+                    if method_name.startswith("__"):
                         continue
 
                     try:
@@ -93,32 +96,29 @@ def extract_classes_from_module(module_name: str) -> Dict[str, Dict[str, Any]]:
                         self_calls = re.findall(SELF_CALL_PATTERN, method_source)
 
                         # Find all external calls
-                        method_lines = method_source.split('\n')
+                        method_lines = method_source.split("\n")
                         external_calls = []
 
                         for line in method_lines:
                             # Skip comments
-                            if '#' in line:
-                                line = line[:line.index('#')]
+                            if "#" in line:
+                                line = line[: line.index("#")]
 
                             matches = re.findall(CALL_PATTERN, line)
                             for match in matches:
-                                if match[0] != 'self' and match[0] != 'cls':
+                                if match[0] != "self" and match[0] != "cls":
                                     external_calls.append(f"{match[0]}.{match[1]}")
 
-                        method_deps[method_name] = {
-                            'self_calls': self_calls,
-                            'external_calls': external_calls
-                        }
+                        method_deps[method_name] = {"self_calls": self_calls, "external_calls": external_calls}
                     except (TypeError, AttributeError):
                         continue
 
                 classes[name] = {
-                    'module': module_name,
-                    'parent': parent,
-                    'methods': methods,
-                    'attributes': attributes,
-                    'method_deps': method_deps
+                    "module": module_name,
+                    "parent": parent,
+                    "methods": methods,
+                    "attributes": attributes,
+                    "method_deps": method_deps,
                 }
             except (TypeError, OSError):
                 # Skip classes without source code
@@ -129,10 +129,11 @@ def extract_classes_from_module(module_name: str) -> Dict[str, Dict[str, Any]]:
         print(f"Error importing module {module_name}: {e}")
         return {}
 
+
 def build_program_graph() -> Dict[str, Dict[str, Any]]:
     """Build a complete program dependency graph."""
     # Discover all modules in the package
-    modules = discover_modules('psy_supabase')
+    modules = discover_modules("psy_supabase")
 
     # Extract classes from each module
     all_classes = {}
@@ -146,68 +147,54 @@ def build_program_graph() -> Dict[str, Dict[str, Any]]:
             module_to_classes[module_name] = list(classes.keys())
             all_classes.update(classes)
 
-    return {
-        'classes': all_classes,
-        'module_to_classes': module_to_classes
-    }
+    return {"classes": all_classes, "module_to_classes": module_to_classes}
+
 
 def generate_class_graph(program_graph: Dict[str, Any]) -> pydot.Dot:
     """Generate a class dependency graph."""
-    graph = pydot.Dot('psy_supabase_architecture', graph_type='digraph', rankdir='TB')
+    graph = pydot.Dot("psy_supabase_architecture", graph_type="digraph", rankdir="TB")
 
     # Set graph attributes for better visualization
-    graph.set_graph_defaults(fontname='Arial', fontsize='16', splines='ortho')
-    graph.set_node_defaults(
-        shape='box',
-        style='filled',
-        fontname='Arial',
-        fontsize='12',
-        height='0.6',
-        width='1.2'
-    )
+    graph.set_graph_defaults(fontname="Arial", fontsize="16", splines="ortho")
+    graph.set_node_defaults(shape="box", style="filled", fontname="Arial", fontsize="12", height="0.6", width="1.2")
 
     # Create class nodes grouped by module
     class_nodes = {}
     module_clusters = {}
 
     # First, create module clusters
-    for module, classes in program_graph['module_to_classes'].items():
+    for module, classes in program_graph["module_to_classes"].items():
         if not classes:
             continue
 
         # Extract module path for cluster name
-        module_short = module.replace('psy_supabase.', '')
+        module_short = module.replace("psy_supabase.", "")
         cluster_name = f"cluster_{module_short.replace('.', '_')}"
 
         # Create cluster (subgraph) for the module
         cluster = pydot.Cluster(
             cluster_name,
             label=module_short,
-            style='filled',
+            style="filled",
             fillcolor=get_module_color(module),
-            color='gray70',
-            fontname='Arial Bold',
-            fontsize='14'
+            color="gray70",
+            fontname="Arial Bold",
+            fontsize="14",
         )
 
         module_clusters[module] = cluster
         graph.add_subgraph(cluster)
 
     # Then, add class nodes to their respective clusters
-    for class_name, class_info in program_graph['classes'].items():
-        module_name = class_info['module']
+    for class_name, class_info in program_graph["classes"].items():
+        module_name = class_info["module"]
 
         # Create node for this class
         node_label = f"{class_name}"
-        if class_info['parent']:
+        if class_info["parent"]:
             node_label += f"\\nExtends: {class_info['parent']}"
 
-        node = pydot.Node(
-            class_name,
-            label=node_label,
-            fillcolor='white',
-            style='filled'
-        )
+        node = pydot.Node(class_name, label=node_label, fillcolor="white", style="filled")
 
         # Add to the correct module cluster
         if module_name in module_clusters:
@@ -218,27 +205,27 @@ def generate_class_graph(program_graph: Dict[str, Any]) -> pydot.Dot:
         class_nodes[class_name] = node
 
     # Add inheritance edges
-    for class_name, class_info in program_graph['classes'].items():
-        parent = class_info['parent']
+    for class_name, class_info in program_graph["classes"].items():
+        parent = class_info["parent"]
 
         if parent and parent in class_nodes:
             edge = pydot.Edge(
                 class_nodes[parent],
                 class_nodes[class_name],
-                arrowhead='empty',
-                style='solid',
-                weight='10',
-                color='blue'
+                arrowhead="empty",
+                style="solid",
+                weight="10",
+                color="blue",
             )
             graph.add_edge(edge)
 
     # Add method call edges (composition/dependency)
-    for class_name, class_info in program_graph['classes'].items():
-        for method, deps in class_info['method_deps'].items():
+    for class_name, class_info in program_graph["classes"].items():
+        for method, deps in class_info["method_deps"].items():
             # Add edges for calls to other classes' methods
-            for ext_call in deps['external_calls']:
-                if '.' in ext_call:
-                    parts = ext_call.split('.')
+            for ext_call in deps["external_calls"]:
+                if "." in ext_call:
+                    parts = ext_call.split(".")
                     if len(parts) >= 2:
                         called_class, called_method = parts[0], parts[1]
 
@@ -247,53 +234,34 @@ def generate_class_graph(program_graph: Dict[str, Any]) -> pydot.Dot:
                             edge = pydot.Edge(
                                 class_nodes[class_name],
                                 class_nodes[called_class],
-                                style='dashed',
-                                color='gray50',
-                                fontsize='9',
-                                label=f" {method}()->{called_method}()"
+                                style="dashed",
+                                color="gray50",
+                                fontsize="9",
+                                label=f" {method}()->{called_method}()",
                             )
                             graph.add_edge(edge)
 
     # Create legend
-    legend = pydot.Cluster(
-        'legend',
-        label='Legend',
-        fontsize='14',
-        color='gray',
-        style='filled',
-        fillcolor='white'
-    )
+    legend = pydot.Cluster("legend", label="Legend", fontsize="14", color="gray", style="filled", fillcolor="white")
 
     legend_items = [
-        ('Core Module', COLOR_MAP['core']),
-        ('Memory Module', COLOR_MAP['memory']),
-        ('Utilities Module', COLOR_MAP['utilities']),
-        ('External Module', COLOR_MAP['external']),
-        ('Inheritance', 'blue', 'solid'),
-        ('Dependency', 'gray50', 'dashed')
+        ("Core Module", COLOR_MAP["core"]),
+        ("Memory Module", COLOR_MAP["memory"]),
+        ("Utilities Module", COLOR_MAP["utilities"]),
+        ("External Module", COLOR_MAP["external"]),
+        ("Inheritance", "blue", "solid"),
+        ("Dependency", "gray50", "dashed"),
     ]
 
     for i, item in enumerate(legend_items):
         if len(item) == 2:
             # Module type
             label, color = item
-            node = pydot.Node(
-                f'legend_{i}',
-                label=label,
-                shape='box',
-                style='filled',
-                fillcolor=color,
-                fontsize='10'
-            )
+            node = pydot.Node(f"legend_{i}", label=label, shape="box", style="filled", fillcolor=color, fontsize="10")
         else:
             # Relationship type
             label, color, style = item
-            node = pydot.Node(
-                f'legend_{i}',
-                label=label,
-                shape='plaintext',
-                fontsize='10'
-            )
+            node = pydot.Node(f"legend_{i}", label=label, shape="plaintext", fontsize="10")
 
         legend.add_node(node)
 
@@ -301,97 +269,62 @@ def generate_class_graph(program_graph: Dict[str, Any]) -> pydot.Dot:
 
     return graph
 
+
 def generate_method_graph(class_name: str, program_graph: Dict[str, Any]) -> pydot.Dot:
     """Generate a method dependency graph for a specific class."""
-    if class_name not in program_graph['classes']:
+    if class_name not in program_graph["classes"]:
         print(f"Class {class_name} not found in program graph")
         return None
 
-    class_info = program_graph['classes'][class_name]
+    class_info = program_graph["classes"][class_name]
 
-    graph = pydot.Dot(f'{class_name}_methods', graph_type='digraph', rankdir='LR')
+    graph = pydot.Dot(f"{class_name}_methods", graph_type="digraph", rankdir="LR")
 
     # Set graph attributes
-    graph.set_graph_defaults(fontname='Arial', fontsize='16')
-    graph.set_node_defaults(
-        shape='box',
-        style='filled',
-        fontname='Arial',
-        fontsize='12',
-        height='0.5',
-        width='1.0'
-    )
+    graph.set_graph_defaults(fontname="Arial", fontsize="16")
+    graph.set_node_defaults(shape="box", style="filled", fontname="Arial", fontsize="12", height="0.5", width="1.0")
 
     # Create nodes for each method
     method_nodes = {}
-    for method in class_info['methods']:
-        if method.startswith('__'):
+    for method in class_info["methods"]:
+        if method.startswith("__"):
             continue
 
         # Style based on method type
-        if method.startswith('_'):
-            node = pydot.Node(
-                f"{class_name}.{method}",
-                label=method,
-                fillcolor='#FEE6CE'  # Private methods
-            )
+        if method.startswith("_"):
+            node = pydot.Node(f"{class_name}.{method}", label=method, fillcolor="#FEE6CE")  # Private methods
         else:
-            node = pydot.Node(
-                f"{class_name}.{method}",
-                label=method,
-                fillcolor='#E5F5E0'  # Public methods
-            )
+            node = pydot.Node(f"{class_name}.{method}", label=method, fillcolor="#E5F5E0")  # Public methods
 
         graph.add_node(node)
         method_nodes[method] = node
 
     # Add edges for method calls
-    for method, deps in class_info['method_deps'].items():
+    for method, deps in class_info["method_deps"].items():
         if method not in method_nodes:
             continue
 
         # Add edges for self calls
-        for called_method in deps['self_calls']:
+        for called_method in deps["self_calls"]:
             if called_method in method_nodes:
-                edge = pydot.Edge(
-                    method_nodes[method],
-                    method_nodes[called_method],
-                    color='black',
-                    fontsize='10'
-                )
+                edge = pydot.Edge(method_nodes[method], method_nodes[called_method], color="black", fontsize="10")
                 graph.add_edge(edge)
 
     # Create legend
-    legend = pydot.Cluster(
-        'legend',
-        label='Legend',
-        fontsize='14',
-        color='gray',
-        style='filled',
-        fillcolor='white'
-    )
+    legend = pydot.Cluster("legend", label="Legend", fontsize="14", color="gray", style="filled", fillcolor="white")
 
-    legend_items = [
-        ('Public Method', '#E5F5E0'),
-        ('Private Method', '#FEE6CE')
-    ]
+    legend_items = [("Public Method", "#E5F5E0"), ("Private Method", "#FEE6CE")]
 
     for i, (label, color) in enumerate(legend_items):
-        node = pydot.Node(
-            f'legend_{i}',
-            label=label,
-            shape='box',
-            style='filled',
-            fillcolor=color,
-            fontsize='10'
-        )
+        node = pydot.Node(f"legend_{i}", label=label, shape="box", style="filled", fillcolor=color, fontsize="10")
         legend.add_node(node)
 
     graph.add_subgraph(legend)
 
     return graph
 
-def main():
+
+def main() -> None:
     """Main function to generate the program graphs."""
     # Create output directory
     output_dir = "docs/diagrams"
@@ -414,15 +347,10 @@ def main():
     class_graph.write_png(f"{output_dir}/psy_supabase_classes.png")
 
     # Generate method-level graphs for key classes
-    key_classes = [
-        'DynamicRAGRetriever',
-        'DatabaseManager',
-        'ModelManager',
-        'AssociativeMemory'
-    ]
+    key_classes = ["DynamicRAGRetriever", "DatabaseManager", "ModelManager", "AssociativeMemory"]
 
     for class_name in key_classes:
-        if class_name in program_graph['classes']:
+        if class_name in program_graph["classes"]:
             print(f"Generating method graph for {class_name}...")
             method_graph = generate_method_graph(class_name, program_graph)
 
@@ -438,6 +366,7 @@ def main():
 
     print("\nAll graphs generated successfully!")
     print("You can find the diagrams in the docs/diagrams/ directory.")
+
 
 if __name__ == "__main__":
     main()
