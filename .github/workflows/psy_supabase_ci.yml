@@ -217,7 +217,13 @@ jobs:
             <p><a href="../htmlcov/index.html">HTML Coverage Report</a></p>
           </div>
 
-          <p class="timestamp">Generated: $(date -u "+%Y-%m-%d %H:%M:%S UTC")</p>
+          <div id="footer">
+              <p>&copy; <span id="currentYear"></span> Alexey Obukhov</p>
+          </div>
+          <script>
+            var currentYear = new Date().getFullYear();
+            document.getElementById('currentYear').textContent = currentYear;
+          </script>
         </body>
         </html>
         EOF

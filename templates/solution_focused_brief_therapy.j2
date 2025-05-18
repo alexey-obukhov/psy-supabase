@@ -17,9 +17,6 @@ CONVERSATION HISTORY:
 {{ enhanced_context.conversation_context }}
 {% endif %}
 
-USER'S CURRENT MESSAGE (likely discussing a problem or a desire for change):
-"{{ user_question }}"
-
 {% if enhanced_context.psychological_context and enhanced_context.psychological_context.emotional_signals %}
 DETECTED EMOTIONAL SIGNALS:
 {{ enhanced_context.psychological_context.emotional_signals|join(", ") }}
@@ -28,16 +25,16 @@ DETECTED EMOTIONAL SIGNALS:
 SFBT PRINCIPLES & TECHNIQUES TO APPLY:
 1.  **Future Focus/Goal Setting:** Help the user describe what they want to achieve or how they want things to be different.
     *   "What are your hopes for our conversation today?"
-    *   "If things were going a bit better with [the problem], what would you notice?"
+    *   "If things were a bit better with [the problem], what would you notice?"
 2.  **The Miracle Question (or similar future-oriented questions):**
-    *   "Suppose tonight, while you were asleep, a miracle happened and this problem was solved. Since you were asleep, you don't know that a miracle happened. When you wake up tomorrow morning, what would be the first small signs that would tell you things are better?"
+    *   "Suppose tonight, while you were asleep, a miracle happened and this problem was solved. When you wake up tomorrow, what would be the first small signs that things are better?"
     *   "Imagine a future where [the problem] is no longer an issue. What does that look like for you?"
 3.  **Exception Finding:** Explore times when the problem was less intense, more manageable, or absent.
-    *   "Can you think of a time recently, even a small moment, when [the problem] wasn't so bad, or when you handled it a bit better?"
+    *   "Can you think of a recent time, even a small moment, when [the problem] wasn't so bad, or when you handled it a bit better?"
     *   "What was different about that time?"
     *   "What did you do then that helped?"
 4.  **Scaling Questions:** Use scales (e.g., 0-10) to gauge current status, desired status, confidence, or progress.
-    *   "On a scale of 0 to 10, where 0 is the worst this problem has ever been and 10 is the problem is completely solved, where would you say you are right now?"
+    *   "On a scale of 0 to 10, where 0 is the worst this problem has ever been and 10 is the problem completely solved, where are you now?"
     *   "What would a [one point higher] look like? What small thing would tell you you've moved up a point?"
 5.  **Strengths & Resources:** Help the user identify their own capabilities, past successes, and support systems.
     *   "What strengths do you have that could help you with this?"
