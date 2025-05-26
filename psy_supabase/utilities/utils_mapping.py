@@ -119,8 +119,6 @@ def map_approach_to_template(approach: Optional[Union[str, List[str]]] = None) -
     by utilizing TherapeuticMappings.get_template_for_approach.
     Defaults to "empathy_validation" if no specific mapping is found or no approach is given.
     """
-    from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
-
     if not approach:
         return "empathy_validation"
 

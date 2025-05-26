@@ -2,7 +2,6 @@ import os
 import time
 import uuid
 
-from dotenv import load_dotenv
 from prismalog.config import LoggingConfig
 from prismalog.log import get_logger
 

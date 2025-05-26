@@ -57,6 +57,7 @@ def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
             text_generator.device = "cpu"
             text_generator.generate_text.return_value = "This is a mock response for GitHub Actions testing."
             text_generator.generate_therapeutic_response.return_value = "This is a mock therapeutic response."
+            text_generator.is_toxic.return_value = False
 
             logger.info("Created mock TextGenerator for GitHub Actions")
         else:

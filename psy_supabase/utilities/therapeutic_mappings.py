@@ -950,10 +950,10 @@ class TherapeuticMappings:
             ],
             "emotions": ["anxiety", "frustration", "helplessness", "anger", "fear"],  # Example emotions
             "approaches": [
-                "cognitive_behavioral_therapy",
-                "acceptance_commitment_therapy",
+                "cognitive_behavioral",
+                "acceptance_commitment",
                 "mindfulness_relaxation",
-                "dialectical_behavior_therapy",
+                "dialectical_behavior",
             ],  # Example approaches
             "description": "Issues related to the need to control, feeling out of control, or being controlled.",
             "human_readable_name": "Control and Empowerment",
@@ -1114,6 +1114,7 @@ class TherapeuticMappings:
         "acceptance_commitment": "acceptance_commitment_therapy",
         "acceptance and commitment": "acceptance_commitment_therapy",
         "mindfulness": "mindfulness_relaxation",
+        "mindfulness_relaxation": "mindfulness_relaxation",
         "meditation": "mindfulness_relaxation",
         # Grief and loss approaches
         "grief_loss": "grief_loss",
@@ -1164,6 +1165,7 @@ class TherapeuticMappings:
         "dbt": "dialectical_behavior_therapy",
         "dialectical": "dialectical_behavior_therapy",
         "dialectical_behavioral": "dialectical_behavior_therapy",
+        "dialectical_behavior": "dialectical_behavior_therapy",
         # Workplace-related (maps to a specific template, not a general theme here)
         "workplace": "workplace_anxiety",  # Assuming workplace_anxiety.j2 template
         "work": "workplace_anxiety",
@@ -1824,7 +1826,9 @@ class TherapeuticMappings:
             return template_name
         else:
             logger.debug(
-                f"No specific template found for theme '{theme}' (via approach '{approach}'). Defaulting to 'empathy_validation'."
+                "No specific template found for theme '%s' (via approach '%s'). Defaulting to 'empathy_validation'.",
+                theme,
+                approach,
             )
             return "empathy_validation"  # Provide a default string
 

@@ -101,7 +101,7 @@ class PromptSelector:
             # Map "greeting" topic to "supportive_listening" for consistency with tests
             if semantic_topic == "greeting":
                 semantic_topic = "supportive_listening"
-                logger.debug(f"Mapped 'greeting' topic to 'supportive_listening' for consistency")
+                logger.debug("Mapped 'greeting' topic to 'supportive_listening' for consistency")
 
             # Use semantic topic if regex confidence is low or not detected
             if semantic_topic and topic_confidence > 0.7 and (regex_confidence < 0.7 or not topic_scores):
@@ -168,7 +168,7 @@ class PromptSelector:
             # Map "greeting" emotion to "concern" for consistency
             if semantic_emotion == "greeting":
                 semantic_emotion = "concern"
-                logger.debug(f"Mapped 'greeting' emotion to 'concern' for consistency")
+                logger.debug("Mapped 'greeting' emotion to 'concern' for consistency")
 
             # Use semantic emotion if regex confidence is low or not detected
             if (
