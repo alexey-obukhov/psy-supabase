@@ -2142,19 +2142,19 @@ class DatabaseManager:
                     "exploration_questions": "What makes you feel hopeless right now? Have there been times when you felt differently, even slightly?",
                 },
                 "trauma": {
-                    "name": "trauma_informed_care",
+                    "name": "trauma_informed",
                     "primary_technique": "trauma_informed",
                     "redirection_strategy": "Prioritize safety, grounding, psychoeducation about trauma, and validate experiences.",
                     "exploration_questions": "What helps you feel safe and grounded in this moment? How are these past experiences affecting you today?",
                 },
                 "ptsd": {
-                    "name": "trauma_informed_care",
+                    "name": "trauma_informed",
                     "primary_technique": "trauma_informed",
                     "redirection_strategy": "Focus on managing PTSD symptoms like flashbacks and hyperarousal, using grounding and coping skills.",
                     "exploration_questions": "Are there specific triggers for your PTSD symptoms? What coping strategies have you found helpful?",
                 },
                 "abuse": {
-                    "name": "trauma_informed_care",
+                    "name": "trauma_informed",
                     "primary_technique": "trauma_informed",
                     "redirection_strategy": "Validate the experience of abuse, focus on safety, and explore its impact on current well-being.",
                     "exploration_questions": "How has this experience of abuse impacted you? What does safety mean to you now?",

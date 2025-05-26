@@ -11,9 +11,6 @@ CONVERSATION HISTORY:
 {{ enhanced_context.conversation_context }}
 {% endif %}
 
-USER'S CURRENT MESSAGE:
-"{{ user_question }}"
-
 {% if enhanced_context.psychological_context and enhanced_context.psychological_context.emotional_signals %}
 DETECTED EMOTIONAL SIGNALS:
 {{ enhanced_context.psychological_context.emotional_signals|join(", ") }}

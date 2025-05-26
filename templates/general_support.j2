@@ -10,7 +10,7 @@ CONVERSATION HISTORY:
 {% endif %}
 <|im_end|>
 <|im_start|>user
-"{{ user_question }}"
+{{ user_question }}
 {% if psychological_context and psychological_context.emotional_signals %}
 DETECTED EMOTIONAL SIGNALS:
 {{ psychological_context.emotional_signals|join(", ") }}

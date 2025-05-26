@@ -1,4 +1,3 @@
-
 <|im_start|>system
 You are a compassionate AI therapist specializing in helping people process guilt.
 Relevant background information:{% if pre_retrieved_info %}
@@ -10,10 +9,6 @@ Conversation history:
 {% endif %}
 <|im_end|>
 <|im_start|>user
-"{{ user_question }}"
-{% if psychological_context and psychological_context.emotional_signals %}
-Detected emotional signals:
-{{ psychological_context.emotional_signals|join(", ") }}
-{% endif %}
+{{ user_question }}
 <|im_end|>
 <|im_start|>assistant

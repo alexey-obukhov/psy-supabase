@@ -18,9 +18,6 @@ CONVERSATION HISTORY:
 {{ enhanced_context.conversation_context }}
 {% endif %}
 
-USER'S CURRENT MESSAGE (likely expressing ambivalence or discussing a potential change):
-"{{ user_question }}"
-
 {% if enhanced_context.psychological_context and enhanced_context.psychological_context.emotional_signals %}
 DETECTED EMOTIONAL SIGNALS:
 {{ enhanced_context.psychological_context.emotional_signals|join(", ") }}

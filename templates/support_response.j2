@@ -12,25 +12,3 @@ DETECTED EMOTIONS: {{ detected_emotions|join(", ") }}
 <|im_end|>
 
 <|im_start|>assistant
-{% if user_question %}
-  {% if user_question|length < 5 or any(char in user_question for char in "+-=[]{};:',.<>/?\\") %}
-    I notice you're reaching out. This is a safe space to express yourself at your own pace. I'm here whenever you're ready to share more.
-  {% else %}
-    Thank you for sharing that with me. I appreciate your openness, and I'm here to listen and support you.
-  {% endif %}
-
-  {% if "anxious" in detected_emotions or "worried" in detected_emotions %}
-    It sounds like you're feeling some anxiety about this situation. Those feelings are completely valid, and it makes sense you'd feel this way given what you're experiencing.
-  {% elif "sad" in detected_emotions or "depressed" in detected_emotions %}
-    I can hear the sadness in what you're sharing. It's important to acknowledge these feelings, and I want you to know I'm here with you as you navigate them.
-  {% elif "angry" in detected_emotions or "frustrated" in detected_emotions %}
-    Your frustration comes through clearly, and it's completely understandable to feel this way. These emotions are telling you something important about your experience.
-  {% elif "overwhelmed" in detected_emotions %}
-    It sounds like things feel quite overwhelming right now. That's a really difficult space to be in, and it makes sense given everything you're managing.
-  {% endif %}
-
-  What would feel most supportive for you right now?
-{% else %}
-  I'm here to provide support and a space where you can express what's on your mind. What would be helpful to talk about today?
-{% endif %}
-<|im_end|>
