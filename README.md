@@ -56,23 +56,11 @@ My technical infrastructure has been enhanced with:
 
 ## Next Steps
 
-We continue to advance this technology with these planned enhancements:
+Planned Enhancements
 
-1. **Therapeutic Progress Tracking**: Measuring how user language around pain points evolves over time
+1. **Vector Search needs to be adjusted**: Truncate each sentence into valuable pieces before indexing or querying. This improves retrieval accuracy and ensures the most relevant information is represented in the vector database.
 
-2. **Adaptive Response Techniques**: Developing more specialized templates based on the type of pain point detected
-
-3. **Long-term Pattern Recognition**: Identifying cyclical patterns in user emotional states across weeks or months
-
-4. **Intervention Timing Optimization**: Learning when direct vs. indirect approaches to pain points are most effective
-
-5. **Comprehensive Prompt Management**: Implementing a PromptManager system for more efficient template handling and automatic size optimization
-
-6. **Template Adaptation**: Creating ultra-compact versions of all templates to handle various context window constraints
-
-7. **Advanced Token Optimization**: Expanding token-based optimization with section prioritization and dynamic content selection
-
-8. **Pre-retrieval Strategies**: Refining which information gets pre-fetched versus dynamically queried during conversations
+2. **Emotion Trajectory**: Track a client’s emotional changes over time.
 
 ## Implementation Status
 
@@ -86,8 +74,8 @@ We continue to advance this technology with these planned enhancements:
 - ✅ Smart prompt truncation
 - ✅ Enhanced PromptManager
 - ✅ Token-efficient templates
-- ✅ Emotional trajectory tracking
-- 📅 Intervention effectiveness measurement (planned)
+- 📅 Enhancing Vector Search by Segmenting Text into Meaningful Units (planned)
+- 📅 Integrating Emotional trajectory tracking (planned)
 
 By continuing to refine these capabilities, I'm building an AI therapeutic assistant that provides increasingly personalized, psychologically-informed support while maintaining operational efficiency.
 
@@ -105,4 +93,4 @@ This project also uses the following libraries:
 *   python-dotenv
 *   ...
 
-These libraries have their own respective licenses.
+*These libraries may have their own respective licenses.
