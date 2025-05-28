@@ -3,12 +3,13 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import torch
-from prismalog.log import get_logger
 from transformers import AutoModel, AutoTokenizer
 
+from psy_supabase import get_package_logger
+from psy_supabase.config import DEFAULT_EMBEDDING_MODEL
 from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
 
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 class SemanticEmotionDetector:
@@ -17,7 +18,7 @@ class SemanticEmotionDetector:
     optimized for semantic similarity.
     """
 
-    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = DEFAULT_EMBEDDING_MODEL):
         """
         Initialize with a very small but effective sentence transformer model.
         """

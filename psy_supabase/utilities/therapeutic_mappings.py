@@ -12,10 +12,11 @@ template for a particular approach. This centralization helps in maintaining
 and updating the knowledge base of the application in a structured manner.
 """
 
-import logging
 from typing import Any, Dict, Final, List, Optional, Tuple, Union
 
-logger = logging.getLogger(__name__)
+from psy_supabase import get_package_logger
+
+logger = get_package_logger(__name__)
 
 
 class TherapeuticMappings:

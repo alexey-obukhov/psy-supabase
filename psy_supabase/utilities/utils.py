@@ -27,8 +27,7 @@ from functools import wraps
 from logging import Logger
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
-from prismalog.log import get_logger
-
+from psy_supabase import get_package_logger
 from psy_supabase.utilities.keep_words import keep_words
 from psy_supabase.utilities.nlp_utils import get_spacy_model
 
@@ -157,7 +156,7 @@ def debug_errors(logger: Optional[Logger] = None) -> Callable:
     """
     # Get a default logger if none provided
     if logger is None:
-        logger = get_logger(__name__)
+        logger = get_package_logger(__name__)
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -233,7 +232,7 @@ def cleanup_memory(force_cuda_cleanup: bool = True) -> None:
 
     import torch
 
-    logger = get_logger(__name__)
+    logger = get_package_logger(__name__)
 
     # First collect Python garbage
     gc.collect()

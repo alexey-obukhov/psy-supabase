@@ -32,12 +32,14 @@ from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 from faiss import Index, IndexFlatIP, normalize_L2
-from prismalog.log import get_logger
+
+from psy_supabase import get_package_logger
+from psy_supabase.config import DEFAULT_EMBEDDING_MODEL
 
 # Import the ModelManager
 from psy_supabase.core.model_manager import get_embedding_provider
 
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 class AssociativeMemory:
@@ -70,7 +72,7 @@ class AssociativeMemory:
     dimension: int
     embedding_provider: Optional[Any]  # Or a more specific provider type if available
 
-    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2") -> None:
+    def __init__(self, model_name: str = DEFAULT_EMBEDDING_MODEL) -> None:
         """
         Initialize the associative memory with a semantic model.
 

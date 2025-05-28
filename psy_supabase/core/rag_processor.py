@@ -60,9 +60,9 @@ import json
 import traceback
 from typing import Any, Dict, List, Optional, Union
 
-from prismalog.log import get_logger
 from typeguard import typechecked
 
+from psy_supabase import get_package_logger
 from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_TOPIC
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
@@ -76,8 +76,7 @@ from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.utilities.safety_handler import SafetyHandler
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 
-# Set up logging
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 class RAGProcessor:

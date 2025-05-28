@@ -26,9 +26,9 @@ This context-aware approach allows the system to:
 import traceback
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from prismalog.log import get_logger
 from typeguard import typechecked
 
+from psy_supabase import get_package_logger
 from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.utilities.vector_utils import find_similar_interactions
 
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from psy_supabase.core.database import DatabaseManager
 
 
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 def determine_context(

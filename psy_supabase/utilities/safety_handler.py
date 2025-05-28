@@ -50,10 +50,10 @@ Usage:
 import re
 from typing import Callable, Dict, List, Optional, Tuple, TypedDict
 
-from prismalog.log import get_logger
+from psy_supabase import get_package_logger
 
 # Set up logging
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 class SafetyCategoryData(TypedDict):

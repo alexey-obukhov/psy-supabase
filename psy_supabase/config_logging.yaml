@@ -1,0 +1,23 @@
+# This is a configuration file for the psy_supabase application.
+log_dir: ./logs
+default_level: debug
+rotation_size_mb: 5
+backup_count: 3
+colored_console: true
+exit_on_critical: false
+
+
+# External loggers configuration - silence noisy libraries
+external_loggers:
+  nltk: WARNING  # Only show WARNING and above from NLTK
+  nltk.downloader: ERROR  # Silence NLTK download messages
+  nltk.data: ERROR  # Silence NLTK data loading messages
+  urllib3: WARNING  # NLTK uses urllib3 for downloads
+  urllib3.connectionpool: ERROR  # Silence connection pool messages
+  requests: WARNING  # Sometimes used for downloads
+  requests.packages.urllib3: ERROR  # Silence urllib3 within requests
+  transformers: WARNING  # If you're using transformers library
+  transformers.tokenization_utils: ERROR  # Silence tokenizer messages
+  sentence_transformers: WARNING  # If you're using sentence-transformers
+  torch: WARNING  # PyTorch can be verbose
+  transformers.modeling_utils: ERROR  # Silence model loading messages

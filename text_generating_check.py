@@ -4,8 +4,10 @@ import torch
 from jinja2 import Template
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from psy_supabase.config import TEXT_GENERATING_MODEL
+
 # 1. Load the model and tokenizer
-model_name = "rasyosef/Phi-1_5-Instruct-v0.1"
+model_name = TEXT_GENERATING_MODEL
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
     model_name, torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32

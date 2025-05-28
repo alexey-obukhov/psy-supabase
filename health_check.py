@@ -4,13 +4,14 @@ import sys
 from prismalog.config import LoggingConfig
 from prismalog.log import get_logger
 
+from psy_supabase.config import TEXT_GENERATING_MODEL
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.common import is_github_actions
 
-config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+config_path = os.path.join(os.path.dirname(__file__), "config_logging.yaml")
 LoggingConfig.initialize(config_file=config_path)
 
 logger = get_logger(__name__)
@@ -31,7 +32,7 @@ def main() -> bool:
         # Initialize with minimal dependencies for testing
         logger.info("Initializing text generator...")
         generator = TextGenerator(
-            model_name=os.getenv("MODEL_NAME", "rasyosef/Phi-1_5-Instruct-v0.1"), device=os.getenv("DEVICE", "cpu")
+            model_name=os.getenv("MODEL_NAME", TEXT_GENERATING_MODEL), device=os.getenv("DEVICE", "cpu")
         )
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_KEY")

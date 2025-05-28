@@ -105,12 +105,11 @@ User: "I'm feeling really sad about losing my job"
 
 from typing import Dict, List, Optional, Union
 
-from prismalog.log import get_logger
-
+from psy_supabase import get_package_logger
 from psy_supabase.config import DEFAULT_TOPIC
 from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
 
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 def map_approach_to_template(approach: Optional[Union[str, List[str]]] = None) -> str:

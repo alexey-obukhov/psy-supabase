@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import torch
 
+from psy_supabase.config import TEXT_GENERATING_MODEL
 from psy_supabase.core.model_manager import ModelManager, get_embedding_provider
 from psy_supabase.core.text_generator import TextGenerator
 from tests.helpers.database_test_base import DatabaseTestBase
@@ -20,7 +21,7 @@ class TestEmbeddingGeneration(DatabaseTestBase):
         """Set up test fixtures."""
         super().setUp()
         # Create minimal mocks to test embedding functions
-        self.text_generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=None)
+        self.text_generator = TextGenerator(model_name=TEXT_GENERATING_MODEL, device=None)
         self.text_generator.model = MagicMock()
         self.text_generator.tokenizer = MagicMock()
 

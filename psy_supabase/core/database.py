@@ -74,11 +74,11 @@ import traceback
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-from prismalog.log import get_logger
 from supabase import create_client
 from typeguard import typechecked
 
-from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_THEME, DEFAULT_TOPIC
+from psy_supabase import get_package_logger
+from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_THEME, DEFAULT_TOPIC, TEXT_GENERATING_MODEL
 from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.utilities.embedding_utils import detect_repetition_pattern
 from psy_supabase.utilities.utils import clean_text, debug_errors
@@ -88,7 +88,7 @@ from psy_supabase.utilities.vector_utils import optimize_vector_operations as op
 from psy_supabase.utilities.vector_utils import update_table_statistics
 
 # Set up logging
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 class DatabaseManager:
@@ -1044,7 +1044,7 @@ class DatabaseManager:
             return []
 
     def enrich_interactions_with_embeddings(
-        self, session_id: Optional[str] = None, model_name: str = "rasyosef/Phi-1_5-Instruct-v0.1"
+        self, session_id: Optional[str] = None, model_name: str = TEXT_GENERATING_MODEL
     ) -> int:
         """
         Enrich interactions that don't have embeddings by generating and adding them.

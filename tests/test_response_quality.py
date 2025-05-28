@@ -6,10 +6,11 @@ import pytest
 import torch
 from prismalog.log import get_logger
 
+from psy_supabase.config import TEXT_GENERATING_MODEL
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
+from psy_supabase.utilities.supportive_terms import SUPPORTIVE_TERMS
 from psy_supabase.utilities.utils import cleanup_memory
-from tests.conftest import SUPPORTIVE_TERMS
 
 # Check if running in GitHub Actions
 RUNNING_IN_GITHUB_ACTIONS = os.environ.get("GITHUB_ACTIONS") == "true"
@@ -47,22 +48,8 @@ def setup_response_generator(mock_db_manager, mock_dynamic_retriever):
     try:
         logger.info("Setting up TextGenerator on %s...", DEVICE)
 
-        # For GitHub Actions, use a fully mocked model
-        if RUNNING_IN_GITHUB_ACTIONS:
-            # Create a mock model that's good enough for testing
-            from unittest.mock import MagicMock
-
-            # Create a fully mocked TextGenerator
-            text_generator = MagicMock()
-            text_generator.device = "cpu"
-            text_generator.generate_text.return_value = "This is a mock response for GitHub Actions testing."
-            text_generator.generate_therapeutic_response.return_value = "This is a mock therapeutic response."
-            text_generator.is_toxic.return_value = False
-
-            logger.info("Created mock TextGenerator for GitHub Actions")
-        else:
-            # Use real TextGenerator with appropriate device
-            text_generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=DEVICE, quantize=False)
+        # Use real TextGenerator with appropriate device
+        text_generator = TextGenerator(model_name=TEXT_GENERATING_MODEL, device=DEVICE, quantize=False)
 
         # Create the RAG processor with mock dependencies
         rag_processor = RAGProcessor(db_manager=mock_db_manager, generator=text_generator)
@@ -541,8 +528,7 @@ Would you like to discuss some strategies that could help with your feelings of 
         assert len(response) > 20, "Response should have meaningful content"
 
         # Check for a broader range of supportive language
-        supportive_terms = ["help", "support", "assist", "here for you", "share", "talk", "listen"]
-        has_supportive_term = any(term in response.lower() for term in supportive_terms)
+        has_supportive_term = any(term in response.lower() for term in SUPPORTIVE_TERMS)
         assert has_supportive_term, f"Response should offer support. Found: {response}"
 
         # Check for any problematic patterns

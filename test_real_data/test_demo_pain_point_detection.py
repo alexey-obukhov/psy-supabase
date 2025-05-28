@@ -22,14 +22,15 @@ import time
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-from prismalog.log import get_logger
 
+from psy_supabase import get_package_logger
+from psy_supabase.config import TEXT_GENERATING_MODEL
 from psy_supabase.utilities.common import is_github_actions
 from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
 from psy_supabase.utilities.utils import cleanup_memory
 
 # Set up logging
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 # Load environment variables
 if not is_github_actions():
@@ -96,7 +97,7 @@ class PainPointDemo:
 
         # Initialize text generator (use CPU for demo purposes)
         device = "cpu"
-        self.generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=device)
+        self.generator = TextGenerator(model_name=TEXT_GENERATING_MODEL, device=device)
 
         # Initialize associative memory
         self.associative_memory = AssociativeMemory()

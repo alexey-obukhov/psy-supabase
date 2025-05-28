@@ -32,11 +32,12 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
 import torch
 import torch.cuda
-from prismalog.log import get_logger
 from sentence_transformers import SentenceTransformer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from typeguard import typechecked
 
+from psy_supabase import get_package_logger
+from psy_supabase.config import DEFAULT_EMBEDDING_MODEL, TEXT_GENERATING_MODEL, TOXIC_CLASSIFICATION_MODEL
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.common import get_models_dir
 from psy_supabase.utilities.common import load_toxicity_model as common_load_toxicity_model
@@ -71,7 +72,7 @@ class ModelManager:
     @classmethod
     @typechecked
     def get_instance(
-        cls, model_name: str = "rasyosef/Phi-1_5-Instruct-v0.1", device: Optional[str] = None, quantize: bool = False
+        cls, model_name: str = TEXT_GENERATING_MODEL, device: Optional[str] = None, quantize: bool = False
     ) -> "ModelManager":
         """
         Get or create a ModelManager instance.
@@ -90,7 +91,7 @@ class ModelManager:
 
     def __init__(self, model_name: str, device: Optional[str] = None, quantize: bool = False) -> None:
         self.model_name = model_name
-        self.logger = get_logger(__name__)
+        self.logger = get_package_logger(__name__)
         self.MODELS_DIR = get_models_dir()
         self.preferred_device = "cuda" if torch.cuda.is_available() else "cpu" if device is None else device
         self.quantize = quantize
@@ -99,13 +100,11 @@ class ModelManager:
         self.generation_model_path = self._download_if_needed(model_name, AutoModelForCausalLM, "generation")
 
         # Download and store embedding model (sentence-transformers)
-        self.embedding_model_path = self._download_if_needed(
-            "sentence-transformers/all-mpnet-base-v2", SentenceTransformer, "embedding"
-        )
+        self.embedding_model_path = self._download_if_needed(DEFAULT_EMBEDDING_MODEL, SentenceTransformer, "embedding")
 
         # Download and store toxicity model (customize as needed)
         self.toxicity_model_path = self._download_if_needed(
-            "facebook/roberta-hate-speech-dynabench-r4-target", AutoModelForCausalLM, "toxicity"
+            TOXIC_CLASSIFICATION_MODEL, AutoModelForCausalLM, "toxicity"
         )
 
         # Now load models from local paths
@@ -353,9 +352,8 @@ class ModelManager:
             if self.sentence_transformer is None:
                 self.logger.info("Initializing SentenceTransformer for fallback embeddings")
                 try:
-                    # Use a reliable, small model for embeddings
-                    model_name = "sentence-transformers/all-mpnet-base-v2"
-                    self.sentence_transformer = SentenceTransformer(model_name)
+                    # Use config model
+                    self.sentence_transformer = SentenceTransformer(DEFAULT_EMBEDDING_MODEL)
                     if self.preferred_device == "cuda" and torch.cuda.is_available():
                         self.sentence_transformer = self.sentence_transformer.to(self.preferred_device)
                 except ImportError:
@@ -393,25 +391,21 @@ class ModelManager:
             try:
                 # Initialize sentence transformer if needed
                 if self.sentence_transformer is None:
-                    # Get path to models directory
                     os.makedirs(self.MODELS_DIR, exist_ok=True)
 
-                    # Define the model name and local path
-                    st_model_name = "all-mpnet-base-v2"
-                    local_path = os.path.join(self.MODELS_DIR, "sentence-transformers_" + st_model_name)
+                    # Use config model name
+                    st_model_name = DEFAULT_EMBEDDING_MODEL.split("/")[-1]
+                    local_path = os.path.join(self.MODELS_DIR, f"sentence-transformers_{st_model_name}")
 
-                    # Check if model exists locally
                     if os.path.exists(local_path) and os.path.isdir(local_path) and len(os.listdir(local_path)) > 0:
-                        # Use local model
                         self.logger.info("Loading SentenceTransformer from local path: %s", local_path)
                         self.sentence_transformer = SentenceTransformer(local_path)
                     else:
-                        # Download model and save locally
                         self.logger.info("Downloading SentenceTransformer to %s", local_path)
                         os.makedirs(local_path, exist_ok=True)
 
-                        # Download and save model
-                        self.sentence_transformer = SentenceTransformer("sentence-transformers/" + st_model_name)
+                        # Use config model
+                        self.sentence_transformer = SentenceTransformer(DEFAULT_EMBEDDING_MODEL)
                         self.sentence_transformer.save(local_path)
                         self.logger.info("SentenceTransformer saved to %s", local_path)
 
@@ -448,7 +442,7 @@ class ModelManager:
 
 @typechecked
 def get_model_manager(
-    model_name: str = "rasyosef/Phi-1_5-Instruct-v0.1", device: Optional[str] = None, quantize: bool = False
+    model_name: str = TEXT_GENERATING_MODEL, device: Optional[str] = None, quantize: bool = False
 ) -> ModelManager:
     """
     Get a ModelManager instance.
@@ -472,27 +466,30 @@ class EmbeddingProviderAdapter:
     It is compatible with the `ai_providers.py` interface and supports batch embedding generation.
     """
 
-    def __init__(self, provider_type: str = "local", model_name: str = "rasyosef/Phi-1_5-Instruct-v0.1"):
+    def __init__(self, provider_type: str = "local", model_name: str = TEXT_GENERATING_MODEL):
         """Initialize the embedding provider."""
         self.provider_type = provider_type
         self.model_name = model_name
         self._provider = None
-        self.logger = get_logger(__name__)
+        self.logger = get_package_logger(__name__)
 
     def get_embedding_dimension(self) -> int:
         """
         Return the dimension of embeddings based on the model.
 
         Returns:
-            The embedding dimension (2048 for phi-1.5, 768 for facebook models)
+            The embedding dimension (eg. 2048 for phi-1.5, 768 for facebook models)
         """
+        embedding_model = DEFAULT_EMBEDDING_MODEL.lower()
+        if "all-minilm-l6-v2" in embedding_model:
+            return 384
+        if "all-mpnet-base-v2" in embedding_model:
+            return 768
         if "phi" in self.model_name.lower():
-            return 2048  # For phi-1.5
+            return 2048
         if "facebook" in self.model_name.lower() or "fb" in self.model_name.lower():
-            return 768  # For Facebook models
-        if "all-minilm-l6-v2" in self.model_name.lower():
-            return 256  # For sentence-transformers/all-MiniLM-L6-v2
-        # Default for other models
+            return 768
+        # Default
         return 1536
 
     def generate_embedding(self, text: str) -> List[float]:
@@ -600,7 +597,7 @@ def get_embedding_provider(model_name: Optional[str] = None) -> EmbeddingProvide
         EmbeddingProviderAdapter with consistent generate_embedding methods
     """
     # Use model name if provided, otherwise use default
-    model = model_name if model_name else "rasyosef/Phi-1_5-Instruct-v0.1"
+    model = model_name if model_name else TEXT_GENERATING_MODEL
 
     # Create adapter
     return EmbeddingProviderAdapter(model)

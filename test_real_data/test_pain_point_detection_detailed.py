@@ -12,10 +12,13 @@ from typing import Any, Dict, List, cast
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch
-from prismalog.log import get_logger
+
+from psy_supabase import get_package_logger
 
 # Add project to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from psy_supabase.config import TEXT_GENERATING_MODEL
 
 # Import local modules
 from psy_supabase.core.database import DatabaseManager
@@ -25,7 +28,7 @@ from psy_supabase.utilities.common import is_github_actions
 from psy_supabase.utilities.utils import cleanup_memory
 
 # Configure logging
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 # Load environment variables
 if not is_github_actions():
@@ -176,7 +179,7 @@ class PainPointDetailedTester:
         self.db_manager = DatabaseManager(
             supabase_url=supabase_url_test, supabase_key=supabase_key_test, user_id=self.test_user_id
         )
-        self.generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=device)
+        self.generator = TextGenerator(model_name=TEXT_GENERATING_MODEL, device=device)
         self.rag_processor = RAGProcessor(
             db_manager=self.db_manager, generator=self.generator, intelligent_processing_enabled=True
         )

@@ -34,8 +34,7 @@ import traceback
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from prismalog.log import get_logger
-
+from psy_supabase import get_package_logger
 from psy_supabase.memory.associative_memory import AssociativeMemory
 from psy_supabase.utilities.stop_words import stop_words
 
@@ -44,7 +43,7 @@ if TYPE_CHECKING:
 
     from .rag_processor import RAGProcessor
 
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 class DynamicRAGRetriever:

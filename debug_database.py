@@ -8,7 +8,7 @@ from prismalog.log import get_logger
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.utilities.common import is_github_actions
 
-config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+config_path = os.path.join(os.path.dirname(__file__), "config_logging.yaml")
 LoggingConfig.initialize(config_file=config_path)
 
 logger = get_logger(__name__)

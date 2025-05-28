@@ -81,7 +81,6 @@ import jinja2
 import torch
 from detoxify import Detoxify
 from jinja2 import Template
-from prismalog.log import get_logger
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_THEME, DEFAULT_TOPIC
@@ -93,13 +92,16 @@ from psy_supabase.utilities.common import (
     load_toxicity_model,
 )
 from psy_supabase.utilities.semantic_emotion_detector import SemanticEmotionDetector
+from psy_supabase.utilities.supportive_terms import SUPPORTIVE_TERMS
 from psy_supabase.utilities.templates.therapeutic_prompt import prompt_templates
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 
 if TYPE_CHECKING:
     from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 
-logger = get_logger(__name__)
+from psy_supabase import get_package_logger
+
+logger = get_package_logger(__name__)
 
 # Only import dotenv in local development environment
 if not is_github_actions():
@@ -609,20 +611,7 @@ class TextGenerator:
 
         # STAGE 7: VALIDATION & QUALITY CONTROL
         # Ensure response has therapeutic language
-        supportive_terms = [
-            "feel",
-            "understand",
-            "support",
-            "help",
-            "listen",
-            "share",
-            "experience",
-            "emotion",
-            "thought",
-            "challenge",
-        ]
-
-        has_supportive_language = any(term in response.lower() for term in supportive_terms)
+        has_supportive_language = any(term in response.lower() for term in SUPPORTIVE_TERMS)
 
         # Check length constraints
         if not has_supportive_language:

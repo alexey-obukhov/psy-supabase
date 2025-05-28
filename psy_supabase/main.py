@@ -13,7 +13,7 @@ This project uses a multi-model architecture to provide comprehensive therapeuti
    hardware requirements, making it accessible for deployment on consumer hardware.
 
 2. **Sentence-Transformers (all-MiniLM-L6-v2)**: Powers the associative memory component,
-   creating 256-dimensional embeddings that connect related psychological concepts and enable
+   creating 384-dimensional embeddings that connect related psychological concepts and enable
    semantic similarity calculations.
 
 3. **Facebook RoBERTa Hate Speech Detector**: Uses the facebook/roberta-hate-speech-dynabench-r4-target
@@ -93,9 +93,9 @@ import torch
 
 # Third-party imports
 from flask import Flask, Response, g, jsonify, request
-from prismalog.log import get_logger
 from typeguard import install_import_hook
 
+from psy_supabase.config import TEXT_GENERATING_MODEL
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.model_manager import get_model_manager
 from psy_supabase.core.rag_processor import RAGProcessor
@@ -109,8 +109,9 @@ from psy_supabase.utilities.utils import cleanup_memory, parse_bool_env
 install_import_hook("psy_supabase")
 
 
-# Set up logging
-logger = get_logger(__name__)
+from psy_supabase import get_package_logger
+
+logger = get_package_logger(__name__)
 
 
 # Initialize spaCy model at startup
@@ -169,21 +170,18 @@ if not supabase_url or not supabase_key:
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Define model name at module level for consistency
-MODEL_NAME = "rasyosef/Phi-1_5-Instruct-v0.1"
-
 app = Flask(__name__)
 
 
 def initialize_app() -> None:
     """Set up the application before the first request."""
     logger.info("Setting up application...")
-    logger.info("Welcome to the Therapy AI Assistant! Using model: %s on %s", MODEL_NAME, DEVICE)
+    logger.info("Welcome to the Therapy AI Assistant! Using model: %s on %s", TEXT_GENERATING_MODEL, DEVICE)
 
     # Initialize the model manager but don't load the model yet
     # This just sets up the instance which will lazy-load when needed
-    get_model_manager(MODEL_NAME, DEVICE)
-    logger.info("Model manager initialized for %s", MODEL_NAME)
+    get_model_manager(TEXT_GENERATING_MODEL, DEVICE)
+    logger.info("Model manager initialized for %s", TEXT_GENERATING_MODEL)
 
 
 # Call initialize directly
@@ -303,7 +301,7 @@ def chat() -> Union[Response, Tuple[Response, int]]:
         logger.info("Received chat request from user %s: %s...", user_id, question[:50])
 
         # Get the model manager instance and then get the generator
-        model_manager = get_model_manager(MODEL_NAME, DEVICE)
+        model_manager = get_model_manager(TEXT_GENERATING_MODEL, DEVICE)
         generator = model_manager.get_generator()
 
         # Create a RAG processor using the retrieved documents
@@ -343,7 +341,7 @@ def optimize_vectors() -> Union[Response, Tuple[Response, int]]:
     """Optimize vector operations for the authenticated user."""
     try:
         # Get model manager for embedding generation
-        model_manager = get_model_manager(MODEL_NAME, DEVICE)
+        model_manager = get_model_manager(TEXT_GENERATING_MODEL, DEVICE)
 
         # Use the database manager to optimize vector operations
         # First ensure all interactions have embedding column
@@ -426,7 +424,7 @@ def free_memory() -> Union[Response, Tuple[Response, int]]:
 
 
 if __name__ == "__main__":
-    logger = get_logger(__name__)
+    logger = get_package_logger(__name__)
     if mp.get_start_method(allow_none=True) is None:
         mp.set_start_method("spawn")
 

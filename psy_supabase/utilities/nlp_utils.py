@@ -14,10 +14,11 @@ import re
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
 import spacy
-from prismalog.log import get_logger
+
+from psy_supabase import get_package_logger
 
 # Setup logging
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 # Import NLTK with error handling
 try:

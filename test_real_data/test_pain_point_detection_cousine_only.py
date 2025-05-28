@@ -55,15 +55,16 @@ from collections import Counter
 from logging import Logger
 from typing import Any, Dict, List, Optional, Set, Union
 
-from prismalog.log import get_logger
 from typeguard import typechecked
+
+from psy_supabase import get_package_logger
 
 # import multiprocessing as mp
 from psy_supabase.utilities.common import is_github_actions
 from psy_supabase.utilities.utils import cleanup_memory
 
 # Set up logging
-logger: Logger = get_logger(__name__)
+logger: Logger = get_package_logger(__name__)
 
 # Conditionally import dotenv
 if not is_github_actions():
@@ -88,6 +89,7 @@ if not supabase_url or not supabase_key:
     logger.critical("SUPABASE_URL and SUPABASE_KEY must be set in environment or .env file")
     sys.exit(1)
 
+from psy_supabase.config import TEXT_GENERATING_MODEL
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
@@ -200,7 +202,7 @@ class PainPointDetectionTester:
             supabase_url=supabase_url, supabase_key=supabase_key, user_id=self.test_user_id
         )
 
-        self.generator = TextGenerator(model_name="rasyosef/Phi-1_5-Instruct-v0.1", device=device)
+        self.generator = TextGenerator(model_name=TEXT_GENERATING_MODEL, device=device)
 
         # Initialize RAG processor with the test schema
         self.rag_processor = RAGProcessor(
@@ -601,5 +603,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    logger = get_logger(__name__)
+    logger = get_package_logger(__name__)
     main()

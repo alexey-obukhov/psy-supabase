@@ -1,8 +1,7 @@
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
-from prismalog.log import get_logger
-
+from psy_supabase import get_package_logger
 from psy_supabase.config import DEFAULT_EMOTION, DEFAULT_TOPIC
 from psy_supabase.utilities.semantic_emotion_detector import SemanticEmotionDetector
 from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
@@ -11,7 +10,7 @@ from psy_supabase.utilities.utils import get_spacy_model
 if TYPE_CHECKING:
     from psy_supabase.core.text_generator import TextGenerator
 
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 class PromptSelector:

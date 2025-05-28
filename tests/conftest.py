@@ -32,10 +32,11 @@ from psy_supabase.config import (  # pylint: disable=unused-import
     DEFAULT_EMOTION,
     DEFAULT_THEME,
     DEFAULT_TOPIC,
+    TEXT_GENERATING_MODEL,
 )
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-config_path = os.path.join(project_root, "psy_supabase", "config.yaml")
+config_path = os.path.join(project_root, "psy_supabase", "config_logging.yaml")
 
 LoggingConfig.initialize(config_file=config_path)
 
@@ -69,7 +70,7 @@ def download_nltk_data():
         try:
             nltk.data.find(f"tokenizers/{package}")
         except LookupError:
-            print(f"Downloading NLTK data package: {package}")
+            logger.info("Downloading NLTK data package: %s", package)
             nltk.download(package, download_dir=nltk_data_dir, quiet=True)
 
 
@@ -82,32 +83,6 @@ TEST_SCHEMA = "test_user_123"
 TEST_SESSION_ID = "test_session_123"
 TEST_URL = "https://fake-supabase-url.com"
 TEST_KEY = "fake-api-key"
-
-# Commonly used terms for identifying supportive language
-SUPPORTIVE_TERMS: List[str] = [
-    "help",
-    "support",
-    "understand",
-    "listen",
-    "hear",
-    "validat",
-    "care",
-    "concern",
-    "empath",
-    "compassion",
-    "acknowledge",
-    "comfort",
-    "reassure",
-    "encourage",
-    "validate",
-    "recognise",
-    "relate",
-    "connect",
-    "sympath",
-    "feel",
-    "emotion",
-    "experienc",
-]
 
 # Sample data with embeddings that should be processed
 SAMPLE_SIMILAR_DOCUMENTS: List[dict] = [

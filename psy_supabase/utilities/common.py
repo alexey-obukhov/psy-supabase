@@ -10,11 +10,13 @@ from pathlib import Path
 from typing import Optional, Tuple, Union
 
 import torch
-from prismalog.log import get_logger
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from psy_supabase import get_package_logger
+from psy_supabase.config import TOXIC_CLASSIFICATION_MODEL
+
 # Configure logger
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 def get_project_root() -> Path:
@@ -59,7 +61,7 @@ def load_toxicity_model(
     """
 
     log = logger_instance or logger
-    toxicity_model_name = "facebook/roberta-hate-speech-dynabench-r4-target"
+    toxicity_model_name = TOXIC_CLASSIFICATION_MODEL
     model_folder = toxicity_model_name.rsplit("/", maxsplit=1)[-1]
     models_dir = get_models_dir()
     local_path = os.path.join(models_dir, model_folder)

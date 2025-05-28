@@ -4,13 +4,9 @@ Entry point for the psy-supabase package.
 """
 import os
 
-from prismalog.config import LoggingConfig
-from prismalog.log import get_logger
+from psy_supabase import get_package_logger
 
-config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-LoggingConfig.initialize(config_file=config_path)
-
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 
 def main() -> None:

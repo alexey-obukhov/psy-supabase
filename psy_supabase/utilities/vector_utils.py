@@ -16,13 +16,14 @@ Key features:
 import traceback
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from prismalog.log import get_logger
 from typeguard import typechecked
+
+from psy_supabase import get_package_logger
 
 if TYPE_CHECKING:
     from psy_supabase.core.database import DatabaseManager
 
-logger = get_logger(__name__)
+logger = get_package_logger(__name__)
 
 # Define a type alias for possible vector inputs
 VectorInputType = Union[List[float], List[int], str, Any]  # Use Any for numpy/torch if optional
