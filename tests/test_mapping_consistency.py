@@ -3,8 +3,6 @@ import os  # Add os import for path joining if needed for template file checks
 
 from psy_supabase.utilities.semantic_emotion_detector import SemanticEmotionDetector
 from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
-
-# Import your mapping function that USES the centralized TherapeuticMappings.APPROACH_TO_TEMPLATE
 from psy_supabase.utilities.utils_mapping import map_approach_to_template
 
 # Import test data for expected values

@@ -38,7 +38,6 @@ class TestTopicEmotionDetection:
             result["topic_confidence"] = result.get("confidence", 0.5)
             result["emotion_confidence"] = result.get("emotion_intensity", 0.0)
 
-            # IMPORTANT FIX: More strictly enforce min_confidence check
             # This ensures ambiguous texts with high confidence thresholds fall back to supportive_listening
             if min_confidence is not None and result["topic_confidence"] < min_confidence:
                 result["topic"] = "supportive_listening"

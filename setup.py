@@ -56,7 +56,7 @@ setup(
         "httpx[http2]>=0.26.0,<0.28.0",
         "werkzeug==3.0.6",
         "spacy==3.7.5",
-        "prismalog==0.1.1",
+        "prismalog==0.1.3",
     ],
     entry_points={
         "console_scripts": [

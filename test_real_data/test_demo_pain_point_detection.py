@@ -23,6 +23,9 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
+# Add project to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from psy_supabase import get_package_logger
 from psy_supabase.config import TEXT_GENERATING_MODEL
 from psy_supabase.utilities.common import is_github_actions
@@ -112,6 +115,14 @@ class PainPointDemo:
 
         # Initialize memory with themes from test conversations
         self._initialize_memory()
+
+        # Check what keys exist that might be related
+        related_keys = [
+            key
+            for key in TherapeuticMappings.ENHANCED_TAXONOMY.keys()
+            if "favor" in key.lower() or "family" in key.lower()
+        ]
+        logger.debug("Related keys: %s", related_keys)
 
     def _verify_schema_exists(self) -> None:
         """Verify that the schema exists and has the required tables."""
@@ -312,12 +323,20 @@ class PainPointDemo:
 
                 # Add exchange details
                 for i, question in enumerate(questions):
+                    # Use existing robust theme detection instead of simple string matching
+                    question_themes = self._detect_themes([question])
+                    pain_point_detected = any(
+                        theme.lower() in [t.lower() for t in expected_themes] for theme in question_themes
+                    )
+
                     exchange = {
                         "question": question,
                         "answer": self.mock_responses[i % len(self.mock_responses)],
-                        "pain_point_detected": any(theme in question.lower() for theme in expected_themes),
+                        "pain_point_detected": pain_point_detected,
                         "recurring_themes": [
-                            theme for theme in results["detected_themes"] if theme.lower() in question.lower()
+                            theme
+                            for theme in results["detected_themes"]
+                            if theme.lower() in question.lower() or theme.lower().replace("_", " ") in question.lower()
                         ],
                     }
                     results["exchanges"].append(exchange)
@@ -448,10 +467,160 @@ class PainPointDemo:
             drop_query = f"""
             DROP SCHEMA IF EXISTS "{self.db_manager.schema_name}" CASCADE;
             """
-            # self.db_manager.supabase.rpc('sql', {'command': drop_query}).execute()
+            self.db_manager.supabase.rpc("sql", {"command": drop_query}).execute()
             logger.info("Dropped schema %s", self.db_manager.schema_name)
         except Exception as e:
             logger.error("Error dropping schema: %s", e)
+
+    def run_conversation_(self, conversation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Run through a complete conversation and detect pain points.
+
+        Args:
+            conversation: A conversation dictionary from TEST_CONVERSATIONS
+
+        Returns:
+            Dictionary with conversation results and detected pain points
+        """
+        name = conversation["name"]
+        session_id = conversation["session_id"]
+        questions = conversation["questions"]
+
+        logger.info("\n=== Running conversation: %s ===", name)
+        logger.info("Session ID: %s", session_id)
+
+        # First, add all conversations to the database
+        added_count = self.add_conversations_to_database(conversation)
+        if added_count == 0:
+            logger.error("Failed to add any interactions to the database!")
+            return {"name": name, "session_id": session_id, "error": "Failed to add interactions to database"}
+
+        # Wait a moment to ensure database operations complete
+        time.sleep(1)
+
+        results = {
+            "name": name,
+            "session_id": session_id,
+            "exchanges": [],
+            "pain_point_detected": 0,
+            "first_detection_at": None,
+            "detected_themes": set(),
+            "detected_approaches": set(),
+        }
+
+        # Look up the conversation in the database to verify it was added
+        try:
+            conversations_list = self.db_manager.get_conversation_history(session_id)
+            if conversations_list:
+                found_count = len(conversations_list)
+                logger.info("Found %d interactions in the database for session %s", found_count, session_id)
+
+                # Process each question to detect pain points
+                all_questions = []
+                for i, item in enumerate(conversations_list):
+                    if isinstance(item, dict):
+                        question = item.get("question", "")
+                        if question:
+                            all_questions.append(question)
+
+                # Simple pain point detection based on question content
+                results["detected_themes"] = self._detect_themes(all_questions)
+
+                # Extract expected themes from metadata
+                expected_themes = set()
+                if "expected_pain_point" in conversation:
+                    expected_themes = set(conversation["expected_pain_point"].get("themes", []))
+
+                results["expected_themes"] = list(expected_themes)
+
+                # Convert detected_themes to list for JSON serialization
+                results["detected_themes"] = list(results["detected_themes"])
+
+                # Add exchange details
+                for i, question in enumerate(questions):
+                    # Use existing robust theme detection instead of simple string matching
+                    question_themes = self._detect_themes([question])
+                    pain_point_detected = any(
+                        theme.lower() in [t.lower() for t in expected_themes] for theme in question_themes
+                    )
+
+                    exchange = {
+                        "question": question,
+                        "answer": self.mock_responses[i % len(self.mock_responses)],
+                        "pain_point_detected": pain_point_detected,
+                        "recurring_themes": [
+                            theme
+                            for theme in results["detected_themes"]
+                            if theme.lower() in question.lower() or theme.lower().replace("_", " ") in question.lower()
+                        ],
+                    }
+                    results["exchanges"].append(exchange)
+
+                    # Count pain points
+                    if exchange["pain_point_detected"]:
+                        results["pain_point_detected"] += 1
+                        if results["first_detection_at"] is None:
+                            results["first_detection_at"] = i + 1
+            else:
+                logger.error("No interactions found in database!")
+                results["error"] = "No interactions found in database"
+
+        except Exception as e:
+            logger.error("Error processing conversation: %s", e)
+            import traceback
+
+            logger.error(traceback.format_exc())
+            results["error"] = str(e)
+
+        # DEBUG: Log all questions being processed for favoritism detection
+        logger.info("Questions being analyzed for themes:")
+        for i, question in enumerate(questions):
+            logger.info("Q%d: %s", i + 1, question)
+
+        # Look for favoritism-related terms manually
+        favoritism_terms = [
+            "favorite",
+            "favorites",
+            "favoritism",
+            "favored",
+            "favoring",
+            "favors",  # Add "favors"!
+            "prefer",
+            "prefers",
+            "preferred",
+            "preference",
+            "preferential",
+            "golden child",
+            "special treatment",
+            "treated differently",
+            "unfair",
+            "why can't you",
+            "they get",
+            "loves more",
+            "always chosen",
+            "never picked",
+            "gets everything",
+            "takes their side",
+        ]
+
+        favoritism_found = []
+        for question in questions:
+            question_lower = question.lower()
+            for term in favoritism_terms:
+                if term.lower() in question_lower:
+                    favoritism_found.append(f"'{term}' in: {question[:100]}")
+                    break  # Found one, move to next question
+
+        if favoritism_found:
+            logger.info("Manual favoritism check found: %s", favoritism_found)
+        else:
+            logger.warning("Manual favoritism check found NO matches in questions")
+            # DEBUG: Show what we're actually looking for vs what we have
+            sample_question = questions[0] if questions else "No questions"
+            logger.debug("Sample question analyzed: %s", sample_question)
+            logger.debug("Looking for terms: %s", favoritism_terms[:10])
+
+        return results
 
 
 def main() -> None:

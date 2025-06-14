@@ -774,7 +774,6 @@ class TestRAGProcessor:
         rag_processor.db_manager = silent_mock_db_manager
         rag_processor.db_manager.find_similar_documents = MagicMock(return_value=[])
 
-        # CRITICAL FIX: Replace the text_generator with our mock
         rag_processor.text_generator = mock_text_generator
 
         # Now we can mock methods on the text_generator

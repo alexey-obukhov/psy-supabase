@@ -770,32 +770,7 @@ class TextGenerator:
             return None
 
     def _final_response_validation(self, response: str) -> str:
-        """Final validation to catch invalid response patterns before sending to user."""
-
-        # Check for code-related patterns that would never be appropriate
-        code_patterns = [
-            r"# YOUR CODE HERE",
-            r"# SOLUTION:",
-            r"def [a-z_]+\(",
-            r"```python",
-            r"function [a-z_]+\(",
-            r"@app\.route",
-        ]
-
-        # Check for instruction leakage patterns
-        instruction_patterns = [
-            r"Answer the following:",
-            r"\d+\.\s+Answer",
-            r"Write your response",
-            r"In your response",
-            r"Please provide",
-        ]
-
-        # Check for inappropriate patterns
-        for pattern in code_patterns + instruction_patterns:
-            if re.search(pattern, response):
-                logger.error("Invalid response detected with pattern: %s", pattern)
-                return self._get_emergency_fallback()
+        """Final validation to catch very short responses."""
 
         # Check for extremely short responses
         if len(response.split()) < 10:

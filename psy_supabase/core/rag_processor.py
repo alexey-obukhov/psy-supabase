@@ -57,8 +57,9 @@ psy_supabase.utilities.embedding_utils: Vector embedding utilities
 """
 
 import json
+import time
 import traceback
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from typeguard import typechecked
 
@@ -144,17 +145,52 @@ class RAGProcessor:
             text_generator=self.generator, db_manager=self.db_manager, prompt_selector=self.prompt_selector
         )
 
-        # Use EmbeddingProviderAdapter instead
+        # Use EmbeddingProviderAdapter
         self.embedding_provider = EmbeddingProviderAdapter()
-
-        # Get the embedding dimension directly from the provider
         self.embedding_dimension = self.embedding_provider.get_embedding_dimension()
 
-        # Constants for vector retrieval optimization
-        self.SIMILARITY_THRESHOLD = 0.7  # Minimum similarity for relevant documents
-        self.MAX_KNOWLEDGE_CHARS = 500  # Max characters for knowledge context
-        self.MAX_CONVERSATION_EXCHANGES = 2  # Max conversation exchanges to include
-        self.VECTOR_CACHE_ENABLED = True  # Enable vector caching for similar questions
+        # Load RAG configuration from config.py
+        from psy_supabase.config import RAG_CONFIG
+
+        self.rag_config = RAG_CONFIG
+
+        # Constants for vector retrieval optimization (from config)
+        self.SIMILARITY_THRESHOLD = float(self.rag_config["similarity_threshold"])
+        self.MAX_KNOWLEDGE_CHARS = int(self.rag_config["max_knowledge_chars"])
+        self.MAX_CONVERSATION_EXCHANGES = int(self.rag_config["max_conversation_exchanges"])
+        self.VECTOR_CACHE_ENABLED = bool(self.rag_config["vector_cache_enabled"])
+
+        # Initialize caching system with proper type annotations
+        self._similarity_cache: Dict[str, Tuple[Dict[str, Any], float]] = {}
+        self._last_search_cache: Dict[str, Dict[str, Any]] = {}
+        self._query_embedding_cache: Dict[str, List[float]] = {}
+
+    def _get_cache_key(self, session_id: str, query: str) -> str:
+        """Generate cache key for similarity search."""
+        import hashlib
+
+        query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
+        return f"{session_id}_{query_hash}"
+
+    def _is_cache_valid(self, timestamp: float) -> bool:
+        """Check if cache entry is still valid."""
+        timeout = float(self.rag_config["similarity_cache_timeout"])
+        return (time.time() - timestamp) < timeout
+
+    def _should_skip_duplicate_search(self, search_signature: str) -> bool:
+        """Check if this search was done recently and should be skipped."""
+        current_time = time.time()
+        dedup_window = float(self.rag_config["deduplication_window"])
+
+        if search_signature in self._last_search_cache:
+            cache_entry = self._last_search_cache[search_signature]
+            last_time = float(cache_entry.get("time", 0))
+            if current_time - last_time < dedup_window:
+                if bool(self.rag_config["log_cache_hits"]):
+                    logger.debug("Skipping duplicate similarity search within %ds", int(dedup_window))
+                return True
+
+        return False
 
     @typechecked
     def generate_response(
@@ -238,7 +274,6 @@ class RAGProcessor:
                 # Get approach type from pain point detection
                 approach_type = pain_point_results.get("approach_type", DEFAULT_APPROACH)
 
-                # Map approach to template using your existing utility
                 template_name = map_approach_to_template(approach_type)
 
                 # Store in metadata for use by text generator
@@ -585,133 +620,157 @@ class RAGProcessor:
     def _enhance_context_with_relevant_documents(
         self, user_question: str, question_embedding: List[float], session_id: str
     ) -> Dict:
-        """
-        Enhance context with only the most relevant documents while maintaining a fixed context size.
+        """Enhanced context retrieval with caching and deduplication."""
 
-        OPTIMIZED: Uses pgvector's similarity search for document selection, limiting data transfer.
+        # Create search signature for deduplication
+        search_signature = f"{user_question[:50]}_{session_id}"
 
-        Args:
-            user_question (str): User's question to enhance with context
-            question_embedding (List[float]): Vector embedding of the question
-            session_id (str): Session ID for conversation history
+        # Check if this search was done recently
+        if self._should_skip_duplicate_search(search_signature):
+            # Return cached result if available
+            cache_key = self._get_cache_key(session_id, user_question)
+            if cache_key in self._similarity_cache:
+                cached_data, timestamp = self._similarity_cache[cache_key]
+                if self._is_cache_valid(timestamp):
+                    return cached_data
 
-        Returns:
-            Dict: Enhanced context with knowledge and conversation data
-        """
         try:
-            # OPTIMIZED: Use pgvector search with threshold applied in database
-            similar_docs = self.db_manager.find_similar_documents(
-                embedding=question_embedding, limit=5, min_similarity=self.SIMILARITY_THRESHOLD
-            )
+            # Record this search to prevent duplicates
+            current_time = time.time()
 
-            # Initialize knowledge context with fixed maximum size
-            knowledge_context = ""
-            relevant_docs = []
+            if bool(self.rag_config["log_similarity_searches"]):
+                logger.info("Finding similar documents in schema: %s", self.db_manager.schema_name)
 
-            if similar_docs:
-                for doc in similar_docs:
-                    # Handle case where doc is a string (the response format issue)
-                    if isinstance(doc, str):
-                        # Try to parse JSON if it's a JSON string
-                        try:
-                            doc_dict = json.loads(doc)
-                            content = doc_dict.get("content", "")
-                            similarity = doc_dict.get("similarity", 0)
-                        except Exception as e:
-                            # If not JSON, use the string as content with default similarity
-                            logger.error("Error parsing JSON document: %s", e)
-                            content = doc
-                            similarity = 0.7  # Default similarity above threshold
-                    else:
-                        # Normal dictionary case
-                        content = doc.get("content", "")
-                        similarity = doc.get("similarity", 0)
-
-                    # Database filtering should handle this, but double-check
-                    if similarity >= self.SIMILARITY_THRESHOLD:
-                        relevant_docs.append((content, similarity))
-
-                # Build knowledge context, keeping track of total length
-                total_length = 0
-                final_docs: List[str] = []
-
-                for content, similarity in relevant_docs:
-                    # Calculate how much this document would add
-                    content_length = len(content)
-
-                    # If adding this document would exceed our limit, stop
-                    if total_length + content_length > self.MAX_KNOWLEDGE_CHARS:
-                        # If this is the first document and it's too long, truncate it
-                        if not final_docs:
-                            truncated = content[: self.MAX_KNOWLEDGE_CHARS] + "..."
-                            final_docs.append(truncated)
-                        break
-
-                    # Otherwise add the full document
-                    final_docs.append(content)
-                    total_length += content_length
-
-                # Join the final set of documents
-                knowledge_context = "\n\n".join(final_docs)
-
-                # Log what we're including
-                logger.info("Using %d documents (%d chars) for knowledge context", len(final_docs), total_length)
-
-            # OPTIMIZATION: Get conversation history with limited exchanges
-            conversation_context = ""
-            try:
-                conversation_history = self.db_manager.get_conversation_history(session_id)
-
-                if conversation_history and len(conversation_history) > 0:
-                    recent_exchanges = conversation_history[-self.MAX_CONVERSATION_EXCHANGES :]
-
-                    conversation_parts = []
-                    for exchange in recent_exchanges:
-                        q = exchange.get("question", exchange.get("question", ""))
-                        a = exchange.get("answer", exchange.get("answer", ""))
-                        if q and a:
-                            # Truncate if needed
-                            q_short = q if len(q) < 100 else q[:97] + "..."
-                            a_short = a if len(a) < 150 else a[:147] + "..."
-                            conversation_parts.append(f"User: {q_short}")
-                            conversation_parts.append(f"Assistant: {a_short}")
-
-                    conversation_context = "\n".join(conversation_parts)
-
-                    # Log the conversation context
-                    if conversation_context:
-                        logger.debug("Added conversation context (%d chars)", len(conversation_context))
-            except Exception as e:
-                logger.error("Error retrieving conversation history: %s", e)
-                # Continue with empty conversation context
-
-            # Create enhanced context dictionary with consistent size limits
-            enhanced_context = {
-                "knowledge_context": knowledge_context.strip(),
-                "conversation_context": conversation_context.strip(),
+            # Initialize context
+            enhanced_context: Dict[str, Any] = {
+                "knowledge_context": "",
+                "conversation_context": "",
                 "session_id": session_id,
-                "has_knowledge": bool(knowledge_context.strip()),
-                "has_conversation": bool(conversation_context.strip()),
-                "vector_threshold": self.SIMILARITY_THRESHOLD,
+                "has_knowledge": False,
+                "has_conversation": False,
                 "user_question": user_question,
             }
 
+            # Get knowledge context if enabled
+            if bool(self.rag_config["enable_knowledge_context"]):
+                similar_docs = self.db_manager.find_similar_documents(
+                    embedding=question_embedding, limit=5, min_similarity=self.SIMILARITY_THRESHOLD
+                )
+
+                knowledge_context = ""
+                if similar_docs:
+                    relevant_docs = []
+                    for doc in similar_docs:
+                        if isinstance(doc, str):
+                            try:
+                                import json
+
+                                doc_dict = json.loads(doc)
+                                content = str(doc_dict.get("content", ""))
+                                similarity = float(doc_dict.get("similarity", 0))
+                            except Exception:
+                                content = str(doc)
+                                similarity = 0.7
+                        else:
+                            content = str(doc.get("content", ""))
+                            similarity = float(doc.get("similarity", 0))
+
+                        if similarity >= self.SIMILARITY_THRESHOLD:
+                            relevant_docs.append((content, similarity))
+
+                    # Build knowledge context with size limit
+                    total_length = 0
+                    final_docs: List[str] = []
+
+                    for content, similarity in relevant_docs:
+                        content_length = len(content)
+                        if total_length + content_length > self.MAX_KNOWLEDGE_CHARS:
+                            if not final_docs:
+                                max_chars = int(self.MAX_KNOWLEDGE_CHARS)
+                                truncated = content[:max_chars] + "..."
+                                final_docs.append(truncated)
+                            break
+                        final_docs.append(content)
+                        total_length += content_length
+
+                    knowledge_context = "\n\n".join(final_docs)
+                    enhanced_context["knowledge_context"] = knowledge_context
+                    enhanced_context["has_knowledge"] = bool(knowledge_context)
+
+                    if bool(self.rag_config["log_context_sizes"]):
+                        logger.info(
+                            "Using %d documents (%d chars) for knowledge context", len(final_docs), total_length
+                        )
+                else:
+                    if bool(self.rag_config["log_similarity_searches"]):
+                        logger.warning("No similar documents found")
+
+            # Get conversation context if enabled
+            if bool(self.rag_config["enable_conversation_context"]):
+                try:
+                    conversation_history = self.db_manager.get_conversation_history(session_id)
+                    if conversation_history and len(conversation_history) > 0:
+                        max_exchanges = int(self.MAX_CONVERSATION_EXCHANGES)
+                        recent_exchanges = conversation_history[-max_exchanges:]
+                        conversation_parts = []
+
+                        for exchange in recent_exchanges:
+                            q = str(exchange.get("question", ""))
+                            a = str(exchange.get("answer", ""))
+                            if q and a:
+                                q_short = q if len(q) < 100 else q[:97] + "..."
+                                a_short = a if len(a) < 150 else a[:147] + "..."
+                                conversation_parts.append(f"User: {q_short}")
+                                conversation_parts.append(f"Assistant: {a_short}")
+
+                        conversation_context = "\n".join(conversation_parts)
+                        enhanced_context["conversation_context"] = conversation_context
+                        enhanced_context["has_conversation"] = bool(conversation_context)
+
+                        if bool(self.rag_config["log_context_sizes"]):
+                            logger.debug("Added conversation context (%d chars)", len(conversation_context))
+                except Exception as e:
+                    logger.error("Error retrieving conversation history: %s", e)
+
+            # Cache the result if caching is enabled
+            if self.VECTOR_CACHE_ENABLED:
+                cache_key = self._get_cache_key(session_id, user_question)
+                self._similarity_cache[cache_key] = (enhanced_context, current_time)
+
+                # Clean old cache entries
+                max_entries = int(self.rag_config["max_cache_entries"])
+                if len(self._similarity_cache) > max_entries:
+                    oldest_key = min(self._similarity_cache.keys(), key=lambda k: self._similarity_cache[k][1])
+                    del self._similarity_cache[oldest_key]
+
+            # Record this search in deduplication cache
+            self._last_search_cache[search_signature] = {"time": current_time, "result": enhanced_context}
+
+            # Clean old deduplication entries
+            cutoff_time = current_time - 30
+            self._last_search_cache = {
+                k: v for k, v in self._last_search_cache.items() if float(v.get("time", 0)) > cutoff_time
+            }
+
             # Log context sizes
-            logger.info("Knowledge context: %d chars from vector similarity search", len(knowledge_context))
-            logger.info("Conversation context: %d chars", len(conversation_context))
-            logger.info("Total prompt context: %d chars", len(knowledge_context) + len(conversation_context))
+            if bool(self.rag_config["log_context_sizes"]):
+                knowledge_len = len(str(enhanced_context["knowledge_context"]))
+                conversation_len = len(str(enhanced_context["conversation_context"]))
+                logger.info("Knowledge context: %d chars from vector similarity search", knowledge_len)
+                logger.info("Conversation context: %d chars", conversation_len)
+                logger.info("Total prompt context: %d chars", knowledge_len + conversation_len)
 
             return enhanced_context
+
         except Exception as e:
             logger.error("Error enhancing context: %s", e)
-            logger.error(traceback.format_exc())
             return {
                 "knowledge_context": "",
                 "conversation_context": "",
                 "session_id": session_id,
                 "has_knowledge": False,
                 "has_conversation": False,
-                "user_question": user_question,  # Include user question even in error case
+                "user_question": user_question,
             }
 
     def enhance_context_with_relevant_documents(
@@ -883,7 +942,6 @@ class RAGProcessor:
                 # Defaults to an empty dict if 'suggested_approach' is not found.
                 suggested_approach_info = pain_point_data_from_db.get("suggested_approach", {})
 
-                # Determine 'approach_type' using your specified logic:
                 # If 'suggested_approach_info' is a dictionary and contains 'approach_type', use it.
                 # Otherwise, fall back to DEFAULT_APPROACH.
                 approach_type = (
@@ -1153,7 +1211,7 @@ class RAGProcessor:
         """
         cache_key = f"{session_id}:{user_question}"
         if not hasattr(self, "_query_embedding_cache"):
-            self._query_embedding_cache: Dict[str, List[float]] = {}
+            self._query_embedding_cache = {}
         if cache_key in self._query_embedding_cache:
             logger.debug("Returning cached embedding for query in session %s", session_id)
             return self._query_embedding_cache[cache_key]

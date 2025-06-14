@@ -3,7 +3,7 @@
 *__pycache__/
 security_files/
 test/logging/*
-logging/
+logging/*
 logs/*
 nltk_data/
 tests/nltk_data/

@@ -57,6 +57,9 @@ from typing import Any, Dict, List, Optional, Set, Union
 
 from typeguard import typechecked
 
+# Add project to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from psy_supabase import get_package_logger
 
 # import multiprocessing as mp

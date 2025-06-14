@@ -376,17 +376,13 @@ class TestTemplateDebugging:
 
     def test_mapping_consistency(self):
         """Test to ensure all therapeutic themes have a corresponding template."""
-        from psy_supabase.config import (  # Ensure DEFAULT_THEME is defined or remove if not used for templates
-            DEFAULT_APPROACH,
-            DEFAULT_THEME,
-        )
+        from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_THEME
 
         missing_approaches = []
         missing_templates = []
 
         for theme_name, theme_data in TherapeuticMappings.THERAPEUTIC_THEMES.items():
             # Get the list of approaches for the current theme
-            # The key is "approaches" (plural) in your THERAPEUTIC_THEMES data
             theme_specific_approaches = theme_data.get("approaches")
 
             if not theme_specific_approaches:

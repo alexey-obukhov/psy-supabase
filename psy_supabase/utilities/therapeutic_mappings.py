@@ -12,6 +12,7 @@ template for a particular approach. This centralization helps in maintaining
 and updating the knowledge base of the application in a structured manner.
 """
 
+import re
 from typing import Any, Dict, Final, List, Optional, Tuple, Union
 
 from psy_supabase import get_package_logger
@@ -711,80 +712,103 @@ class TherapeuticMappings:
             "fear of abandonment",
         ],
         "favoritism": [
-            # Direct terms
+            # Core favoritism terms - word stems that catch variations
+            "favor",
+            "favors",
             "favorite",
             "favorites",
             "favoritism",
+            "favored",
+            "favoring",
+            "prefer",
+            "prefers",
             "preferred",
             "preference",
             "preferential",
-            # Common phrases about favoritism
+            "preferring",
+            # Family favoritism phrases
+            "golden child",
+            "scapegoat",
+            "black sheep",
+            "favorite child",
+            "preferred child",
+            "special treatment",
+            "treated differently",
+            "different treatment",
+            "unfair treatment",
+            "unequal treatment",
+            "double standards",
+            # Parental favoritism
+            "mom's favorite",
+            "dad's favorite",
+            "mother's favorite",
+            "father's favorite",
+            "parents prefer",
+            "clearly prefers",
+            "obviously favors",
+            "always chooses",
+            "mommy's boy",
+            "daddy's girl",
+            "mama's boy",
+            "papa's girl",
+            # Comparative language
+            "loves more",
+            "cares more",
+            "pays more attention",
+            "spends more time",
+            "gives more to",
+            "shows more love",
+            "more affectionate with",
+            "always takes their side",
+            "takes his side",
+            "takes her side",
+            # Sibling competition
+            "sibling rivalry",
+            "sibling comparison",
+            "compared to sibling",
+            "brother gets",
+            "sister gets",
+            "sibling gets everything",
+            "they get everything",
+            "gets away with everything",
+            "can do no wrong",
+            "never gets in trouble",
+            "always gets what they want",
+            # Emotional impact phrases
+            "never measure up",
+            "always second best",
+            "not as good as",
+            "not the favorite",
+            "less important",
+            "valued less",
+            "feeling left out",
+            "feeling inferior",
+            "feeling less than",
+            "jealous of sibling",
+            "disappointed parents",
+            "not good enough for them",
+            # Behavioral indicators
+            "special privileges",
+            "gets special attention",
+            "gets better treatment",
+            "why can't you be like",
+            "your sibling would",
+            "they never",
+            "living in shadow",
+            "compete with",
+            "always chosen",
+            "never picked",
+            # Family dynamics
+            "parental preference",
+            "family competition",
             "plays favorites",
             "pick favorites",
             "choosing favorites",
             "clear favorite",
             "obvious favorite",
             "always liked better",
-            "treat differently",
-            "different treatment",
-            "unfair treatment",
-            # Family roles indicating favoritism
-            "golden child",
-            "scapegoat",
-            "black sheep",
-            "favorite child",
-            "least favorite",
-            "favorite son",
-            "favorite daughter",
-            # Parent-specific favoritism
-            "mom's favorite",
-            "dad's favorite",
-            "parents prefer",
-            "mommy's boy",
-            "daddy's girl",
-            # Comparison phrases
-            "loves more than",
-            "cares more about",
-            "pays more attention to",
-            "spends more time with",
-            "gives more to",
-            "always takes their side",
-            # Impact phrases
-            "never measure up",
-            "always second best",
-            "not the favorite",
-            "less important",
-            "valued less",
-            "treated better",
-            # Behavioral indicators
-            "gets away with everything",
-            "can do no wrong",
-            "never gets in trouble",
-            "always gets what they want",
-            "special privileges",
-            "special treatment",
-            # Emotional experiences
-            "feeling less than",
-            "feeling inferior",
-            "feeling left out",
-            "jealous of sibling",
-            "sibling rivalry",
-            "sibling comparison",
-            # Family dynamics
-            "parental preference",
-            "family competition",
-            "unequal treatment",
-            "different standards",
-            "double standards",
-            # Additional everyday phrases
-            "always chooses them",
-            "always takes their side",
-            "gets special attention",
-            "gets better treatment",
-            "shows more love to",
-            "more affectionate with",
-            "clearly prefers",
-            "obviously favors",
+            "treat better",
+            "loved more than",
         ],
         "family": [
             # Core family terms
@@ -918,6 +942,763 @@ class TherapeuticMappings:
             "family upbringing",
             "childhood home",
             "childhood family",
+        ],
+        # Family dynamics and favoritism
+        "favoritism": [
+            # Core favoritism terms - word stems that catch variations
+            "favor",
+            "favors",
+            "favorite",
+            "favorites",
+            "favoritism",
+            "favored",
+            "favoring",
+            "prefer",
+            "prefers",
+            "preferred",
+            "preference",
+            "preferential",
+            "preferring",
+            # Family favoritism phrases
+            "golden child",
+            "scapegoat",
+            "black sheep",
+            "favorite child",
+            "preferred child",
+            "special treatment",
+            "treated differently",
+            "different treatment",
+            "unfair treatment",
+            "unequal treatment",
+            "double standards",
+            # Parental favoritism
+            "mom's favorite",
+            "dad's favorite",
+            "mother's favorite",
+            "father's favorite",
+            "parents prefer",
+            "clearly prefers",
+            "obviously favors",
+            "always chooses",
+            "mommy's boy",
+            "daddy's girl",
+            "mama's boy",
+            "papa's girl",
+            # Comparative language
+            "loves more",
+            "cares more",
+            "pays more attention",
+            "spends more time",
+            "gives more to",
+            "shows more love",
+            "more affectionate with",
+            "always takes their side",
+            "takes his side",
+            "takes her side",
+            # Sibling competition
+            "sibling rivalry",
+            "sibling comparison",
+            "compared to sibling",
+            "brother gets",
+            "sister gets",
+            "sibling gets everything",
+            "they get everything",
+            "gets away with everything",
+            "can do no wrong",
+            "never gets in trouble",
+            "always gets what they want",
+            # Emotional impact phrases
+            "never measure up",
+            "always second best",
+            "not as good as",
+            "not the favorite",
+            "less important",
+            "valued less",
+            "feeling left out",
+            "feeling inferior",
+            "feeling less than",
+            "jealous of sibling",
+            "disappointed parents",
+            "not good enough for them",
+            # Behavioral indicators
+            "special privileges",
+            "gets special attention",
+            "gets better treatment",
+            "why can't you be like",
+            "your sibling would",
+            "they never",
+            "living in shadow",
+            "compete with",
+            "always chosen",
+            "never picked",
+            # Family dynamics
+            "parental preference",
+            "family competition",
+            "plays favorites",
+            "pick favorites",
+            "choosing favorites",
+            "clear favorite",
+            "obvious favorite",
+            "always liked better",
+            "treat better",
+            "loved more than",
+        ],
+        "family": [
+            # Core family terms
+            "family",
+            "families",
+            "familial",
+            "parent",
+            "parents",
+            "parental",
+            "mother",
+            "father",
+            "mom",
+            "dad",
+            "sibling",
+            "siblings",
+            "brother",
+            "sister",
+            # Extended family
+            "grandparent",
+            "aunt",
+            "uncle",
+            "cousin",
+            "in-law",
+            "in-laws",
+            "extended family",
+            # Family relationships
+            "family relationship",
+            "family dynamic",
+            "family issue",
+            "family problem",
+            "family conflict",
+            "family tension",
+            # Common phrases
+            "my family",
+            "our family",
+            "the family",
+            "family member",
+            "family situation",
+            "within the family",
+            "in my family",
+        ],
+        "childhood": [
+            # Direct terms
+            "child",
+            "childhood",
+            "children",
+            "kid",
+            "kids",
+            "young",
+            # Time periods
+            "growing up",
+            "grew up",
+            "when I was young",
+            "as a child",
+            "as kids",
+            "early years",
+            "younger years",
+            # Experiences
+            "raised",
+            "upbringing",
+            "childhood experience",
+            "childhood memory",
+            "childhood trauma",
+            # Family context
+            "family history",
+            "family background",
+            "family upbringing",
+            "childhood home",
+            "childhood family",
+        ],
+        "insecurity": [
+            # Core insecurity terms
+            "insecure",
+            "insecurity",
+            "insecurities",
+            "uncertain",
+            "uncertainty",
+            "doubt",
+            "doubts",
+            "doubting",
+            "self-doubt",
+            "self-conscious",
+            "inadequate",
+            "inadequacy",
+            "not enough",
+            "not good enough",
+            "vulnerable",
+            "vulnerability",
+            "exposed",
+            "fragile",
+            # Relationship insecurity
+            "relationship insecurity",
+            "insecure in relationship",
+            "feel insecure",
+            "afraid of losing",
+            "fear of abandonment",
+            "fear losing them",
+            "not secure in relationship",
+            "worried about relationship",
+            "relationship anxiety",
+            "attachment anxiety",
+            "clingy",
+            # Self-worth related
+            "low self-esteem",
+            "poor self-image",
+            "lack confidence",
+            "don't feel worthy",
+            "unworthy",
+            "not deserving",
+            "feel small",
+            "feel insignificant",
+            "feel lesser",
+            "compare myself",
+            "comparing myself",
+            "not measuring up",
+            # Physical/appearance insecurity
+            "body insecurity",
+            "appearance anxiety",
+            "how I look",
+            "ugly",
+            "unattractive",
+            "fat",
+            "skinny",
+            "too short",
+            "too tall",
+            "hate my body",
+            "don't like how I look",
+            "self-image issues",
+            # Performance insecurity
+            "imposter syndrome",
+            "feel like fraud",
+            "don't belong",
+            "afraid of failure",
+            "fear of judgment",
+            "what others think",
+            "not smart enough",
+            "not talented enough",
+            "out of my league",
+        ],
+        "jealousy": [
+            # Core jealousy terms
+            "jealous",
+            "jealousy",
+            "envious",
+            "envy",
+            "resentful",
+            "resentment",
+            "green with envy",
+            "bitter",
+            "possessive",
+            "territorial",
+            # Relationship jealousy
+            "jealous of partner",
+            "partner talking to",
+            "worried about cheating",
+            "suspicious",
+            "don't trust",
+            "checking phone",
+            "following",
+            "stalking",
+            "monitoring",
+            "watching",
+            "spying",
+            # Social jealousy
+            "jealous of friends",
+            "jealous of siblings",
+            "jealous of coworkers",
+            "they have everything",
+            "why can't I have",
+            "wish I had",
+            "not fair they get",
+            "they don't deserve",
+            "I deserve more",
+            # Success/achievement jealousy
+            "jealous of success",
+            "envious of achievements",
+            "why them not me",
+            "they got promoted",
+            "they have better",
+            "more successful than me",
+            "everyone else has",
+            "left behind",
+            "missing out",
+            # Emotional expressions
+            "makes me sick",
+            "burns me up",
+            "can't stand seeing",
+            "hate when they",
+            "bothers me when",
+            "upsets me that",
+        ],
+        "trust": [
+            # Core trust terms
+            "trust",
+            "trusted",
+            "trusting",
+            "trustworthy",
+            "distrust",
+            "mistrust",
+            "faith",
+            "confidence",
+            "belief",
+            "rely",
+            "relying",
+            "dependable",
+            # Trust issues
+            "trust issues",
+            "hard to trust",
+            "don't trust",
+            "can't trust",
+            "lost trust",
+            "broken trust",
+            "betrayed",
+            "betrayal",
+            "lied to",
+            "cheated on",
+            "let down",
+            "disappointed",
+            # Relationship trust
+            "trust in relationship",
+            "trust my partner",
+            "faithful",
+            "loyalty",
+            "being honest",
+            "telling truth",
+            "keeping secrets",
+            "hiding things",
+            "suspicious behavior",
+            "acting strange",
+            "something's wrong",
+            # Building/rebuilding trust
+            "learning to trust",
+            "want to trust",
+            "trying to trust",
+            "rebuild trust",
+            "regain trust",
+            "earn trust back",
+            "prove trustworthy",
+            "show I can trust",
+            "give another chance",
+            # Past trauma affecting trust
+            "burned before",
+            "hurt in past",
+            "past relationships",
+            "previous betrayal",
+            "once bitten twice shy",
+            "walls up",
+            "guard up",
+            "protective",
+        ],
+        # Also enhance existing relationship theme
+        "relationship": [
+            # Existing relationship terms plus additions for insecurity patterns
+            "relationship",
+            "relationships",
+            "partner",
+            "boyfriend",
+            "girlfriend",
+            "spouse",
+            "husband",
+            "wife",
+            "dating",
+            "couple",
+            "romantic",
+            # Relationship problems
+            "relationship problems",
+            "relationship issues",
+            "relationship trouble",
+            "fighting",
+            "arguing",
+            "conflict",
+            "tension",
+            "distance",
+            "growing apart",
+            "drifting apart",
+            "disconnected",
+            # Relationship insecurity patterns
+            "needy",
+            "clingy",
+            "possessive",
+            "controlling",
+            "demanding",
+            "checking up on",
+            "need constant reassurance",
+            "seeking validation",
+            "afraid they'll leave",
+            "fear of being alone",
+            "abandonment",
+            # Communication issues
+            "don't communicate",
+            "can't talk",
+            "won't listen",
+            "misunderstand",
+            "not hearing me",
+            "don't feel heard",
+            "ignored",
+            "dismissed",
+            # Commitment issues
+            "commitment",
+            "committed",
+            "exclusive",
+            "serious",
+            "casual",
+            "moving too fast",
+            "moving too slow",
+            "ready for next step",
+            "marriage",
+            "engagement",
+            "living together",
+            "future together",
+        ],
+        "humiliation": [
+            # Core humiliation terms
+            "humiliate",
+            "humiliated",
+            "humiliating",
+            "humiliation",
+            "embarrass",
+            "embarrassed",
+            "embarrassing",
+            "embarrassment",
+            "mortify",
+            "mortified",
+            "mortifying",
+            "mortification",
+            "shame",
+            "shamed",
+            "shaming",
+            "ashamed",
+            # Workplace humiliation
+            "publicly humiliated",
+            "humiliated at work",
+            "embarrassed at work",
+            "made to look stupid",
+            "made fun of",
+            "laughed at",
+            "mocked",
+            "ridiculed",
+            "belittled",
+            "put down",
+            "degraded",
+            "demeaned",
+            # Social humiliation
+            "humiliated in front of",
+            "embarrassed in public",
+            "made a fool of",
+            "looked like an idiot",
+            "felt stupid",
+            "felt foolish",
+            "lost face",
+            "dignity stripped",
+            "pride wounded",
+            # Emotional impact
+            "want to disappear",
+            "crawl under a rock",
+            "hide my face",
+            "never show my face",
+            "die of embarrassment",
+            "mortified beyond belief",
+            "crushed my spirit",
+            "destroyed my confidence",
+            "shattered my ego",
+            # Professional humiliation
+            "dress down",
+            "dressed down",
+            "chewed out",
+            "torn apart",
+            "ripped to shreds",
+            "destroyed in meeting",
+            "called out publicly",
+            "made example of",
+            "singled out",
+            "targeted for criticism",
+        ],
+        "inadequacy": [
+            # Core inadequacy terms
+            "inadequate",
+            "inadequacy",
+            "not enough",
+            "not good enough",
+            "insufficient",
+            "deficient",
+            "lacking",
+            "falling short",
+            "subpar",
+            "below standard",
+            "not up to par",
+            "not measuring up",
+            # Self-perception of inadequacy
+            "feel inadequate",
+            "feeling inadequate",
+            "sense of inadequacy",
+            "not capable",
+            "incapable",
+            "incompetent",
+            "not qualified",
+            "out of my depth",
+            "in over my head",
+            "can't handle it",
+            "not cut out for",
+            "don't have what it takes",
+            "not skilled enough",
+            # Comparison-based inadequacy
+            "everyone else is better",
+            "others are more capable",
+            "can't compete",
+            "behind everyone else",
+            "not as good as others",
+            "lagging behind",
+            "can't keep up",
+            "struggling to keep up",
+            "outclassed",
+            # Professional inadequacy
+            "not qualified for job",
+            "imposter syndrome",
+            "fake it till you make it",
+            "don't belong here",
+            "hired by mistake",
+            "over my head at work",
+            "can't do the job",
+            "failing at work",
+            "not meeting expectations",
+            # Emotional expressions
+            "feel like a failure",
+            "total failure",
+            "complete failure",
+            "disappointment",
+            "let everyone down",
+            "not worthy",
+            "don't deserve",
+            "undeserving",
+            "not earned my place",
+        ],
+        "workplace": [
+            # Core workplace terms
+            "work",
+            "workplace",
+            "job",
+            "office",
+            "career",
+            "professional",
+            "employment",
+            "employer",
+            "employee",
+            "staff",
+            "team",
+            # Workplace roles
+            "boss",
+            "manager",
+            "supervisor",
+            "coworker",
+            "colleague",
+            "subordinate",
+            "executive",
+            "leadership",
+            "management",
+            "hr",
+            "human resources",
+            "department",
+            "company",
+            "organization",
+            # Work activities
+            "meeting",
+            "presentation",
+            "project",
+            "deadline",
+            "task",
+            "assignment",
+            "responsibility",
+            "performance",
+            "evaluation",
+            "review",
+            "feedback",
+            "promotion",
+            "raise",
+            "bonus",
+            # Work environment
+            "office culture",
+            "work environment",
+            "corporate",
+            "professional setting",
+            "work atmosphere",
+            "team dynamics",
+            "office politics",
+            "work relationships",
+            "professional relationships",
+            # Work-related stress
+            "work stress",
+            "job stress",
+            "workplace pressure",
+            "work pressure",
+            "work anxiety",
+            "job anxiety",
+            "career stress",
+            "professional stress",
+            "work-life balance",
+            "overwork",
+            "overtime",
+            "workload",
+            # Work problems
+            "work issues",
+            "job problems",
+            "workplace problems",
+            "work conflict",
+            "workplace conflict",
+            "work drama",
+            "office drama",
+            "work troubles",
+        ],
+        "criticism": [
+            # Core criticism terms
+            "criticize",
+            "criticized",
+            "criticizing",
+            "criticism",
+            "critique",
+            "judge",
+            "judged",
+            "judging",
+            "judgment",
+            "judgmental",
+            "blame",
+            "blamed",
+            "blaming",
+            "fault",
+            "faulted",
+            "faulting",
+            # Types of criticism
+            "harsh criticism",
+            "constant criticism",
+            "unfair criticism",
+            "constructive criticism",
+            "destructive criticism",
+            "brutal criticism",
+            "nitpicking",
+            "fault-finding",
+            "picking apart",
+            "tearing down",
+            # Receiving criticism
+            "being criticized",
+            "under criticism",
+            "criticized for",
+            "picked on",
+            "singled out",
+            "targeted",
+            "attacked",
+            "condemned",
+            "denounced",
+            "censured",
+            "reprimanded",
+            # Self-criticism
+            "self-criticism",
+            "self-critical",
+            "critical of myself",
+            "hard on myself",
+            "my own worst critic",
+            "beat myself up",
+            "self-blame",
+            "blame myself",
+            "fault myself",
+            # Workplace criticism
+            "criticized at work",
+            "boss criticizes",
+            "manager criticizes",
+            "performance criticism",
+            "work criticism",
+            "professional criticism",
+            "negative feedback",
+            "poor evaluation",
+            "bad review",
+            # Emotional impact of criticism
+            "can't take criticism",
+            "sensitive to criticism",
+            "hurt by criticism",
+            "crushed by criticism",
+            "destroyed by criticism",
+            "devastated by feedback",
+            "feel attacked",
+            "feel judged",
+            "feel condemned",
+            # Family/relationship criticism
+            "criticized by family",
+            "parents criticize",
+            "criticized by partner",
+            "constant judgment",
+            "never good enough",
+            "always finding fault",
+        ],
+        # Also enhance the existing workplace_trauma section with more specific terms
+        "workplace_trauma": [
+            # Existing terms plus new ones
+            "workplace abuse",
+            "work abuse",
+            "boss abuse",
+            "manager abuse",
+            "toxic workplace",
+            "hostile work",
+            "bullied at work",
+            "harassed at work",
+            "workplace harassment",
+            "workplace bullying",
+            "abused at work",
+            "work trauma",
+            "workplace trauma",
+            "toxic boss",
+            "toxic manager",
+            # Humiliation-specific workplace trauma
+            "humiliated at work",
+            "embarrassed at work",
+            "publicly shamed",
+            "made example of",
+            "singled out",
+            "called out publicly",
+            "criticized in front of others",
+            "torn apart in meeting",
+            # Inadequacy-inducing workplace trauma
+            "made to feel stupid",
+            "told I'm incompetent",
+            "questioned my abilities",
+            "undermined my confidence",
+            "made to feel small",
+            "belittled my work",
+            "dismissed my ideas",
+            "ignored my contributions",
+            "overlooked for promotion",
+            # Professional sabotage
+            "sabotaged my work",
+            "set me up to fail",
+            "impossible deadlines",
+            "unrealistic expectations",
+            "moving goalposts",
+            "changing requirements",
+            "no support",
+            "thrown under the bus",
+            "scapegoated",
+            # Power abuse
+            "abuse of power",
+            "authority abuse",
+            "position abuse",
+            "rank abuse",
+            "threatened my job",
+            "intimidation tactics",
+            "retaliation",
+            "punitive measures",
+            "disciplinary action",
+            "write-ups",
+            # Emotional workplace abuse
+            "gaslighting at work",
+            "mind games",
+            "psychological manipulation",
+            "emotional abuse",
+            "verbal abuse",
+            "yelling",
+            "screaming",
+            "condescending",
+            "patronizing",
+            "talking down to",
         ],
     }
 
@@ -1891,3 +2672,99 @@ class TherapeuticMappings:
         all_patterns.update(cls.CLINICAL_PATTERNS)
         all_patterns.update(cls.INTERPERSONAL_PATTERNS)
         return all_patterns
+
+    @classmethod
+    def detect_theme_from_text(cls, text: str, use_patterns: bool = True) -> str:
+        """
+        Enhanced theme detection using both keywords and emotion patterns.
+
+        Args:
+            text: The input text to analyze
+            use_patterns: Whether to also use emotion patterns for detection
+
+        Returns:
+            str: The detected theme name
+        """
+        if not text or not text.strip():
+            return "general_support"
+
+        text_lower = text.lower()
+
+        # 1. Keyword-based detection (same as basic version)
+        theme_scores = cls._score_themes_by_keywords(text_lower)
+
+        # 2. Pattern-based detection (if enabled)
+        if use_patterns:
+            pattern_scores = cls._score_themes_by_patterns(text_lower)
+
+            # Combine scores
+            for theme, score in pattern_scores.items():
+                if theme in theme_scores:
+                    theme_scores[theme] += score * 0.5  # Weight pattern matches lower
+                else:
+                    theme_scores[theme] = score * 0.5
+
+        # Return best match
+        if theme_scores:
+            best_theme = max(theme_scores.items(), key=lambda x: x[1])[0]
+            logger.debug(f"detect_theme_from_text: Best theme '{best_theme}' with score {theme_scores[best_theme]}")
+            return best_theme
+
+        return "general_support"
+
+    @classmethod
+    def _score_themes_by_keywords(cls, text_lower: str) -> Dict[str, float]:
+        """Score themes based on keyword matches."""
+        theme_scores: Dict[str, float] = {}
+
+        # Check THERAPEUTIC_THEMES
+        for theme, theme_data in cls.THERAPEUTIC_THEMES.items():
+            keywords = theme_data.get("keywords", [])
+            score = 0
+
+            for keyword in keywords:
+                keyword_lower = keyword.lower()
+                if keyword_lower in text_lower:
+                    score += 2
+
+                if re.search(r"\b" + re.escape(keyword_lower) + r"\b", text_lower):
+                    score += 1
+
+            if score > 0:
+                theme_scores[theme] = score
+
+        return theme_scores
+
+    @classmethod
+    def _score_themes_by_patterns(cls, text_lower: str) -> Dict[str, float]:
+        """Score themes based on emotion pattern matches using existing TherapeuticMappings."""
+        theme_scores: Dict[str, float] = {}  # Add explicit type annotation
+
+        for emotion, patterns in cls.CORE_EMOTIONS.items():
+            total_score = 0.0  # Make sure it's float
+            for pattern, weight in patterns:
+                matches = re.findall(pattern, text_lower)
+                if matches:
+                    total_score += len(matches) * weight
+
+            if total_score > 0:
+                # Find which themes contain this emotion in their emotions list
+                matching_themes = []
+                for theme, theme_data in cls.THERAPEUTIC_THEMES.items():
+                    emotions_list = theme_data.get("emotions", [])
+                    if emotion in emotions_list:
+                        matching_themes.append(theme)
+
+                # If no direct match found, map the emotion to themes
+                if not matching_themes:
+                    matching_themes = ["general_support"]  # fallback
+
+                # Distribute score across matching themes
+                for theme in matching_themes:
+                    score_per_theme = total_score / len(matching_themes)
+                    if theme in theme_scores:
+                        theme_scores[theme] += score_per_theme
+                    else:
+                        theme_scores[theme] = score_per_theme
+
+        return theme_scores

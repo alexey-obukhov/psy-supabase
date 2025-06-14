@@ -71,8 +71,7 @@ Usage:
 import json
 import re
 import traceback
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from supabase import create_client
 from typeguard import typechecked
@@ -80,6 +79,7 @@ from typeguard import typechecked
 from psy_supabase import get_package_logger
 from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_THEME, DEFAULT_TOPIC, TEXT_GENERATING_MODEL
 from psy_supabase.core.model_manager import get_embedding_provider
+from psy_supabase.core.pain_point_detector import PainPointDetector
 from psy_supabase.utilities.embedding_utils import detect_repetition_pattern
 from psy_supabase.utilities.utils import clean_text, debug_errors
 from psy_supabase.utilities.utils_mapping import map_approach_name, map_theme_to_approach_type
@@ -114,6 +114,9 @@ class DatabaseManager:
         self.supabase_url = supabase_url
         self.supabase_key = supabase_key
         self.user_id = user_id
+        self._pain_point_detector: Optional[PainPointDetector] = None
+
+        self.supabase = create_client(self.supabase_url, self.supabase_key)
 
         # Special case for default schema
         if user_id == "default":
@@ -122,7 +125,12 @@ class DatabaseManager:
         else:
             self.schema_name = self._sanitize_schema_name(user_id)
 
-        self.supabase = create_client(self.supabase_url, self.supabase_key)
+    @property
+    def pain_point_detector(self) -> PainPointDetector:
+        """Lazy initialization of pain point detector."""
+        if self._pain_point_detector is None:
+            self._pain_point_detector = PainPointDetector(self)
+        return self._pain_point_detector
 
     def create_default_schema_sync(self) -> bool:
         """Creates a default schema if it doesn't exist."""
@@ -241,14 +249,7 @@ class DatabaseManager:
             # Log the exact data being inserted for debugging
             logger.debug("Adding interaction with data: %s..., session_id: %s", question[:30], session_id)
 
-            # Bypass RPC completely - use direct table insertion
-            insert_data = {"question": question, "answer": answer, "context": context, "metadata": metadata}
-
-            # Include session_id if provided
-            if session_id:
-                insert_data["session_id"] = session_id
-
-            # Direct table insertion
+            # Direct table insertion FIRST
             response = self.supabase.rpc(
                 "add_interaction",
                 {
@@ -283,8 +284,111 @@ class DatabaseManager:
                 if not embedding_result:
                     logger.error("Failed to add embedding for interaction %d", interaction_id)
                     return {"success": False, "error": "Failed to add embedding for interaction"}
-                return {"success": True}
-            return {"success": False, "error": "Question is empty"}
+
+            if session_id and len(question.strip()) > 10:  # Only for meaningful questions
+                try:
+                    logger.debug("Detecting pain points for session: %s", session_id)
+                    pain_data = self.detect_pain_points(session_id=session_id, min_occurrences=2)
+
+                    if pain_data.get("pain_points") and pain_data.get("severity") != "none":
+                        logger.info(
+                            "Pain points detected! Count: %d, Severity: %s",
+                            len(pain_data["pain_points"]),
+                            pain_data.get("severity"),
+                        )
+
+                        # Keep existing pain_points array structure but enhance it
+                        existing_pain_points = metadata.get("pain_points", [])
+                        for new_pp in pain_data["pain_points"]:
+                            recurring_terms = new_pp.get("recurring_terms", [])
+                            if recurring_terms:  # Check if we have actual terms
+                                # Check if this pain point already exists to avoid duplicates
+                                existing_chunks = [pp.get("question", "") for pp in existing_pain_points]
+                                # Use the first recurring term or join them as the question identifier
+                                primary_term = recurring_terms[0] if recurring_terms else ""
+
+                                if primary_term not in existing_chunks:
+                                    existing_pain_points.append(
+                                        {
+                                            "question": primary_term,  # Store primary recurring term
+                                            "detected": True,
+                                            "similarity": 1.0,
+                                            "template_used": new_pp.get(
+                                                "template_used", "cognitive_behavioral_therapy"
+                                            ),
+                                            # Add temporal recurrence data
+                                            "occurrence_count": new_pp.get("occurrence_count", 1),
+                                            "severity": new_pp.get("severity", "low"),
+                                            "theme": new_pp.get("theme", "general_support"),
+                                            "recurring_terms": recurring_terms,  # Store all terms
+                                            "first_seen": new_pp.get("first_seen", 0),
+                                            "affected_interactions": new_pp.get("affected_interactions", []),
+                                        }
+                                    )
+
+                        # Update metadata with enhanced pain points
+                        metadata["pain_points"] = existing_pain_points
+                        metadata["has_pain_points"] = True
+                        metadata["pain_severity"] = pain_data.get("severity", "low")
+                        metadata["total_pain_points"] = len(existing_pain_points)
+
+                        # Add temporal analysis summary
+                        metadata["pain_analysis"] = {
+                            "total_detected": len(pain_data["pain_points"]),
+                            "overall_severity": pain_data.get("severity", "none"),
+                            "analysis_time_window": pain_data.get("analysis_time_window_days", 30),
+                            "total_interactions_analyzed": pain_data.get("total_interactions_analyzed", 0),
+                        }
+
+                        # Update the interaction with the new metadata containing pain points
+                        update_response = self.supabase.rpc(
+                            "update_interaction_metadata",
+                            {
+                                "p_schema_name": self.schema_name,
+                                "p_interaction_id": interaction_id,
+                                "p_metadata": metadata,
+                            },
+                        ).execute()
+
+                        # Add proper verification and logging
+                        if update_response.data is True:
+                            logger.info(
+                                "✅ Updated interaction %d with %d pain points (severity: %s)",
+                                interaction_id,
+                                len(existing_pain_points),
+                                pain_data.get("severity"),
+                            )
+
+                            # Log details of what was saved
+                            for i, pp in enumerate(existing_pain_points):
+                                chunk = pp.get("question", "")[:50]
+                                detected = pp.get("detected", False)
+                                similarity = pp.get("similarity", 0)
+                                logger.info(
+                                    "  Pain point %d: detected=%s, similarity=%.2f, chunk='%s...'",
+                                    i + 1,
+                                    detected,
+                                    similarity,
+                                    chunk,
+                                )
+                        else:
+                            logger.error(
+                                "❌ Failed to update interaction %d with pain point metadata. Response: %s",
+                                interaction_id,
+                                update_response.data,
+                            )
+
+                            # Try to understand why it failed
+                            if hasattr(update_response, "error") and update_response.error:
+                                logger.error("  Error details: %s", update_response.error)
+                    else:
+                        logger.debug("No pain points detected for session: %s", session_id)
+
+                except Exception as e:
+                    logger.error("Pain point detection failed, continuing: %s", e)
+                    # Continue with normal flow even if pain point detection fails
+
+            return {"success": True}
 
         except Exception as e:
             logger.error("Error adding interaction: %s", e)
@@ -301,15 +405,9 @@ class DatabaseManager:
             if isinstance(raw_metadata, dict):
                 metadata_dict = raw_metadata.copy()  # Use a copy to avoid modifying original
             elif isinstance(raw_metadata, str):
-                try:
-                    # Try loading if it's a valid JSON string
-                    metadata_dict = json.loads(raw_metadata)
-                    if not isinstance(metadata_dict, dict):  # Ensure it loaded as a dict
-                        logger.warning("Metadata string did not decode to a dictionary. Storing as raw.")
-                        metadata_dict = {"raw_metadata": raw_metadata}
-                except json.JSONDecodeError:
-                    # If it's not valid JSON, store the raw string under a key
-                    logger.warning("Metadata was a string but not valid JSON. Storing as raw.")
+                metadata_dict = json.loads(raw_metadata)
+                if not isinstance(metadata_dict, dict):  # Ensure it loaded as a dict
+                    logger.warning("Metadata string did not decode to a dictionary. Storing as raw.")
                     metadata_dict = {"raw_metadata": raw_metadata}
 
             # Add session_id to metadata if provided
@@ -502,8 +600,6 @@ class DatabaseManager:
             searches, use find_similar_documents_via_rpc instead.
         """
         try:
-            logger.info("Finding similar documents in schema: %s", self.schema_name)
-
             # Check if we have either query_text or embedding
             if embedding is None and query_text is None:
                 logger.error("Must provide either query_text or embedding for similarity search")
@@ -1793,7 +1889,7 @@ class DatabaseManager:
         metadata: Optional[Dict] = None,
         session_id: Optional[str] = None,
     ) -> bool:
-        """Save an interaction to the database with proper metadata handling."""
+        """Save interaction and detect pain points using existing PainPointDetector."""
         try:
             # Ensure schema exists
             logger.info("Ensuring schema exists for user: %s", self.user_id)
@@ -1867,8 +1963,40 @@ class DatabaseManager:
                         },
                     ).execute()
 
-                    if embed_response.data is True:
-                        logger.info("Embedding stored successfully for interaction %d", interaction_id)
+                if embed_response.data is True:
+                    logger.info("Embedding stored successfully for interaction %d", interaction_id)
+
+                    if session_id and len(question.strip()) > 10:
+                        try:
+                            logger.debug(
+                                "Detecting pain points for session: %s after saving interaction %d",
+                                session_id,
+                                interaction_id,
+                            )
+
+                            pain_result = self.detect_pain_points(
+                                session_id=session_id,
+                                threshold=0.5,
+                                min_occurrences=2,
+                                time_window_days=7,
+                            )
+
+                            if pain_result.get("pain_points"):
+                                logger.info(
+                                    "🎯 Pain points detected! Count: %d, Severity: %s",
+                                    len(pain_result["pain_points"]),
+                                    pain_result.get("severity"),
+                                )
+
+                                # Update the metadata with pain point results
+                                # self.pain_point_detector._update_interaction_with_pain_points(
+                                #     interaction_id, session_id, pain_result
+                                # )
+                            else:
+                                logger.debug("No pain points detected for session: %s", session_id)
+
+                        except Exception as e:
+                            logger.error("Pain point detection failed, continuing: %s", e)
                     else:
                         logger.warning("Embedding storage function returned: %s", embed_response.data)
                 else:
@@ -1908,703 +2036,123 @@ class DatabaseManager:
 
         return text
 
-    def detect_pain_points(self, session_id: str, threshold: float = 0.7, min_occurrences: int = 2) -> Dict:
-        """
-        Detect pain points from conversation history using vector similarity.
-
-        Args:
-            session_id: The session ID to analyse
-            threshold: Similarity threshold for clustering (0.0-1.0)
-            min_occurrences: Minimum number of occurrences to consider a pain point
-
-        Returns:
-            Dict with pain point information: {
-                'pain_points': List of pain point objects,
-                'severity': Overall severity assessment,
-                'first_detected_at': Index of first detection
-        }
-
-        """
+    def verify_schema_structure(self) -> bool:
+        """Verify that the schema has the correct structure."""
         try:
-            # Get conversation history
-            history = self.get_conversation_history(session_id)
-
-            if not history or len(history) < min_occurrences:
-                return {"pain_points": [], "severity": "none", "first_detected_at": None}
-
-            # Extract questions and convert to vectors
-            questions = [item.get("question", "") for item in history]
-
-            # Track clusters of similar questions
-            question_clusters: List[Dict[str, Any]] = []
-
-            # For each question, check if it forms a cluster with others
-            for primary_idx, question in enumerate(questions):
-                # Skip empty questions
-                if not question.strip():
-                    continue
-
-                # Get the vector for this question
-                primary_embedding = self.create_embedding(question)
-                if not primary_embedding:
-                    # Skip this question if embedding generation fails
-                    logger.warning(f"Failed to generate embedding for question at index {primary_idx}")
-                    continue
-
-                # Search for similar questions in the conversation
-                similar_indices = []
-
-                for compare_idx, other_question in enumerate(questions):
-                    if primary_idx == compare_idx:  # Skip comparing to self
-                        continue
-
-                    if not other_question.strip():
-                        continue
-
-                    # Generate embedding for comparing question
-                    compare_embedding = self.create_embedding(other_question)
-                    if not compare_embedding:
-                        continue
-
-                    # Use proper vector similarity via Supabase
-                    similar_items = self.find_similar_interactions_by_embedding(
-                        embedding=primary_embedding, session_id=session_id, limit=1, threshold=threshold
-                    )
-
-                    # Check if the compared question is returned as similar
-                    if similar_items and len(similar_items) > 0:
-                        # Extract the similarity score from the result
-                        similarity = similar_items[0].get("similarity", 0)
-
-                        if similarity > threshold:
-                            similar_indices.append(compare_idx)
-
-                # If we found enough similar questions, we have a cluster
-                if len(similar_indices) + 1 >= min_occurrences:  # +1 to include the current question
-                    cluster: Dict[str, Any] = {
-                        "indices": [primary_idx] + similar_indices,  # Type is List[int]
-                        "questions": [questions[primary_idx]] + [questions[s_i] for s_i in similar_indices],
-                        "recurring_terms": self._extract_recurring_terms(
-                            [questions[primary_idx]] + [questions[s_i] for s_i in similar_indices]
-                        ),
-                        "first_occurrence": min([primary_idx] + similar_indices),
-                        "count": len(similar_indices) + 1,
-                    }
-
-                    # Check if this cluster overlaps significantly with an existing one
-                    is_new_cluster = True
-                    for existing in question_clusters:
-                        # Explicitly get the lists - mypy should infer List[int] now
-                        cluster_indices: List[int] = cluster["indices"]
-                        existing_indices: List[int] = existing["indices"]
-
-                        # Create sets - mypy should be happy now
-                        overlap = len(set(cluster_indices).intersection(set(existing_indices)))
-
-                        # If more than 50% overlap, consider it the same cluster
-                        if overlap > len(cluster_indices) / 2:
-                            is_new_cluster = False
-                            break
-
-                    if is_new_cluster:
-                        question_clusters.append(cluster)
-
-            # Calculate overall pain point metrics
-            pain_points = sorted(question_clusters, key=lambda x: x["first_occurrence"])
-
-            # Determine severity based on cluster counts and sizes
-            total_questions = len(questions)
-            if not pain_points:
-                severity = "none"
-            elif sum(p["count"] for p in pain_points) > total_questions * 0.7:
-                severity = "high"
-            elif sum(p["count"] for p in pain_points) > total_questions * 0.4:
-                severity = "medium"
-            else:
-                severity = "low"
-
-            # Find the first detected pain point
-            first_detected_at = min(p["first_occurrence"] for p in pain_points) if pain_points else None
-
-            return {"pain_points": pain_points, "severity": severity, "first_detected_at": first_detected_at}
-
-        except Exception as e:
-            logger.error("Error detecting pain points: %s", e)
-            return {"pain_points": [], "severity": "none", "first_detected_at": None}
-
-    def _text_similarity(self, text1: str, text2: str) -> float:
-        """
-        Calculate simple text similarity for testing purposes.
-        In production, use actual vector embeddings.
-        """
-        # Simple word overlap calculation for testing
-        words1 = set(re.findall(r"\b\w+\b", text1.lower()))
-        words2 = set(re.findall(r"\b\w+\b", text2.lower()))
-
-        if not words1 or not words2:
-            return 0.0
-
-        overlap = len(words1.intersection(words2))
-        union = len(words1.union(words2))
-
-        return overlap / union if union > 0 else 0.0
-
-    def _extract_recurring_terms(self, texts: List[str]) -> List[str]:
-        """
-        Extract common terms from a set of texts that might indicate pain points.
-        """
-        from psy_supabase.utilities.stop_words import stop_words
-
-        # Combine all texts
-        combined = " ".join(texts)
-
-        # Extract words and count frequencies
-        words = re.findall(r"\b\w+\b", combined.lower())  # Ensure lowercase for consistency
-        word_counts: Dict[str, int] = {}
-
-        for word in words:
-            # Skip stop words and very short words
-            if len(word) <= 2 or word in stop_words:
-                continue
-            word_counts[word] = word_counts.get(word, 0) + 1
-
-        # Find words that appear in multiple texts
-        recurring_words = []
-        for word, count in word_counts.items():
-            # Word must appear multiple times and in multiple texts
-            if count >= 2 and sum(1 for text in texts if word in text.lower()) >= 2:
-                recurring_words.append(word)
-
-        # Sort by frequency
-        recurring_words.sort(key=lambda w: word_counts[w], reverse=True)
-
-        # Return top terms
-        return recurring_words[:5]  # Limit to top 5 terms
-
-    def get_recommended_therapeutic_approach(self, pain_point: Dict[Any, Any]) -> Dict[str, Any]:
-        """
-        Get a recommended therapeutic approach for a detected pain point
-        based on recurring terms and a predefined dictionary of approaches.
-
-        Args:
-            pain_point: Dictionary containing details of the detected pain point,
-                        including 'recurring_terms'.
-
-        Returns:
-            Dict: Dictionary with approach information (name, technique, strategy, questions).
-        """
-        try:
-            # Define the available approaches directly within the function
-            # Keys are lowercase trigger terms.
-            # 'name' should be a canonical approach name (often used by map_approach_to_template).
-            # 'primary_technique' is a short identifier for the core technique.
-            approaches = {
-                "anxiety": {
-                    "name": "cognitive_behavioral_therapy",
-                    "primary_technique": "cbt",
-                    "redirection_strategy": "Explore anxiety triggers, cognitive distortions, and develop coping mechanisms.",
-                    "exploration_questions": "What physical sensations do you notice when anxious? What thoughts typically accompany these feelings?",
-                },
-                "panic": {
-                    "name": "cognitive_behavioral_therapy",  # Or specific panic_control_treatment
-                    "primary_technique": "cbt",
-                    "redirection_strategy": "Psychoeducation about panic, identify catastrophic thoughts, and practice coping skills.",
-                    "exploration_questions": "What are your main fears when you experience panic? What has helped, even a little, in the past?",
-                },
-                "worried": {
-                    "name": "worry_management_cbt",
-                    "primary_technique": "cbt",
-                    "redirection_strategy": "Examine evidence for and against worries, differentiate productive vs. unproductive worry, and schedule 'worry time'.",
-                    "exploration_questions": "How likely is this worry to come true? What's the worst that could happen, and how would you cope if it did?",
-                },
-                "fear": {  # General fear, could be phobia related
-                    "name": "exposure_therapy",  # Or CBT if more general
-                    "primary_technique": "exposure",
-                    "redirection_strategy": "Gradual exposure to feared situations or stimuli, coupled with relaxation techniques.",
-                    "exploration_questions": "What specific situations or things trigger this fear? What do you typically do to avoid it?",
-                },
-                "depressed": {
-                    "name": "behavioral_activation_cbt",
-                    "primary_technique": "behavioral_activation",
-                    "redirection_strategy": "Identify and schedule pleasant or mastery-oriented activities to counteract withdrawal and improve mood.",
-                    "exploration_questions": "What activities used to bring you joy or a sense of accomplishment? What's one small step you could take towards re-engaging?",
-                },
-                "sad": {  # General sadness, might be less clinical than "depressed"
-                    "name": "supportive_listening_mood",  # Or behavioral_activation if persistent
-                    "primary_technique": "supportive_listening",
-                    "redirection_strategy": "Validate feelings of sadness, explore its context, and identify potential coping strategies.",
-                    "exploration_questions": "Can you tell me more about what's making you feel sad? What usually helps you when you feel this way?",
-                },
-                "hopeless": {
-                    "name": "cognitive_behavioral_therapy",  # Often linked with depression
-                    "primary_technique": "cbt",
-                    "redirection_strategy": "Challenge hopeless thoughts, identify exceptions, and build a sense of agency or hope.",
-                    "exploration_questions": "What makes you feel hopeless right now? Have there been times when you felt differently, even slightly?",
-                },
-                "trauma": {
-                    "name": "trauma_informed",
-                    "primary_technique": "trauma_informed",
-                    "redirection_strategy": "Prioritize safety, grounding, psychoeducation about trauma, and validate experiences.",
-                    "exploration_questions": "What helps you feel safe and grounded in this moment? How are these past experiences affecting you today?",
-                },
-                "ptsd": {
-                    "name": "trauma_informed",
-                    "primary_technique": "trauma_informed",
-                    "redirection_strategy": "Focus on managing PTSD symptoms like flashbacks and hyperarousal, using grounding and coping skills.",
-                    "exploration_questions": "Are there specific triggers for your PTSD symptoms? What coping strategies have you found helpful?",
-                },
-                "abuse": {
-                    "name": "trauma_informed",
-                    "primary_technique": "trauma_informed",
-                    "redirection_strategy": "Validate the experience of abuse, focus on safety, and explore its impact on current well-being.",
-                    "exploration_questions": "How has this experience of abuse impacted you? What does safety mean to you now?",
-                },
-                "grief": {
-                    "name": "grief_processing",
-                    "primary_technique": "grief_processing",
-                    "redirection_strategy": "Provide space for expressing grief, validate feelings, explore meaning-making and coping with the loss.",
-                    "exploration_questions": "What does this loss mean to you? What are some of the most challenging aspects of this grief right now?",
-                },
-                "loss": {
-                    "name": "grief_processing",
-                    "primary_technique": "grief_processing",
-                    "redirection_strategy": "Acknowledge the pain of loss, explore the different emotions involved, and support adaptation.",
-                    "exploration_questions": "How are you coping with this loss day-to-day? Are there any rituals or memories you find comforting?",
-                },
-                "relationship": {
-                    "name": "interpersonal_therapy",
-                    "primary_technique": "interpersonal",
-                    "redirection_strategy": "Explore patterns in relationships, communication styles, unmet needs, and role transitions.",
-                    "exploration_questions": "What are the recurring themes in your relationship conflicts? What are your needs and expectations in a relationship?",
-                },
-                "partner": {  # More specific than "relationship"
-                    "name": "interpersonal_therapy",
-                    "primary_technique": "interpersonal",
-                    "redirection_strategy": "Focus on the dynamics with the specific partner, communication, and shared goals or conflicts.",
-                    "exploration_questions": "Can you describe a recent interaction with your partner that was challenging? What would you like to be different in this relationship?",
-                },
-                "conflict": {  # General conflict
-                    "name": "problem_solving_therapy",  # Or interpersonal if relationship-focused
-                    "primary_technique": "problem_solving",
-                    "redirection_strategy": "Identify the core issues of the conflict, explore different perspectives, and brainstorm solutions.",
-                    "exploration_questions": "What is the main point of disagreement in this conflict? What outcomes are you hoping for?",
-                },
-                "alone": {
-                    "name": "attachment_based_therapy",
-                    "primary_technique": "attachment",
-                    "redirection_strategy": "Explore feelings of loneliness, attachment patterns, and fears of abandonment or disconnection.",
-                    "exploration_questions": "What does being alone bring up for you? Can you describe your typical patterns in close relationships?",
-                },
-                "lonely": {
-                    "name": "attachment_based_therapy",
-                    "primary_technique": "attachment",
-                    "redirection_strategy": "Validate feelings of loneliness and explore underlying needs for connection and belonging.",
-                    "exploration_questions": "In what situations do you feel most lonely? What kind of connections are you seeking?",
-                },
-                "failure": {
-                    "name": "compassion_focused_therapy",
-                    "primary_technique": "cft",
-                    "redirection_strategy": "Challenge self-critical thoughts related to perceived failure and cultivate self-compassion.",
-                    "exploration_questions": "How do you typically respond to yourself when you feel you've failed? What would a compassionate perspective be?",
-                },
-                "self-esteem": {
-                    "name": "compassion_focused_therapy",  # Or strengths_based
-                    "primary_technique": "cft",
-                    "redirection_strategy": "Identify and challenge negative self-beliefs, focus on strengths, and practice self-acceptance.",
-                    "exploration_questions": "What are some qualities you value in yourself? When do you feel most confident or capable?",
-                },
-                "worthless": {
-                    "name": "compassion_focused_therapy",
-                    "primary_technique": "cft",
-                    "redirection_strategy": "Address core beliefs of worthlessness with self-compassion and by examining evidence.",
-                    "exploration_questions": "Where do you think this feeling of worthlessness comes from? Can you think of times you've acted in line with your values despite these feelings?",
-                },
-                "guilt": {
-                    "name": "cognitive_behavioral_therapy_guilt",  # Or CFT
-                    "primary_technique": "cbt",
-                    "redirection_strategy": "Explore the source of guilt, differentiate appropriate vs. inappropriate guilt, and work towards self-forgiveness or making amends.",
-                    "exploration_questions": "What specific actions or inactions are you feeling guilty about? What are your values related to this situation?",
-                },
-                "shame": {
-                    "name": "compassion_focused_therapy",
-                    "primary_technique": "cft",
-                    "redirection_strategy": "Normalize shame as a human emotion, reduce self-criticism, and build shame resilience through self-compassion.",
-                    "exploration_questions": "Shame can be a very powerful emotion. How does it show up for you? What might help you meet this feeling with kindness?",
-                },
-                "stress": {
-                    "name": "mindfulness_based_stress_reduction",
-                    "primary_technique": "mindfulness",
-                    "redirection_strategy": "Identify stressors, develop mindfulness skills to manage stress, and increase awareness of present moment reactions.",
-                    "exploration_questions": "What are your main stressors currently? Have you explored mindfulness or relaxation techniques before?",
-                },
-                "overwhelmed": {
-                    "name": "problem_solving_therapy",  # Or mindfulness
-                    "primary_technique": "problem_solving",
-                    "redirection_strategy": "Break down overwhelming situations into manageable parts, prioritize, and brainstorm coping strategies.",
-                    "exploration_questions": "What specific things are contributing to this feeling of being overwhelmed? What's one small thing you could address first?",
-                },
-                "work": {  # General work-related stress
-                    "name": "workplace_stress_management",
-                    "primary_technique": "problem_solving",  # Or CBT
-                    "redirection_strategy": "Identify specific workplace challenges, explore coping strategies, problem-solving, or boundary setting.",
-                    "exploration_questions": "Can you describe the specific situations at work causing distress? What aspects are within your control to change or influence?",
-                },
-                "job": {  # Similar to "work"
-                    "name": "workplace_stress_management",
-                    "primary_technique": "problem_solving",
-                    "redirection_strategy": "Focus on job-specific stressors, career satisfaction, and work-life balance.",
-                    "exploration_questions": "What aspects of your job are most challenging right now? What would make your work life feel more manageable or fulfilling?",
-                },
-                "boss": {  # Specific to authority figures at work
-                    "name": "workplace_conflict_resolution",
-                    "primary_technique": "communication_skills",  # Or assertiveness training
-                    "redirection_strategy": "Explore dynamics with the boss, develop communication strategies, and address power imbalances if relevant.",
-                    "exploration_questions": "Can you describe a recent interaction with your boss that was difficult? What are your communication goals in these situations?",
-                },
-                "addiction": {
-                    "name": "motivational_interviewing",
-                    "primary_technique": "mi",
-                    "redirection_strategy": "Explore ambivalence about change, build motivation, support self-efficacy, and discuss harm reduction or recovery goals.",
-                    "exploration_questions": "What are some of the reasons you're considering a change regarding this? What does a positive change look like to you?",
-                },
-                "substance": {
-                    "name": "motivational_interviewing",
-                    "primary_technique": "mi",
-                    "redirection_strategy": "Non-judgmentally explore substance use patterns, motivations, and potential impacts on life goals.",
-                    "exploration_questions": "How does substance use fit into your life right now? What are your thoughts about its role?",
-                },
-                "craving": {
-                    "name": "relapse_prevention_cbt",
-                    "primary_technique": "cbt",
-                    "redirection_strategy": "Identify triggers for cravings, develop coping strategies, and create a relapse prevention plan.",
-                    "exploration_questions": "What situations or feelings usually lead to cravings? What strategies have helped you manage them in the past, or what new ones could you try?",
-                },
-                # Add more specific keywords and approaches as needed
-            }
-
-            # Default approach if no specific match is found
-            default_approach = {
-                "name": DEFAULT_APPROACH,
-                "primary_technique": "Person-Centered",
-                "redirection_strategy": "Reflect recurring theme and invite deeper exploration",
-                "exploration_questions": "I notice this theme comes up frequently. Could you share more about what this means to you?",
-            }
-
-            # Extract recurring terms from the pain point data
-            recurring_terms = pain_point.get("recurring_terms", [])
-            if not recurring_terms:
-                logger.warning("No recurring terms found in pain point data.")
-                return default_approach
-
-            # Find the first matching approach based on recurring terms
-            for term in recurring_terms:
-                term_lower = term.lower()
-                # Check for exact match or if term contains a key
-                for key, approach in approaches.items():
-                    if term_lower == key or key in term_lower:
-                        logger.info("Found matching approach '%s' for term '%s'", approach["name"], term)
-                        return approach  # Return the full approach dictionary
-
-            # If no specific match, return the default approach
-            logger.info("No specific approach found for terms: %s. Returning default.", recurring_terms)
-            return default_approach
-
-        except Exception as e:
-            logger.error("Error getting recommended therapeutic approach: %s", e)
-            # Return a safe default in case of any error
-            return {
-                "name": DEFAULT_TOPIC,
-                "primary_technique": "Person-Centered",
-                "redirection_strategy": "Provide empathetic reflection",
-                "exploration_questions": "Can you tell me more about your experience?",
-            }
-
-    def analyze_pain_points_over_time(self, session_id: str) -> List[Dict]:
-        """
-        Analyze how pain points evolve over therapy sessions.
-        """
-        try:
-            # Get conversation history filtered by session_id in metadata
-            history = self.get_conversation_history(session_id)
-
-            # Identify session boundaries
-            sessions = []
-            current_session: List[Dict[str, Any]] = []
-
-            for item in history:
-                metadata = {}
-                if isinstance(item.get("metadata"), str):
-                    try:
-                        metadata = json.loads(item.get("metadata", "{}"))
-                    except:
-                        metadata = {}
-                elif isinstance(item.get("metadata"), dict):
-                    metadata = item.get("metadata")
-
-                # Check for session start markers
-                if metadata.get("session_start"):
-                    if current_session:
-                        sessions.append(current_session)
-                    current_session = [item]
-                else:
-                    current_session.append(item)
-
-            # Add the last session if not empty
-            if current_session:
-                sessions.append(current_session)
-
-            # If no explicit sessions, create time-based sessions (weekly)
-            if not sessions:
-                # Sort by timestamp
-                try:
-                    history = sorted(history, key=lambda x: x.get("created_at", ""))
-
-                    # Group by approximate week
-                    week_ms = 7 * 24 * 60 * 60 * 1000  # One week in milliseconds
-                    current_week = None
-                    current_session = []
-
-                    for item in history:
-                        timestamp = item.get("created_at", "")
-                        if not timestamp:
-                            continue
-
-                        # Extract milliseconds from timestamp
-                        try:
-                            dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                            ms = int(dt.timestamp() * 1000)
-
-                            # Start a new week if needed
-                            if current_week is None:
-                                current_week = ms
-                                current_session = [item]
-                            elif ms - current_week > week_ms:
-                                sessions.append(current_session)
-                                current_session = [item]
-                                current_week = ms
-                            else:
-                                current_session.append(item)
-                        except:
-                            current_session.append(item)
-
-                    # Add the last session if not empty
-                    if current_session:
-                        sessions.append(current_session)
-                except:
-                    # If timestamp parsing fails, fall back to simple chunking
-                    chunk_size = max(len(history) // 3, 1)  # At least 3 chunks if possible
-                    sessions = [history[i : i + chunk_size] for i in range(0, len(history), chunk_size)]
-
-            # Analyze pain points in each session
-            results = []
-
-            for i, session in enumerate(sessions):
-                # Skip very small sessions
-                if len(session) < 2:
-                    continue
-
-                # Get session date from first message
-                session_date = session[0].get("created_at", "")
-
-                # Detect pain points in this session
-                session_pain_points = self.detect_pain_points(
-                    session_id,
-                    threshold=0.6,  # Lower threshold for smaller sample
-                    min_occurrences=max(min(len(session) // 3, 2), 1),  # Scale with session size
-                )
-
-                # Get primary themes from pain points
-                primary_themes = []
-                approach_types = []
-
-                for pp in session_pain_points.get("pain_points", []):
-                    # Get the primary theme term if available
-                    primary_theme = (
-                        pp.get("recurring_terms", ["unknown"])[0] if pp.get("recurring_terms") else "unknown"
-                    )
-                    primary_themes.append(primary_theme)
-
-                    # Map the theme to an approach type
-                    approach = map_theme_to_approach_type(primary_theme)
-                    approach_types.append(approach)
-
-                # Record pain point data with both themes and approach types
-                results.append(
-                    {
-                        "session_number": i + 1,
-                        "session_date": session_date,
-                        "pain_point_count": len(session_pain_points.get("pain_points", [])),
-                        "severity": session_pain_points.get("severity", "none"),
-                        "primary_themes": primary_themes,
-                        "approach_types": approach_types,
-                        "message_count": len(session),
-                    }
-                )
-
-            return results
-
-        except Exception as e:
-            logger.error("Error analysing pain points over time: %s", e)
-            return []
-
-    def get_emotional_signals(self, session_id: str) -> Dict[str, Any]:
-        """
-        Analyze emotional signals from user interactions in the current session.
-
-        Args:
-            session_id: The session ID to analyse
-
-        Returns:
-            Dictionary with emotional signals and their frequencies
-        """
-        try:
-            # Ensure session is valid
-            if not session_id:
-                return {"error": "No session ID provided"}
-
-            # Query to analyse emotional content across user messages
+            # Check if required tables exist
             query = f"""
-            WITH user_messages AS (
-                SELECT
-                    question as text,
-                    created_at
-                FROM
-                    {self.schema_name}.interactions
-                WHERE
-                    question IS NOT NULL AND question != ''
-                    AND metadata->>'session_id' = '{session_id}'
-                ORDER BY
-                    created_at DESC
-                LIMIT 10
-            ),
-            emotion_words AS (
-                SELECT word, category FROM (
-                    VALUES
-                    ('happy', 'joy'),
-                    ('joy', 'joy'),
-                    ('excited', 'joy'),
-                    ('pleased', 'joy'),
-                    ('sad', 'sadness'),
-                    ('unhappy', 'sadness'),
-                    ('depressed', 'sadness'),
-                    ('miserable', 'sadness'),
-                    ('angry', 'anger'),
-                    ('frustrated', 'anger'),
-                    ('annoyed', 'anger'),
-                    ('furious', 'anger'),
-                    ('anxious', 'anxiety'),
-                    ('worried', 'anxiety'),
-                    ('nervous', 'anxiety'),
-                    ('scared', 'anxiety'),
-                    ('confused', 'confusion'),
-                    ('uncertain', 'confusion'),
-                    ('lost', 'confusion'),
-                    ('hopeful', 'hope'),
-                    ('optimistic', 'hope'),
-                    ('grateful', 'gratitude'),
-                    ('thankful', 'gratitude'),
-                    ('lonely', 'loneliness'),
-                    ('alone', 'loneliness'),
-                    ('isolated', 'loneliness'),
-                    ('ashamed', 'shame'),
-                    ('embarrassed', 'shame'),
-                    ('guilty', 'guilt')
-                ) AS t(word, category)
-            ),
-            word_matches AS (
-                SELECT
-                    e.category,
-                    COUNT(*) as frequency
-                FROM
-                    user_messages m,
-                    emotion_words e
-                WHERE
-                    m.text ILIKE '%' || e.word || '%'
-                GROUP BY
-                    e.category
-                ORDER BY
-                    frequency DESC
-            )
-            SELECT
-                category,
-                frequency
-            FROM
-                word_matches
-            ORDER BY
-                frequency DESC
-            LIMIT 5;
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = '{self.schema_name}'
+                AND table_name = 'interactions'
+            ) as interactions_exists,
+            EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = '{self.schema_name}'
+                AND table_name = 'interaction_embeddings'
+            ) as embeddings_exists;
             """
 
-            # Execute the query
             response = self.supabase.rpc("sql", {"command": query}).execute()
 
-            if not response.data:
-                # No emotional signals detected
-                return {"signals": [], "primary_emotion": "neutral"}
+            if response.data and len(response.data) > 0:
+                result = response.data[0]
+                if isinstance(result, dict):
+                    return result.get("interactions_exists", False) and result.get("embeddings_exists", False)
 
-            # Format the results
-            signals = []
-            for item in response.data:
-                if isinstance(item, dict):
-                    signals.append(
-                        {"emotion": item.get("category", DEFAULT_EMOTION), "frequency": item.get("frequency", 0)}
-                    )
-                elif isinstance(item, str):
-                    parts = item.split(",")
-                    if len(parts) >= 2:
-                        signals.append({"emotion": parts[0], "frequency": int(parts[1]) if parts[1].isdigit() else 0})
-
-            # Determine primary emotion
-            primary_emotion = signals[0]["emotion"] if signals else DEFAULT_EMOTION
-
-            return {"signals": signals, "primary_emotion": primary_emotion}
-
-        except Exception as e:
-            logger.error("Error analysing emotional signals: %s", e)
-            return {"error": str(e), "signals": [], "primary_emotion": "neutral"}
-
-    def verify_schema_structure(self) -> bool:
-        """Verifies the structure of the user schema for proper table setup."""
-        try:
-            # Call the function to verify schema structure
-            response = self.supabase.rpc("verify_schema_structure", {"p_schema_name": self.schema_name}).execute()
-
-            # Check if all required tables exist and have correct column counts
-            if not response.data:
-                logger.error("No tables found in schema: %s", self.schema_name)
-                return False
-
-            all_valid = True
-            for table in response.data:
-                if not table.get("table_exists"):  # Changed from 'exists' to 'table_exists'
-                    logger.error("Missing table: %s", table.get("table_name"))
-                    all_valid = False
-                elif table.get("columns_found") != table.get("columns_expected"):
-                    logger.error(
-                        f"Table {table.get('table_name')} has {table.get('columns_found')} "
-                        + f"columns but expected {table.get('columns_expected')}"
-                    )
-                    all_valid = False
-
-            return all_valid
+            return False
 
         except Exception as e:
             logger.error("Error verifying schema structure: %s", e)
             return False
 
+    def detect_pain_points(
+        self, session_id: str, threshold: float = 0.7, min_occurrences: int = 2, time_window_days: int = 30
+    ) -> Dict:
+        """
+        Detect pain points based on TEMPORAL RECURRENCE patterns.
+        Delegates to the PainPointDetector module.
+        """
+        return self.pain_point_detector.detect_pain_points(session_id, threshold, min_occurrences, time_window_days)
+
+    def get_recommended_therapeutic_approach(
+        self, session_id: str, pain_point: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        """Get recommended therapeutic approach based on session analysis."""
+        try:
+            # Analyze themes in the session
+            themes = self.extract_psychological_themes(session_id, min_occurrences=1)
+
+            # If pain_point is provided, use its theme to boost relevance
+            if pain_point and isinstance(pain_point, dict):
+                pain_point_theme = pain_point.get("theme")
+                if pain_point_theme:
+                    # Boost the pain point theme in our analysis
+                    themes[pain_point_theme] = themes.get(pain_point_theme, 0) + 5
+
+            if not themes:
+                return {
+                    "approach": DEFAULT_APPROACH,
+                    "approach_type": "supportive_listening",
+                    "confidence": 0.5,
+                    "reasoning": "No specific themes detected",
+                }
+
+            # Get the most prominent theme
+            primary_theme = max(themes.items(), key=lambda x: x[1])[0]
+
+            # Map to therapeutic approach
+            approach = map_approach_name(primary_theme)
+            approach_type = map_theme_to_approach_type(primary_theme)
+
+            # If we have a pain point, include it in the reasoning
+            reasoning = f"Primary theme detected: {primary_theme}"
+            if pain_point:
+                reasoning += f" (influenced by detected pain point: {pain_point.get('question', 'N/A')})"
+
+            return {
+                "approach": approach,
+                "approach_type": approach_type,
+                "confidence": min(1.0, themes[primary_theme] / 5.0),  # Normalize confidence
+                "reasoning": reasoning,
+            }
+
+        except Exception as e:
+            logger.error("Error getting therapeutic approach: %s", e)
+            return {
+                "approach": DEFAULT_APPROACH,
+                "approach_type": "supportive_listening",
+                "confidence": 0.5,
+                "reasoning": "Error in analysis",
+            }
+
     def ensure_schema_exists(self) -> bool:
         """
-
-        Ensure the user schema exists and is properly set up.
+        Ensure that the required database schema exists for the current user.
+        Uses the existing Supabase function: ensure_schema_exists(schema_name TEXT)
 
         Returns:
-            bool: True if the schema exists, False otherwise.
-
+            bool: True if schema exists or was created successfully, False otherwise
         """
-        # Check if the schema already exists
-        response = self.supabase.rpc("ensure_schema_exists", {"schema_name": self.schema_name}).execute()
+        try:
+            logger.info("Ensuring schema exists for user: %s", self.user_id)
 
-        if response.data:
-            logger.info("Schema %s already exists.", self.schema_name)
-            return True
-        return False
+            response = self.supabase.rpc("ensure_schema_exists", {"schema_name": self.schema_name}).execute()
+
+            if response.error:
+                logger.error("Error calling ensure_schema_exists function: %s", response.error)
+                return False
+
+            # The function returns a boolean indicating success
+            schema_created = response.data
+
+            if schema_created:
+                logger.info("Schema %s ensured successfully", self.schema_name)
+                return True
+            else:
+                logger.error("Failed to ensure schema %s exists", self.schema_name)
+                return False
+
+        except Exception as e:
+            logger.error("Error ensuring schema exists: %s", e)
+            return False

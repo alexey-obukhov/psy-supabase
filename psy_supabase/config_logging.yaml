@@ -1,5 +1,6 @@
 # This is a configuration file for the psy_supabase application.
-log_dir: ./logs
+log_dir: ./logging
+log_format: "%(asctime)s - %(filename)s:%(lineno)d - %(name)s - [%(levelname)s] - %(message)s"
 default_level: debug
 rotation_size_mb: 5
 backup_count: 3

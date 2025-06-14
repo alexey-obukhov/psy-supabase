@@ -161,7 +161,6 @@ class TestRAGContextIntegration(DatabaseTestBase):
         if self.has_db_access:
             try:
                 # Delete test interactions by session ID
-                # This depends on your database structure and methods
                 if hasattr(self.db_manager, "delete_session_interactions"):
                     self.db_manager.delete_session_interactions(self.test_session_id)
                 self.logger.info(f"Cleaned up test session {self.test_session_id}")
@@ -322,9 +321,7 @@ class TestRAGContextIntegration(DatabaseTestBase):
 
             # Check the interaction was saved without using limit parameter
             if hasattr(self.db_manager, "get_conversation_history"):
-                # Modify this to match your actual method signature
                 try:
-                    # Try different approaches depending on your implementation
                     recent_interactions = self.db_manager.get_conversation_history(session_id)
 
                     # Check if we got any interactions

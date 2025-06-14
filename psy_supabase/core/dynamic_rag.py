@@ -455,17 +455,14 @@ class DynamicRAGRetriever:
             logger.warning("Cannot detect pain points without a session ID.")
             return {}
 
-        # Call database function to detect pain points
-        # Now self.session_id is guaranteed to be a str
         pain_point_data = self.db_manager.detect_pain_points(session_id=self.session_id)
-
-        # The test expects a specific format, so let's format it properly
         result = {}
 
         if pain_point_data:
             # Extract the pain point name from the recurring_terms if available
             if "pain_points" in pain_point_data and pain_point_data["pain_points"]:
-                recurring_terms = pain_point_data["pain_points"][0].get("recurring_terms", [])
+                first_pain_point = pain_point_data["pain_points"][0]
+                recurring_terms = first_pain_point.get("recurring_terms", [])
                 if recurring_terms:
                     result["pain_point"] = recurring_terms[0]
 
@@ -474,9 +471,12 @@ class DynamicRAGRetriever:
                 result["severity"] = pain_point_data["severity"]
 
             # Get recommended therapeutic approach
-            approach = self.db_manager.get_recommended_therapeutic_approach(pain_point=pain_point_data)
-            if approach:
-                result["approach"] = approach
+            if "pain_point" in result:
+                approach = self.db_manager.get_recommended_therapeutic_approach(
+                    session_id=self.session_id, pain_point=first_pain_point  # Use the defined variable
+                )
+                if approach:
+                    result["approach"] = approach
 
         return result
 
