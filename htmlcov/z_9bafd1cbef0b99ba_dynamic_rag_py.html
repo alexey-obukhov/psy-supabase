@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for psy_supabase/core/dynamic_rag.py: 44%</title>
+    <title>Coverage for psy_supabase/core/dynamic_rag.py: 45%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
-    <link rel="stylesheet" href="style_cb_8e611ae1.css" type="text/css">
+    <link rel="stylesheet" href="style_cb_81f8c14c.css" type="text/css">
     <script src="coverage_html_cb_6fb7b396.js" defer></script>
 </head>
 <body class="pyfile">
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>psy_supabase/core/dynamic_rag.py</b>:
-            <span class="pc_cov">44%</span>
+            <span class="pc_cov">45%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -54,8 +54,8 @@
             </div>
         </aside>
         <h2>
-            <span class="text">232 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">103<span class="text"> run</span></button>
+            <span class="text">234 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">105<span class="text"> run</span></button>
             <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">129<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
@@ -64,8 +64,8 @@
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a id="nextFileLink" class="nav" href="z_9bafd1cbef0b99ba_model_manager_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.8.2">coverage.py v7.8.2</a>,
-            created at 2025-05-28 22:09 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
+            created at 2025-06-14 21:39 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -537,28 +537,28 @@
     <p class="mis show_mis"><span class="n"><a id="t455" href="#t455">455</a></span><span class="t">            <span class="nam">logger</span><span class="op">.</span><span class="nam">warning</span><span class="op">(</span><span class="str">"Cannot detect pain points without a session ID."</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t456" href="#t456">456</a></span><span class="t">            <span class="key">return</span> <span class="op">{</span><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t457" href="#t457">457</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t458" href="#t458">458</a></span><span class="t">        <span class="com"># Call database function to detect pain points</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t459" href="#t459">459</a></span><span class="t">        <span class="com"># Now self.session_id is guaranteed to be a str</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t460" href="#t460">460</a></span><span class="t">        <span class="nam">pain_point_data</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">db_manager</span><span class="op">.</span><span class="nam">detect_pain_points</span><span class="op">(</span><span class="nam">session_id</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">session_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t461" href="#t461">461</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t462" href="#t462">462</a></span><span class="t">        <span class="com"># The test expects a specific format, so let's format it properly</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t463" href="#t463">463</a></span><span class="t">        <span class="nam">result</span> <span class="op">=</span> <span class="op">{</span><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t464" href="#t464">464</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t465" href="#t465">465</a></span><span class="t">        <span class="key">if</span> <span class="nam">pain_point_data</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t466" href="#t466">466</a></span><span class="t">            <span class="com"># Extract the pain point name from the recurring_terms if available</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t467" href="#t467">467</a></span><span class="t">            <span class="key">if</span> <span class="str">"pain_points"</span> <span class="key">in</span> <span class="nam">pain_point_data</span> <span class="key">and</span> <span class="nam">pain_point_data</span><span class="op">[</span><span class="str">"pain_points"</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t468" href="#t468">468</a></span><span class="t">                <span class="nam">recurring_terms</span> <span class="op">=</span> <span class="nam">pain_point_data</span><span class="op">[</span><span class="str">"pain_points"</span><span class="op">]</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">"recurring_terms"</span><span class="op">,</span> <span class="op">[</span><span class="op">]</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t469" href="#t469">469</a></span><span class="t">                <span class="key">if</span> <span class="nam">recurring_terms</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t470" href="#t470">470</a></span><span class="t">                    <span class="nam">result</span><span class="op">[</span><span class="str">"pain_point"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">recurring_terms</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t471" href="#t471">471</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t472" href="#t472">472</a></span><span class="t">            <span class="com"># Add severity if available</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t473" href="#t473">473</a></span><span class="t">            <span class="key">if</span> <span class="str">"severity"</span> <span class="key">in</span> <span class="nam">pain_point_data</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t474" href="#t474">474</a></span><span class="t">                <span class="nam">result</span><span class="op">[</span><span class="str">"severity"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">pain_point_data</span><span class="op">[</span><span class="str">"severity"</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t475" href="#t475">475</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t476" href="#t476">476</a></span><span class="t">            <span class="com"># Get recommended therapeutic approach</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t477" href="#t477">477</a></span><span class="t">            <span class="nam">approach</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">db_manager</span><span class="op">.</span><span class="nam">get_recommended_therapeutic_approach</span><span class="op">(</span><span class="nam">pain_point</span><span class="op">=</span><span class="nam">pain_point_data</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t478" href="#t478">478</a></span><span class="t">            <span class="key">if</span> <span class="nam">approach</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t479" href="#t479">479</a></span><span class="t">                <span class="nam">result</span><span class="op">[</span><span class="str">"approach"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">approach</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t458" href="#t458">458</a></span><span class="t">        <span class="nam">pain_point_data</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">db_manager</span><span class="op">.</span><span class="nam">detect_pain_points</span><span class="op">(</span><span class="nam">session_id</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">session_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t459" href="#t459">459</a></span><span class="t">        <span class="nam">result</span> <span class="op">=</span> <span class="op">{</span><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t460" href="#t460">460</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t461" href="#t461">461</a></span><span class="t">        <span class="key">if</span> <span class="nam">pain_point_data</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t462" href="#t462">462</a></span><span class="t">            <span class="com"># Extract the pain point name from the recurring_terms if available</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t463" href="#t463">463</a></span><span class="t">            <span class="key">if</span> <span class="str">"pain_points"</span> <span class="key">in</span> <span class="nam">pain_point_data</span> <span class="key">and</span> <span class="nam">pain_point_data</span><span class="op">[</span><span class="str">"pain_points"</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t464" href="#t464">464</a></span><span class="t">                <span class="nam">first_pain_point</span> <span class="op">=</span> <span class="nam">pain_point_data</span><span class="op">[</span><span class="str">"pain_points"</span><span class="op">]</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t465" href="#t465">465</a></span><span class="t">                <span class="nam">recurring_terms</span> <span class="op">=</span> <span class="nam">first_pain_point</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">"recurring_terms"</span><span class="op">,</span> <span class="op">[</span><span class="op">]</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t466" href="#t466">466</a></span><span class="t">                <span class="key">if</span> <span class="nam">recurring_terms</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t467" href="#t467">467</a></span><span class="t">                    <span class="nam">result</span><span class="op">[</span><span class="str">"pain_point"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">recurring_terms</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t468" href="#t468">468</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t469" href="#t469">469</a></span><span class="t">            <span class="com"># Add severity if available</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t470" href="#t470">470</a></span><span class="t">            <span class="key">if</span> <span class="str">"severity"</span> <span class="key">in</span> <span class="nam">pain_point_data</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t471" href="#t471">471</a></span><span class="t">                <span class="nam">result</span><span class="op">[</span><span class="str">"severity"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">pain_point_data</span><span class="op">[</span><span class="str">"severity"</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t472" href="#t472">472</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t473" href="#t473">473</a></span><span class="t">            <span class="com"># Get recommended therapeutic approach</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t474" href="#t474">474</a></span><span class="t">            <span class="key">if</span> <span class="str">"pain_point"</span> <span class="key">in</span> <span class="nam">result</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t475" href="#t475">475</a></span><span class="t">                <span class="nam">approach</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">db_manager</span><span class="op">.</span><span class="nam">get_recommended_therapeutic_approach</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t476" href="#t476">476</a></span><span class="t">                    <span class="nam">session_id</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">session_id</span><span class="op">,</span> <span class="nam">pain_point</span><span class="op">=</span><span class="nam">first_pain_point</span>  <span class="com"># Use the defined variable</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t477" href="#t477">477</a></span><span class="t">                <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t478" href="#t478">478</a></span><span class="t">                <span class="key">if</span> <span class="nam">approach</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t479" href="#t479">479</a></span><span class="t">                    <span class="nam">result</span><span class="op">[</span><span class="str">"approach"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">approach</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t480" href="#t480">480</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t481" href="#t481">481</a></span><span class="t">        <span class="key">return</span> <span class="nam">result</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t482" href="#t482">482</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -669,8 +669,8 @@
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a class="nav" href="z_9bafd1cbef0b99ba_model_manager_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.8.2">coverage.py v7.8.2</a>,
-            created at 2025-05-28 22:09 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
+            created at 2025-06-14 21:39 +0000
         </p>
     </div>
 </footer>
