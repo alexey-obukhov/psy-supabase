@@ -42,25 +42,29 @@ This innovation represents a significant step forward in therapeutic chatbots be
 
 My technical infrastructure has been enhanced with:
 
-1. **CustomLogger Integration**: Replaced standard logging with own colorful, more readable prismalog system
+1. **Vector Search needs to be adjusted**: Truncate each sentence into valuable pieces before indexing or querying. This improves retrieval accuracy and ensures the most relevant information is represented in the vector database.
 
-2. **Memory Optimization**: Added GPU memory management to gracefully handle CUDA out-of-memory scenarios with automatic CPU fallback
+2. **Custom Logger Integration [prismalog](https://pypi.org/project/prismalog/)**: Replaced standard logging with own colorful, more readable, fast prismalog system
 
-3. **Distributed Knowledge Management**: Implemented a system that can dynamically query the knowledge base mid-conversation when specific psychological topics arise
+3. **Memory Optimization**: Added GPU memory management to gracefully handle CUDA out-of-memory scenarios with automatic CPU fallback
 
-4. **Token-Based Prompt Management**: Added intelligent token counting and optimization to ensure prompts never exceed model context limits
+4. **Distributed Knowledge Management**: Implemented a system that can dynamically query the knowledge base mid-conversation when specific psychological topics arise
 
-5. **Smart Truncation**: Implemented priority-based truncation that preserves system instructions and user questions while reducing less essential content
+5. **Token-Based Prompt Management**: Added intelligent token counting and optimization to ensure prompts never exceed model context limits
 
-6. **Token Monitoring**: Added detailed logging of token counts to track model utilization and identify optimization opportunities
+6. **Smart Truncation**: Implemented priority-based truncation that preserves system instructions and user questions while reducing less essential content
+
+7. **Token Monitoring**: Added detailed logging of token counts to track model utilization and identify optimization opportunities
+
+8. **Add Full Customization** Integrate full customization via separate program and logging configuration files to tailor user interactions and system behavior based on individual needs and preferences.
 
 ## Next Steps
 
 Planned Enhancements
 
-1. **Vector Search needs to be adjusted**: Truncate each sentence into valuable pieces before indexing or querying. This improves retrieval accuracy and ensures the most relevant information is represented in the vector database.
+1. **Emotion Trajectory**: Track a client’s emotional changes over time.
 
-2. **Emotion Trajectory**: Track a client’s emotional changes over time.
+2. **AI Integration**: Integrate AI into the project as a 'knowledge database' to enhance response generation from user input on life, problems, and therapy expectations.
 
 ## Implementation Status
 
@@ -70,27 +74,19 @@ Planned Enhancements
 - ✅ Psychological topic extraction
 - ✅ Memory-efficient processing
 - ✅ Custom logging integration
+- ✅ Add Full Customization
 - ✅ Token-aware text generation
 - ✅ Smart prompt truncation
-- ✅ Enhanced PromptManager
+- ✅ Enhanced Prompt Manager
 - ✅ Token-efficient templates
 - ✅ Enhancing Vector Search by Segmenting Text into Meaningful Units
 - 📅 Integrating Emotional trajectory tracking (planned)
+- 📅 AI Integration (planned)
 
-By continuing to refine these capabilities, I'm building an AI therapeutic assistant that provides increasingly personalized, psychologically-informed support while maintaining operational efficiency.
+By continuing to refine these capabilities, I'm building an AI therapeutic assistant that provides increasingly personalized, psychologically-informed support while maintaining operational efficiency. Looking forward to collaborate with interested people.
 
 # psy-supabase
 
-This project uses the [rasyosef/Phi-1_5-Instruct-v0.1](https://huggingface.co/rasyosef/Phi-1_5-Instruct-v0.1) model.
-
 The code I have written for this project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
-This project also uses the following libraries:
-
-*   transformers
-*   langchain
-*   supabase
-*   python-dotenv
-*   ...
-
-*These libraries may have their own respective licenses.
+*Beaware, these project uses libraries which may have their own respective licenses.
