@@ -92,4 +92,5 @@ The code I have written for this project is licensed under the MIT License. See 
 Please refer to manual how to get required free supabase anon key and project url required by this program [Supabase Setup Manual](https://alexey-obukhov.github.io/supabase_login.html)
 
 *Beaware, these project uses libraries which may have their own respective licenses.
+
 *Disclaimer: This AI tool is **not** a replacement for professional therapy and should **not** be used as a substitute for qualified mental health care.
