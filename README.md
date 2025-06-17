@@ -14,9 +14,17 @@
 
 A psychological AI backend using Supabase for knowledge storage and retrieval.
 
+(https://github.com/alexey-obukhov/alexey-obukhov.github.io/blob/main/files/programm_illustration.png)
+
 # Pain Point Detection in AI Therapeutic Conversations
 
 By leveraging pgvector's capabilities, there was created a more psychologically-informed AI assistant that can identify recurring themes and potential areas of psychological distress.
+
+## Project Illustration
+
+<img src="https://github.com/alexey-obukhov/alexey-obukhov.github.io/raw/main/files/programm_illustration.png" alt="Brain Map Illustration" width="600">
+
+*Caption: A brain map illustrating how past events (eg. trauma, symbolized by a broken heart), strongly influences current behavior through highlighted neural pathways.*
 
 ## Recent Enhancements
 
