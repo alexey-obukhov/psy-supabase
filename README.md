@@ -16,7 +16,7 @@ A psychological AI backend using Supabase for knowledge storage and retrieval.
 
 # Pain Point Detection in AI Therapeutic Conversations
 
-By leveraging pgvector's capabilities, I'm creating a more psychologically-informed AI assistant that can identify recurring themes and potential areas of psychological distress.
+By leveraging pgvector's capabilities, there was created a more psychologically-informed AI assistant that can identify recurring themes and potential areas of psychological distress.
 
 ## Recent Enhancements
 
@@ -89,4 +89,7 @@ By continuing to refine these capabilities, I'm building an AI therapeutic assis
 
 The code I have written for this project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
+Please refer to manual how to get required free supabase anon key and project url required by this program [Supabase Setup Manual](https://alexey-obukhov.github.io/supabase_login.html)
+
 *Beaware, these project uses libraries which may have their own respective licenses.
+*Disclaimer: This AI tool is **not** a replacement for professional therapy and should **not** be used as a substitute for qualified mental health care.
