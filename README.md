@@ -14,8 +14,6 @@
 
 A psychological AI backend using Supabase for knowledge storage and retrieval.
 
-(https://github.com/alexey-obukhov/alexey-obukhov.github.io/blob/main/files/programm_illustration.png)
-
 # Pain Point Detection in AI Therapeutic Conversations
 
 By leveraging pgvector's capabilities, there was created a more psychologically-informed AI assistant that can identify recurring themes and potential areas of psychological distress.
