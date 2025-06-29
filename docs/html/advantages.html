@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advantages - Mindful Assistant</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1 class="site-title">Mindful Assistant</h1>
+      <nav class="site-nav">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="advantages.html" class="active">Advantages</a></li>
+          <li><a href="webchat.html">Chat</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <section class="page-banner">
+    <div class="container">
+      <h2>Advantages</h2>
+    </div>
+  </section>
+
+  <section class="advantage-categories">
+    <div class="container">
+      <div class="category-tabs">
+        <button class="tab-btn active" data-tab="all">All</button>
+        <button class="tab-btn" data-tab="technical">Technical</button>
+        <button class="tab-btn" data-tab="therapeutic">Therapeutic</button>
+        <button class="tab-btn" data-tab="privacy">Privacy</button>
+      </div>
+      
+      <div class="advantage-cards">
+        <div class="advantage-card" data-category="technical">
+          <div class="advantage-icon">💬</div>
+          <h3>Natural Language Processing</h3>
+          <p>Advanced NLP techniques to understand emotional nuances.</p>
+        </div>
+        
+        <div class="advantage-card" data-category="therapeutic">
+          <div class="advantage-icon">🧠</div>
+          <h3>Pain Point Detection</h3>
+          <p>Identifies recurring patterns in your conversations.</p>
+        </div>
+        
+        <div class="advantage-card" data-category="technical">
+          <div class="advantage-icon">📊</div>
+          <h3>Semantic Chunking</h3>
+          <p>Breaks down complex thoughts for more accurate analysis.</p>
+        </div>
+        
+        <div class="advantage-card" data-category="therapeutic">
+          <div class="advantage-icon">🔄</div>
+          <h3>Continuous Learning</h3>
+          <p>Adapts to your communication style over time.</p>
+        </div>
+        
+        <div class="advantage-card" data-category="privacy">
+          <div class="advantage-icon">🛡️</div>
+          <h3>Privacy-Centric</h3>
+          <p>Secure data storage with Supabase.</p>
+        </div>
+        
+        <div class="advantage-card" data-category="technical">
+          <div class="advantage-icon">⚡</div>
+          <h3>Real-Time Response</h3>
+          <p>Immediate feedback when you need support.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tech-highlights alt-bg">
+    <div class="container">
+      <div class="split-content">
+        <div class="tech-text">
+          <h2>Technical Innovations</h2>
+          <ul class="check-list">
+            <li><strong>Vector Embeddings:</strong> Understanding semantic similarity</li>
+            <li><strong>Context-Aware Responses:</strong> Maintaining conversation history</li>
+            <li><strong>Modular Architecture:</strong> Easily extensible system</li>
+            <li><strong>Cloudflare Integration:</strong> Fast global access</li>
+          </ul>
+        </div>
+        <div class="tech-visual">
+          <div class="code-snippet">
+            <pre><code>// Semantic chunking example
+chunks = model_based_chunk_question(question)
+embeddings = [create_embedding(chunk) for chunk in chunks]</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-banner">
+    <div class="container">
+      <h2>Experience the benefits yourself</h2>
+      <a href="webchat.html" class="btn btn-primary btn-with-image">
+        <img src="ai-chat-icon.png" alt="Chat" class="btn-icon">
+        <span>Try Mindful Assistant Now</span>
+      </a>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-info">
+          <h3>Mindful Assistant</h3>
+          <p>An open-source project built with Supabase and AI for accessible psychological support.</p>
+        </div>
+        <div class="footer-links">
+          <h4>Links</h4>
+          <ul>
+            <li><a href="https://github.com/alexey-obukhov/psy-supabase">GitHub</a></li>
+            <li><a href="advantages.html">Advantages</a></li>
+            <li><a href="webchat.html">Chat</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="copyright">
+        <p>&copy; 2025 Mindful Assistant</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

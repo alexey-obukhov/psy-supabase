@@ -427,19 +427,9 @@ jobs:
             cp -r site/temp3.10/htmlcov/* site/htmlcov/
           fi
 
-      - name: Create redirect index
+      - name: Copy custom starting web page
         run: |
-          cat > site/index.html << EOF
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta http-equiv="refresh" content="0; url='reports/html/index.html'" />
-          </head>
-          <body>
-            <p>Redirecting to <a href="reports/html/index.html">test reports</a>...</p>
-          </body>
-          </html>
-          EOF
+          cp -r docs/static/html/* site/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
