@@ -429,7 +429,7 @@ jobs:
 
       - name: Copy custom starting web page
         run: |
-          cp -r docs/static/html/* site/
+          cp -r docs/html/* site/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
