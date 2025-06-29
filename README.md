@@ -68,9 +68,20 @@ My technical infrastructure has been enhanced with:
 
 Planned Enhancements
 
-1. **Emotion Trajectory**: Track a client’s emotional changes over time.
+1. **Migrate to self-hosting Supabase**: Work in Progress. Already see how it is better, then using supabase.com: free account only has 2gib RAM vs own RAM. Was decided to use:
+CREATE POLICY "Users can access their own data"
+  ON your_table
+  FOR SELECT, INSERT, UPDATE, DELETE
+  USING (user_id = auth.uid());
+with singe schema instead of user=schema.
 
-2. **AI Integration**: Integrate AI into the project as a 'knowledge database' to enhance response generation from user input on life, problems, and therapy expectations.
+2. **Finish web-site**: www.psy-supabase is already live with Index, chat, supabase, etc. sections. Add logging using password.
+
+3. **Integrate vector search in chatbot**: The hipothese about "every thought is connected" was prove in one of the 'test_real_data' folder testing Script. Now need to integrate it to the Chat.
+
+4*. **Emotion Trajectory**: Track a client’s emotional changes over time.
+
+5*. **AI Integration**: Expand AI in the project with a 'knowledge database' to enhance response generation from user input on life, problems, and therapy expectations.
 
 ## Implementation Status
 
