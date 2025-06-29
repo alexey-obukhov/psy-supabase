@@ -75,7 +75,7 @@ CREATE POLICY "Users can access their own data"
   USING (user_id = auth.uid());
 with singe schema instead of user=schema.
 
-2. **Finish web-site**: www.psy-supabase is already live with Index, chat, supabase, etc. sections. Add logging using password.
+2. **Finish web-site**: www.psy-supabase.com is already live with Index, chat, supabase, etc. sections. Add logging using password.
 
 3. **Integrate vector search in chatbot**: The hipothese about "every thought is connected" was prove in one of the 'test_real_data' folder testing Script. Now need to integrate it to the Chat.
 
