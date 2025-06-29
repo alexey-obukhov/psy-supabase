@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for psy_supabase/core/response_generator.py: 78%</title>
+    <title>Coverage for psy_supabase/core/response_generator.py: 76%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
     <link rel="stylesheet" href="style_cb_81f8c14c.css" type="text/css">
     <script src="coverage_html_cb_6fb7b396.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>psy_supabase/core/response_generator.py</b>:
-            <span class="pc_cov">78%</span>
+            <span class="pc_cov">76%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,8 +55,8 @@
         </aside>
         <h2>
             <span class="text">229 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">179<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">50<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">175<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">54<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_9bafd1cbef0b99ba_text_generator_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-17 08:00 +0000
+            created at 2025-06-29 17:44 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -426,9 +426,9 @@
     <p class="mis show_mis"><span class="n"><a id="t344" href="#t344">344</a></span><span class="t">            <span class="nam">logger</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="str">f"Using topic as approach for template selection: {topic}"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t345" href="#t345">345</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t346" href="#t346">346</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">selected_template</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t347" href="#t347">347</a></span><span class="t">            <span class="nam">selected_template</span> <span class="op">=</span> <span class="nam">map_approach_to_template</span><span class="op">(</span><span class="key">None</span><span class="op">)</span>  <span class="com"># Should return "empathy_validation"</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t348" href="#t348">348</a></span><span class="t">            <span class="nam">template_selection_reason</span> <span class="op">=</span> <span class="str">"fallback:default"</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t349" href="#t349">349</a></span><span class="t">            <span class="nam">logger</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="str">f"Using default template after all selection paths failed: {selected_template}"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t347" href="#t347">347</a></span><span class="t">            <span class="nam">selected_template</span> <span class="op">=</span> <span class="nam">map_approach_to_template</span><span class="op">(</span><span class="key">None</span><span class="op">)</span>  <span class="com"># Should return "empathy_validation"</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t348" href="#t348">348</a></span><span class="t">            <span class="nam">template_selection_reason</span> <span class="op">=</span> <span class="str">"fallback:default"</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t349" href="#t349">349</a></span><span class="t">            <span class="nam">logger</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="str">f"Using default template after all selection paths failed: {selected_template}"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t350" href="#t350">350</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t351" href="#t351">351</a></span><span class="t">        <span class="com"># Store the template choice in the generation_context for later retrieval</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t352" href="#t352">352</a></span><span class="t">        <span class="key">if</span> <span class="str">"metadata"</span> <span class="key">not</span> <span class="key">in</span> <span class="nam">generation_context</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -564,7 +564,7 @@
     <p class="pln"><span class="n"><a id="t482" href="#t482">482</a></span><span class="t">            <span class="com"># Convert to proper type for map_approach_to_template</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t483" href="#t483">483</a></span><span class="t">            <span class="nam">approach_type</span><span class="op">:</span> <span class="nam">Optional</span><span class="op">[</span><span class="nam">str</span><span class="op">]</span> <span class="op">=</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t484" href="#t484">484</a></span><span class="t">            <span class="key">if</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">approach_type_raw</span><span class="op">,</span> <span class="op">(</span><span class="nam">list</span><span class="op">,</span> <span class="nam">tuple</span><span class="op">)</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t485" href="#t485">485</a></span><span class="t">                <span class="nam">approach_type</span> <span class="op">=</span> <span class="nam">approach_type_raw</span><span class="op">[</span><span class="num">0</span><span class="op">]</span> <span class="key">if</span> <span class="nam">approach_type_raw</span> <span class="key">else</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t485" href="#t485">485</a></span><span class="t">                <span class="nam">approach_type</span> <span class="op">=</span> <span class="nam">approach_type_raw</span><span class="op">[</span><span class="num">0</span><span class="op">]</span> <span class="key">if</span> <span class="nam">approach_type_raw</span> <span class="key">else</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t486" href="#t486">486</a></span><span class="t">            <span class="key">elif</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">approach_type_raw</span><span class="op">,</span> <span class="nam">str</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t487" href="#t487">487</a></span><span class="t">                <span class="nam">approach_type</span> <span class="op">=</span> <span class="nam">approach_type_raw</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t488" href="#t488">488</a></span><span class="t">            <span class="key">else</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -640,7 +640,7 @@
             <a class="nav" href="z_9bafd1cbef0b99ba_text_generator_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-17 08:00 +0000
+            created at 2025-06-29 17:44 +0000
         </p>
     </div>
 </footer>

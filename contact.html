@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact - Mindful Assistant</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1 class="site-title">Mindful Assistant</h1>
+      <nav class="site-nav">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="advantages.html">Advantages</a></li>
+          <li><a href="webchat.html">Chat</a></li>
+          <li><a href="contact.html" class="active">Contact</a></li>
+        </ul>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <section class="page-banner mini">
+    <div class="container">
+      <h2>Contact Us</h2>
+    </div>
+  </section>
+
+  <section class="contact-section">
+    <div class="container">
+      <div class="contact-grid">
+        <div class="contact-form-container">
+          <h3>Send a Message</h3>
+          <form id="contact-form" class="contact-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="subject">Subject</label>
+              <input type="text" id="subject" name="subject" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="message">Message</label>
+              <textarea id="message" name="message" rows="4" required></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Send Message</button>
+          </form>
+        </div>
+
+        <div class="contact-info">
+          <div class="contact-methods">
+            <div class="contact-method">
+              <div class="contact-icon">📧</div>
+              <div class="contact-details">
+                <h4>Email</h4>
+                <p><a href="mailto:info@psy-supabase.com">info@psy-supabase.com</a></p>
+              </div>
+            </div>
+            
+            <div class="contact-method">
+              <div class="contact-icon">💻</div>
+              <div class="contact-details">
+                <h4>GitHub</h4>
+                <p><a href="https://github.com/alexey-obukhov/psy-supabase" target="_blank">github.com/alexey-obukhov/psy-supabase</a></p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="contribute-box">
+            <h3>Contribute</h3>
+            <p>Mindful Assistant is open-source. We welcome contributions from developers, psychologists, and anyone interested in mental wellness technology.</p>
+            <a href="https://github.com/alexey-obukhov/psy-supabase" class="btn btn-outline" target="_blank">View on GitHub</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-info">
+          <h3>Mindful Assistant</h3>
+          <p>An open-source project built with Supabase and AI for accessible psychological support.</p>
+        </div>
+        <div class="footer-links">
+          <h4>Links</h4>
+          <ul>
+            <li><a href="https://github.com/alexey-obukhov/psy-supabase">GitHub</a></li>
+            <li><a href="advantages.html">Advantages</a></li>
+            <li><a href="webchat.html">Chat</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="copyright">
+        <p>&copy; 2025 Mindful Assistant</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

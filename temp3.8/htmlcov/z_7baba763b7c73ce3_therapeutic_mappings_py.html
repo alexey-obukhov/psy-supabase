@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for psy_supabase/utilities/therapeutic_mappings.py: 80%</title>
+    <title>Coverage for psy_supabase/utilities/therapeutic_mappings.py: 78%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
     <link rel="stylesheet" href="style_cb_8e611ae1.css" type="text/css">
     <script src="coverage_html_cb_6fb7b396.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>psy_supabase/utilities/therapeutic_mappings.py</b>:
-            <span class="pc_cov">80%</span>
+            <span class="pc_cov">78%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,8 +55,8 @@
         </aside>
         <h2>
             <span class="text">166 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">133<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">33<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">130<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">36<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_7baba763b7c73ce3_utils_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.6.1">coverage.py v7.6.1</a>,
-            created at 2025-06-17 07:58 +0000
+            created at 2025-06-29 17:47 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -2611,14 +2611,14 @@
     <p class="pln"><span class="n"><a id="t2529" href="#t2529">2529</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t2530" href="#t2530">2530</a></span><span class="t">        <span class="nam">theme_data</span> <span class="op">=</span> <span class="nam">cls</span><span class="op">.</span><span class="nam">THERAPEUTIC_THEMES</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="nam">theme_lower</span><span class="op">,</span> <span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t2531" href="#t2531">2531</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">theme_data</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t2532" href="#t2532">2532</a></span><span class="t">            <span class="nam">logger</span><span class="op">.</span><span class="nam">warning</span><span class="op">(</span><span class="str">f"Theme '{theme_lower}' not found in THERAPEUTIC_THEMES. Defaulting approach."</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t2532" href="#t2532">2532</a></span><span class="t">            <span class="nam">logger</span><span class="op">.</span><span class="nam">warning</span><span class="op">(</span><span class="str">f"Theme '{theme_lower}' not found in THERAPEUTIC_THEMES. Defaulting approach."</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t2533" href="#t2533">2533</a></span><span class="t">            <span class="com"># Fallback: Check if the input theme is directly an approach itself</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t2534" href="#t2534">2534</a></span><span class="t">            <span class="key">if</span> <span class="nam">theme_lower</span> <span class="key">in</span> <span class="nam">cls</span><span class="op">.</span><span class="nam">APPROACH_TO_TEMPLATE</span> <span class="key">or</span> <span class="nam">any</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t2534" href="#t2534">2534</a></span><span class="t">            <span class="key">if</span> <span class="nam">theme_lower</span> <span class="key">in</span> <span class="nam">cls</span><span class="op">.</span><span class="nam">APPROACH_TO_TEMPLATE</span> <span class="key">or</span> <span class="nam">any</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t2535" href="#t2535">2535</a></span><span class="t">                <span class="nam">theme_lower</span> <span class="op">==</span> <span class="nam">key</span><span class="op">.</span><span class="nam">lower</span><span class="op">(</span><span class="op">)</span> <span class="key">for</span> <span class="nam">key</span> <span class="key">in</span> <span class="nam">cls</span><span class="op">.</span><span class="nam">APPROACH_TO_TEMPLATE</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t2536" href="#t2536">2536</a></span><span class="t">            <span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t2537" href="#t2537">2537</a></span><span class="t">                <span class="nam">logger</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span><span class="str">f"Theme '{theme_lower}' matches a direct approach. Returning it."</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t2538" href="#t2538">2538</a></span><span class="t">                <span class="key">return</span> <span class="nam">theme_lower</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t2539" href="#t2539">2539</a></span><span class="t">            <span class="key">return</span> <span class="str">"supportive_listening"</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t2539" href="#t2539">2539</a></span><span class="t">            <span class="key">return</span> <span class="str">"supportive_listening"</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t2540" href="#t2540">2540</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t2541" href="#t2541">2541</a></span><span class="t">        <span class="nam">approaches</span> <span class="op">=</span> <span class="nam">theme_data</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">"approaches"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t2542" href="#t2542">2542</a></span><span class="t">        <span class="key">if</span> <span class="nam">approaches</span> <span class="key">and</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">approaches</span><span class="op">,</span> <span class="nam">list</span><span class="op">)</span> <span class="key">and</span> <span class="nam">len</span><span class="op">(</span><span class="nam">approaches</span><span class="op">)</span> <span class="op">></span> <span class="num">0</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -2859,7 +2859,7 @@
             <a class="nav" href="z_7baba763b7c73ce3_utils_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.6.1">coverage.py v7.6.1</a>,
-            created at 2025-06-17 07:58 +0000
+            created at 2025-06-29 17:47 +0000
         </p>
     </div>
 </footer>

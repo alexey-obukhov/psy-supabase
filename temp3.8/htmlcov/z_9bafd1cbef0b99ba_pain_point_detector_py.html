@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for psy_supabase/core/pain_point_detector.py: 54%</title>
+    <title>Coverage for psy_supabase/core/pain_point_detector.py: 52%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
     <link rel="stylesheet" href="style_cb_8e611ae1.css" type="text/css">
     <script src="coverage_html_cb_6fb7b396.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>psy_supabase/core/pain_point_detector.py</b>:
-            <span class="pc_cov">54%</span>
+            <span class="pc_cov">52%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,8 +55,8 @@
         </aside>
         <h2>
             <span class="text">523 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">283<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">240<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">272<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">251<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_9bafd1cbef0b99ba_rag_processor_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.6.1">coverage.py v7.6.1</a>,
-            created at 2025-06-17 07:58 +0000
+            created at 2025-06-29 17:47 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -519,13 +519,13 @@
     <p class="run"><span class="n"><a id="t437" href="#t437">437</a></span><span class="t">                            <span class="key">return</span> <span class="nam">float</span><span class="op">(</span><span class="nam">sim</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t438" href="#t438">438</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t439" href="#t439">439</a></span><span class="t">            <span class="com"># Log only best match if configured</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t440" href="#t440">440</a></span><span class="t">            <span class="nam">log_best</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">chunking_config</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">"log_only_best_matches"</span><span class="op">,</span> <span class="key">True</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t441" href="#t441">441</a></span><span class="t">            <span class="key">if</span> <span class="op">(</span><span class="nam">isinstance</span><span class="op">(</span><span class="nam">log_best</span><span class="op">,</span> <span class="nam">bool</span><span class="op">)</span> <span class="key">and</span> <span class="nam">log_best</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t440" href="#t440">440</a></span><span class="t">            <span class="nam">log_best</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">chunking_config</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">"log_only_best_matches"</span><span class="op">,</span> <span class="key">True</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t441" href="#t441">441</a></span><span class="t">            <span class="key">if</span> <span class="op">(</span><span class="nam">isinstance</span><span class="op">(</span><span class="nam">log_best</span><span class="op">,</span> <span class="nam">bool</span><span class="op">)</span> <span class="key">and</span> <span class="nam">log_best</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t442" href="#t442">442</a></span><span class="t">                <span class="key">and</span> <span class="nam">best_match</span> <span class="key">and</span> <span class="nam">max_sim</span> <span class="op">></span> <span class="num">0.8</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t443" href="#t443">443</a></span><span class="t">                <span class="nam">logger</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span><span class="str">"Best similarity: '%s' vs '%s' = %s"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t443" href="#t443">443</a></span><span class="t">                <span class="nam">logger</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span><span class="str">"Best similarity: '%s' vs '%s' = %s"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t444" href="#t444">444</a></span><span class="t">                             <span class="nam">best_match</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">,</span> <span class="nam">best_match</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">,</span> <span class="nam">max_sim</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t445" href="#t445">445</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t446" href="#t446">446</a></span><span class="t">            <span class="key">return</span> <span class="nam">float</span><span class="op">(</span><span class="nam">max_sim</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t446" href="#t446">446</a></span><span class="t">            <span class="key">return</span> <span class="nam">float</span><span class="op">(</span><span class="nam">max_sim</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t447" href="#t447">447</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t448" href="#t448">448</a></span><span class="t">        <span class="key">except</span> <span class="nam">Exception</span> <span class="key">as</span> <span class="nam">e</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t449" href="#t449">449</a></span><span class="t">            <span class="nam">logger</span><span class="op">.</span><span class="nam">error</span><span class="op">(</span><span class="str">"Error in sentence transformer similarity: %s"</span><span class="op">,</span> <span class="nam">e</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -652,7 +652,7 @@
     <p class="run"><span class="n"><a id="t570" href="#t570">570</a></span><span class="t">                <span class="key">if</span> <span class="nam">group_start</span> <span class="key">and</span> <span class="nam">group_end</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t571" href="#t571">571</a></span><span class="t">                    <span class="com"># Simple comparison</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t572" href="#t572">572</a></span><span class="t">                    <span class="key">if</span> <span class="nam">group_start</span> <span class="op">&lt;=</span> <span class="nam">interaction_time</span> <span class="op">&lt;=</span> <span class="nam">group_end</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t573" href="#t573">573</a></span><span class="t">                        <span class="key">return</span> <span class="nam">group</span><span class="op">[</span><span class="str">"group_id"</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t573" href="#t573">573</a></span><span class="t">                        <span class="key">return</span> <span class="nam">group</span><span class="op">[</span><span class="str">"group_id"</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t574" href="#t574">574</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t575" href="#t575">575</a></span><span class="t">            <span class="key">return</span> <span class="nam">len</span><span class="op">(</span><span class="nam">temporal_groups</span><span class="op">)</span>  <span class="com"># New group</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t576" href="#t576">576</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -1068,19 +1068,19 @@
     <p class="pln"><span class="n"><a id="t986" href="#t986">986</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t987" href="#t987">987</a></span><span class="t">            <span class="com"># Format 2: ISO with +00:00 timezone</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t988" href="#t988">988</a></span><span class="t">            <span class="key">if</span> <span class="str">'+00:00'</span> <span class="key">in</span> <span class="nam">clean_timestamp</span> <span class="key">or</span> <span class="str">'-00:00'</span> <span class="key">in</span> <span class="nam">clean_timestamp</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t989" href="#t989">989</a></span><span class="t">                <span class="key">return</span> <span class="nam">datetime</span><span class="op">.</span><span class="nam">fromisoformat</span><span class="op">(</span><span class="nam">clean_timestamp</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t989" href="#t989">989</a></span><span class="t">                <span class="key">return</span> <span class="nam">datetime</span><span class="op">.</span><span class="nam">fromisoformat</span><span class="op">(</span><span class="nam">clean_timestamp</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t990" href="#t990">990</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t991" href="#t991">991</a></span><span class="t">            <span class="com"># Format 3: ISO without timezone</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t992" href="#t992">992</a></span><span class="t">            <span class="key">if</span> <span class="str">'T'</span> <span class="key">in</span> <span class="nam">clean_timestamp</span> <span class="key">and</span> <span class="key">not</span> <span class="nam">clean_timestamp</span><span class="op">.</span><span class="nam">endswith</span><span class="op">(</span><span class="op">(</span><span class="str">'Z'</span><span class="op">,</span> <span class="str">'+00:00'</span><span class="op">,</span> <span class="str">'-00:00'</span><span class="op">)</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t993" href="#t993">993</a></span><span class="t">                <span class="com"># Handle microseconds - pad to 6 digits or add if missing</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t994" href="#t994">994</a></span><span class="t">                <span class="key">if</span> <span class="str">'.'</span> <span class="key">in</span> <span class="nam">clean_timestamp</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t995" href="#t995">995</a></span><span class="t">                    <span class="nam">base_part</span><span class="op">,</span> <span class="nam">micro_part</span> <span class="op">=</span> <span class="nam">clean_timestamp</span><span class="op">.</span><span class="nam">rsplit</span><span class="op">(</span><span class="str">'.'</span><span class="op">,</span> <span class="num">1</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t995" href="#t995">995</a></span><span class="t">                    <span class="nam">base_part</span><span class="op">,</span> <span class="nam">micro_part</span> <span class="op">=</span> <span class="nam">clean_timestamp</span><span class="op">.</span><span class="nam">rsplit</span><span class="op">(</span><span class="str">'.'</span><span class="op">,</span> <span class="num">1</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t996" href="#t996">996</a></span><span class="t">                    <span class="com"># Pad microseconds to 6 digits</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t997" href="#t997">997</a></span><span class="t">                    <span class="key">if</span> <span class="nam">len</span><span class="op">(</span><span class="nam">micro_part</span><span class="op">)</span> <span class="op">&lt;</span> <span class="num">6</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t998" href="#t998">998</a></span><span class="t">                        <span class="nam">micro_part</span> <span class="op">=</span> <span class="nam">micro_part</span><span class="op">.</span><span class="nam">ljust</span><span class="op">(</span><span class="num">6</span><span class="op">,</span> <span class="str">'0'</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t999" href="#t999">999</a></span><span class="t">                    <span class="key">elif</span> <span class="nam">len</span><span class="op">(</span><span class="nam">micro_part</span><span class="op">)</span> <span class="op">></span> <span class="num">6</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t997" href="#t997">997</a></span><span class="t">                    <span class="key">if</span> <span class="nam">len</span><span class="op">(</span><span class="nam">micro_part</span><span class="op">)</span> <span class="op">&lt;</span> <span class="num">6</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t998" href="#t998">998</a></span><span class="t">                        <span class="nam">micro_part</span> <span class="op">=</span> <span class="nam">micro_part</span><span class="op">.</span><span class="nam">ljust</span><span class="op">(</span><span class="num">6</span><span class="op">,</span> <span class="str">'0'</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t999" href="#t999">999</a></span><span class="t">                    <span class="key">elif</span> <span class="nam">len</span><span class="op">(</span><span class="nam">micro_part</span><span class="op">)</span> <span class="op">></span> <span class="num">6</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t1000" href="#t1000">1000</a></span><span class="t">                        <span class="nam">micro_part</span> <span class="op">=</span> <span class="nam">micro_part</span><span class="op">[</span><span class="op">:</span><span class="num">6</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t1001" href="#t1001">1001</a></span><span class="t">                    <span class="nam">normalized_timestamp</span> <span class="op">=</span> <span class="str">f"{base_part}.{micro_part}+00:00"</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t1001" href="#t1001">1001</a></span><span class="t">                    <span class="nam">normalized_timestamp</span> <span class="op">=</span> <span class="str">f"{base_part}.{micro_part}+00:00"</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1002" href="#t1002">1002</a></span><span class="t">                <span class="key">else</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1003" href="#t1003">1003</a></span><span class="t">                    <span class="nam">normalized_timestamp</span> <span class="op">=</span> <span class="nam">clean_timestamp</span> <span class="op">+</span> <span class="str">"+00:00"</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1004" href="#t1004">1004</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -1120,7 +1120,7 @@
             <a class="nav" href="z_9bafd1cbef0b99ba_rag_processor_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.6.1">coverage.py v7.6.1</a>,
-            created at 2025-06-17 07:58 +0000
+            created at 2025-06-29 17:47 +0000
         </p>
     </div>
 </footer>

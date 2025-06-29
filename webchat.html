@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat - Mindful Assistant</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
+</head>
+<body class="chat-page">
+  <header class="site-header">
+    <div class="container">
+      <h1 class="site-title">Mindful Assistant</h1>
+      <nav class="site-nav">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="advantages.html">Advantages</a></li>
+          <li><a href="webchat.html" class="active">Chat</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <section class="chat-container">
+    <div class="container flex-layout">
+      <div class="chat-main">
+        <div class="chat-interface">
+          <div id="chat-log" class="chat-log">
+            <div class="message bot-message">
+              <div class="message-bubble">
+                <p>Hello. I'm your Mindful Assistant. How can I support you today?</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="processing-indicator" class="message bot-message" style="display: none;">
+            <div class="message-bubble">
+              <div class="thinking-animation">
+                <svg width="50" height="20" viewBox="0 0 50 20" xmlns="http://www.w3.org/2000/svg">
+                  <path id="brainwave" d="M 0 10 C 5 10, 5 2, 10 2 S 15 18, 20 10 S 25 2, 30 10 S 35 18, 40 10 S 45 2, 50 10" stroke="var(--color-accent-calm)" fill="none" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <form id="chat-form" class="chat-form">
+            <input type="text" id="username" name="username" placeholder="Session name" required>
+            <div class="message-input-container">
+              <textarea id="question" name="question" rows="1" placeholder="Share your thoughts here..." required></textarea>
+              <button type="submit" id="send-button" aria-label="Send Message">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <div class="chat-sidebar">
+        <div class="help-panel">
+          <h3>How to Get Started</h3>
+          <ul class="quick-tips">
+            <li>Be specific about your feelings</li>
+            <li>Ask clarifying questions</li>
+            <li>Try to describe thoughts in detail</li>
+            <li>For acute crisis, seek professional help</li>
+          </ul>
+        </div>
+        
+        <div class="info-panel">
+          <h4>About This Chat</h4>
+          <p>Mindful Assistant uses AI to provide supportive responses based on psychological principles. All conversations are private and secure.</p>
+          <p><a href="advantages.html">Learn more about how it works</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer compact">
+    <div class="container">
+      <div class="footer-minimal">
+        <div class="copyright">
+          <p>&copy; 2025 Mindful Assistant | <a href="https://github.com/alexey-obukhov/psy-supabase">GitHub</a></p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
