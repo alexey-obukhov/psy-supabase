@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Welcome - Supabase Auth Example</title>
+  <style>
+    body { font-family: sans-serif; background: #f4f4f4; }
+    .container { max-width: 400px; margin: 60px auto; padding: 2em; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #ccc; }
+    h2 { text-align: center; }
+    label { display: block; margin-top: 1em; }
+    input { width: 100%; padding: 0.5em; margin-top: 0.5em; }
+    button { width: 100%; padding: 0.7em; margin-top: 1.5em; }
+    .toggle { text-align: center; margin-top: 1em; cursor: pointer; color: #0070f3; }
+    .message { margin-top: 1em; text-align: center; color: #b00; }
+    .success { color: green; }
+    .loading { color: #555; }
+  </style>
+  <!-- Supabase UMD build -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.42.7/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <!-- ... HTML content ... -->
+  <div class="container">
+    <h2 id="form-title">Welcome</h2>
+    <form id="auth-form">
+      <label>Email
+        <input type="email" id="email" required autocomplete="username">
+      </label>
+      <label>Password
+        <input type="password" id="password" required autocomplete="current-password">
+      </label>
+      <label id="username-label" style="display:none;">Username
+        <input type="text" id="username" autocomplete="username">
+      </label>
+      <button type="submit" id="submit-btn">Log In</button>
+    </form>
+    <div class="toggle" id="toggle-form">Don't have an account? Create one</div>
+    <div class="message" id="message"></div>
+  </div>
+  <script>
+    // Wait for the DOM and Supabase library to be ready
+    document.addEventListener('DOMContentLoaded', function () {
+      // Initialize Supabase client using the global 'supabase' object
+      const supabaseUrl = 'https://supabase.psy-supabase.com'; // self-hosted URL
+      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmY2Rpbmp4and6Y2R4Z3Z4bHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYzMzc3MTYsImV4cCI6MjA1MTkxMzcxNn0.n22JvFNTRvKZnKDl7YGGXjc9Y6HaRcaap9pM-N2eZrs'; // anon/public key
+      const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+      let isLogin = true;
+
+      const formTitle = document.getElementById('form-title');
+      const authForm = document.getElementById('auth-form');
+      const submitBtn = document.getElementById('submit-btn');
+      const toggleForm = document.getElementById('toggle-form');
+      const messageDiv = document.getElementById('message');
+
+      function showMessage(msg, isSuccess = false, isLoading = false) {
+        messageDiv.textContent = msg;
+        messageDiv.className = 'message';
+        if (isSuccess) messageDiv.classList.add('success');
+        if (isLoading) messageDiv.classList.add('loading');
+      }
+
+      toggleForm.onclick = () => {
+        isLogin = !isLogin;
+        formTitle.textContent = isLogin ? 'Welcome' : 'Create Account';
+        submitBtn.textContent = isLogin ? 'Log In' : 'Sign Up';
+        toggleForm.textContent = isLogin
+          ? "Don't have an account? Create one"
+          : "Already have an account? Log in";
+        // Show/hide username field
+        document.getElementById('username-label').style.display = isLogin ? 'none' : 'block';
+        showMessage('');
+      };
+
+      authForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value.trim();
+        let username = '';
+        if (!isLogin) {
+          username = document.getElementById('username').value.trim();
+          // Check if username exists
+          let { data: existing, error: checkError } = await supabaseClient
+            .from('profiles')
+            .select('id')
+            .eq('username', username)
+            .single();
+          if (existing) {
+            showMessage('Username already taken. Please choose another.');
+            return;
+          }
+        }
+        showMessage('Processing...', false, true);
+
+        if (isLogin) {
+          // Login flow
+          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+          if (error) {
+            showMessage('Login failed: ' + (error.message || 'Unknown error'));
+          } else if (data && data.session) {
+            const userId = data.user.id;
+            // Fetch the user's profile using the UUID
+            const { data: profile, error: profileError } = await supabaseClient
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single();
+            if (profile) {
+              showMessage('Logged in as ' + profile.username + ' (UUID: ' + userId + ')', true);
+              // Redirect to user's own Supabase instance
+              setTimeout(() => {
+                window.location.href = `https://supabase.psy-supabase.com/${profile.username}`;
+              }, 1500); // Show message for 1.5s, then redirect
+            } else {
+              showMessage('Logged in, but no profile found for this user.', true);
+            }
+          } else {
+            showMessage('Login failed: No session returned.');
+          }
+        } else {
+          // Sign up flow
+          const { data, error } = await supabaseClient.auth.signUp({ email, password });
+          if (data.user && !error) {
+            // Insert username into profiles table
+            const { error: insertError } = await supabaseClient
+              .from('profiles')
+              .insert([{ id: data.user.id, username }]);
+            if (insertError) {
+              showMessage('Error saving username: ' + insertError.message);
+              return;
+            }
+            if (data.user && !data.session) {
+              showMessage('Account created! Please check your email to confirm your address. <br><b>Note:</b> The confirmation email will come from <b>psy.supabase@gmail.com</b>', true);
+            } else if (data.session) {
+              showMessage('Account created and logged in!', true);
+            } else {
+              showMessage('Sign up successful! Please check your email.', true);
+            }
+            // Optionally, switch to login form
+            isLogin = true;
+            toggleForm.onclick();
+          } else {
+            let msg = error.message || 'Sign up failed';
+            if (msg.includes('Signups not allowed')) {
+              msg += ' (Sign-up may be disabled in Supabase project settings)';
+            }
+            showMessage(msg);
+          }
+        }
+      };
+    });
+  </script>
+</body>
+</html>
