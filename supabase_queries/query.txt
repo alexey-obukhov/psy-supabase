@@ -28,6 +28,8 @@ DROP FUNCTION IF EXISTS analyze_emotional_trajectory(text, int);
 DROP FUNCTION IF EXISTS analyze_conversation_topics(text, text, int);
 DROP FUNCTION IF EXISTS get_high_quality_interactions(text, text, float, integer);
 DROP FUNCTION IF EXISTS get_columns_types(text);
+DROP FUNCTION IF EXISTS update_interaction_metadata(text, integer, jsonb);
+
 
 
 -- Enable the vector extension
@@ -1292,3 +1294,20 @@ EXCEPTION WHEN OTHERS THEN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION update_interaction_metadata(
+    p_schema_name TEXT,
+    p_interaction_id INTEGER,
+    p_metadata JSONB
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    EXECUTE format('UPDATE %I.interactions SET metadata = $1 WHERE interaction_id = $2', p_schema_name)
+    USING p_metadata, p_interaction_id;
+
+    RETURN FOUND;
+END;
+$$;

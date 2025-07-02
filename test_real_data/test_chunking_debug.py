@@ -3,6 +3,7 @@
 import os
 import sys
 import uuid
+import datetime
 from typing import cast
 
 # Add project to path
@@ -15,6 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = get_package_logger(__name__)
+
 
 def debug_chunking():
     """Debug what semantic chunking is actually doing."""
@@ -33,8 +35,9 @@ def debug_chunking():
         user_id=test_user_id
     )
 
-    # Get the pain detector
     pain_detector = db_manager.pain_point_detector
+    db_manager.schema_name = db_manager.schema_name
+    db_manager.create_user_schema_sync()
 
     # Test questions
     q1 = "I feel inadequate at work every single day and it's affecting my confidence"
@@ -42,6 +45,27 @@ def debug_chunking():
 
     logger.info(f"Question 1: {q1}")
     logger.info(f"Question 2: {q2}")
+
+    # Insert both questions as interactions and get their IDs
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    interaction_ids = []
+    questions = [q1, q2]
+    for idx, question in enumerate(questions):
+        data_point = {
+            "user_id": test_user_id,
+            "question": question,
+            "context": "",
+            "answer": "",
+            "created_at": now,
+            "metadata": {},
+        }
+        db_manager.add_interaction_rpc(data_point)
+        logger.info(f"Inserted interaction for question {idx}: {question}")
+        interaction_ids.append(idx)  # or just use idx directly
+
+    # Use the second interaction (index 1) as the current one for updating
+    current_interaction_index = 1
+    # Now you can use current_interaction_index to refer to the second question/interaction
 
     # Test semantic chunking directly
     try:
@@ -63,7 +87,6 @@ def debug_chunking():
         # Test the actual comparison logic using existing methods
         logger.info("\n📝 Testing chunk comparison logic...")
 
-        # Test intersection using existing approach
         set1 = set(chunk.strip().lower() for chunk in chunks1 if len(chunk.strip()) > 1)
         set2 = set(chunk.strip().lower() for chunk in chunks2 if len(chunk.strip()) > 1)
 
@@ -82,6 +105,25 @@ def debug_chunking():
 
             if similarity > 0.3:  # 30% threshold
                 logger.info("🎯 PAIN POINT DETECTED! High chunk overlap")
+                painpoint_chunks = [chunk for chunk in intersection if len(chunk) > 1]
+                logger.info(f"Writing painpoint_chunks to metadata for interaction: {current_interaction_index}")
+
+                # Prepare your metadata with painpoint_chunks
+                metadata = {
+                    "painpoint_chunks": painpoint_chunks,
+                    # ... any other metadata fields ...
+                }
+
+                # Use the update_interaction_metadata RPC
+                db_manager.supabase.rpc(
+                    "update_interaction_metadata",
+                    {
+                        "p_schema_name": db_manager.schema_name,
+                        "p_interaction_id": current_interaction_index,
+                        "p_metadata": metadata,
+                    },
+                ).execute()
+                logger.info(f"✅ Updated metadata with painpoint_chunks for interaction id {current_interaction_index}")
             else:
                 logger.info("📝 Low similarity - not a pain point")
         else:
