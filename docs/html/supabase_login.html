@@ -3,20 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Welcome - Supabase Auth Example</title>
-  <style>
-    body { font-family: sans-serif; background: #f4f4f4; }
-    .container { max-width: 400px; margin: 60px auto; padding: 2em; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #ccc; }
-    h2 { text-align: center; }
-    label { display: block; margin-top: 1em; }
-    input { width: 100%; padding: 0.5em; margin-top: 0.5em; }
-    button { width: 100%; padding: 0.7em; margin-top: 1.5em; }
-    .toggle { text-align: center; margin-top: 1em; cursor: pointer; color: #0070f3; }
-    .message { margin-top: 1em; text-align: center; color: #b00; }
-    .success { color: green; }
-    .loading { color: #555; }
-  </style>
-  <!-- Supabase UMD build -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.42.7/dist/umd/supabase.min.js"></script>
+  <link rel="stylesheet" href="styles/supabase_login.css">
+  <script src="scripts/supabase_auth.js"></script>
 </head>
 <body>
   <!-- ... HTML content ... -->
@@ -40,10 +28,7 @@
   <script>
     // Wait for the DOM and Supabase library to be ready
     document.addEventListener('DOMContentLoaded', function () {
-      // Initialize Supabase client using the global 'supabase' object
-      const supabaseUrl = 'https://supabase.psy-supabase.com'; // self-hosted URL
-      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmY2Rpbmp4and6Y2R4Z3Z4bHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYzMzc3MTYsImV4cCI6MjA1MTkxMzcxNn0.n22JvFNTRvKZnKDl7YGGXjc9Y6HaRcaap9pM-N2eZrs'; // anon/public key
-      const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+      const supabaseClient = window.supabaseClient;
 
       let isLogin = true;
 
@@ -99,6 +84,7 @@
             showMessage('Login failed: ' + (error.message || 'Unknown error'));
           } else if (data && data.session) {
             const userId = data.user.id;
+            const accessToken = data.session.access_token;
             // Fetch the user's profile using the UUID
             const { data: profile, error: profileError } = await supabaseClient
               .from('profiles')
