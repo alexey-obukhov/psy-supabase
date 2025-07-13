@@ -1,0 +1,1299 @@
+/* --- TUTORIAL STYLES FOR CLOUDFLARE TUNNEL RECOVERY --- */
+
+/* --- 1. TUTORIAL-SPECIFIC VARIABLES --- */
+:root {
+  /* Tutorial-specific colors */
+  --color-success: #28a745;
+  --color-warning: #ffc107;
+  --color-danger: #dc3545;
+  --color-info: #17a2b8;
+  
+  /* Code block colors */
+  --color-code-bg: #f8f9fa;
+  --color-code-border: #e9ecef;
+  --color-syntax-comment: #6c757d;
+  --color-syntax-keyword: #d73a49;
+  --color-syntax-string: #032f62;
+  
+  /* Tutorial spacing */
+  --tutorial-section-gap: 60px;
+  --code-block-padding: 20px;
+  
+  /* Enhanced shadows */
+  --shadow-tutorial-card: 0 4px 20px rgba(91, 155, 213, 0.1);
+  --shadow-code-block: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* --- 2. TUTORIAL HERO SECTION --- */
+.tutorial-hero {
+  background: linear-gradient(135deg, var(--color-accent-soft) 0%, var(--color-primary-light) 100%);
+  padding: 80px 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.tutorial-hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%235b9bd5' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+.tutorial-hero .container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.tutorial-hero h1 {
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  color: var(--color-primary-dark);
+  margin-bottom: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.hero-subtitle {
+  font-size: 1.2rem;
+  color: var(--color-text-light);
+  margin-bottom: 30px;
+  line-height: 1.5;
+}
+
+.tutorial-meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.tutorial-meta span {
+  background: var(--color-background);
+  padding: 8px 16px;
+  border-radius: var(--border-radius);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-primary-dark);
+  box-shadow: var(--shadow-code-block);
+}
+
+/* --- 3. TUNNEL DIAGRAM SVG STYLES --- */
+.tunnel-diagram {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  filter: drop-shadow(0 4px 10px rgba(91, 155, 213, 0.2));
+}
+
+.cloud-group {
+  animation: float 6s ease-in-out infinite;
+}
+
+.server-group {
+  animation: pulse 4s ease-in-out infinite;
+}
+
+.warning-icon {
+  animation: warning-blink 2s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes warning-blink {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.3; }
+}
+
+/* --- 4. MAIN TUTORIAL CONTENT --- */
+.tutorial-content {
+  padding: 80px 0;
+  background: var(--color-background);
+}
+
+.tutorial-content .container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 60px;
+  max-width: 1400px;
+}
+
+/* --- 5. TABLE OF CONTENTS --- */
+.table-of-contents {
+  position: sticky;
+  top: 120px;
+  height: fit-content;
+  background: var(--color-card-bg);
+  padding: 30px;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-tutorial-card);
+  border: 1px solid var(--color-border);
+}
+
+.table-of-contents h3 {
+  color: var(--color-primary-dark);
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.table-of-contents ul {
+  list-style: none;
+}
+
+.table-of-contents li {
+  margin-bottom: 8px;
+}
+
+.table-of-contents a {
+  color: var(--color-text);
+  text-decoration: none;
+  padding: 8px 12px;
+  display: block;
+  border-radius: var(--border-radius);
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.table-of-contents a:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  transform: translateX(5px);
+}
+
+/* --- 6. TUTORIAL ARTICLE --- */
+.tutorial-article {
+  max-width: none;
+}
+
+.tutorial-section {
+  margin-bottom: var(--tutorial-section-gap);
+  scroll-margin-top: 120px;
+}
+
+.tutorial-section h2 {
+  color: var(--color-primary-dark);
+  font-size: 2rem;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 3px solid var(--color-primary-light);
+  font-weight: 600;
+}
+
+.tutorial-section h3 {
+  color: var(--color-primary-dark);
+  font-size: 1.4rem;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.tutorial-section h4 {
+  color: var(--color-primary);
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+/* --- 7. PROBLEM CARD --- */
+.problem-card {
+  display: flex;
+  gap: 20px;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe6e6 100%);
+  padding: 30px;
+  border-radius: var(--card-radius);
+  border-left: 5px solid var(--color-danger);
+  margin-bottom: 30px;
+  box-shadow: var(--shadow-tutorial-card);
+}
+
+.problem-icon {
+  flex-shrink: 0;
+}
+
+.problem-icon svg {
+  width: 40px;
+  height: 40px;
+}
+
+.problem-content h3 {
+  color: var(--color-danger);
+  margin-bottom: 15px;
+}
+
+.problem-symptoms {
+  margin-top: 15px;
+}
+
+.problem-symptoms li {
+  margin-bottom: 8px;
+  color: var(--color-text-light);
+}
+
+/* --- 8. PREREQUISITES GRID --- */
+.prerequisites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 25px;
+  margin-top: 30px;
+}
+
+.prereq-card {
+  background: var(--color-card-bg);
+  padding: 25px;
+  border-radius: var(--card-radius);
+  text-align: center;
+  border: 1px solid var(--color-border);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.prereq-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+}
+
+.prereq-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-tutorial-card);
+}
+
+.prereq-icon {
+  margin-bottom: 15px;
+}
+
+.prereq-icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.prereq-card h4 {
+  color: var(--color-primary-dark);
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+.prereq-card p {
+  color: var(--color-text-light);
+  font-size: 0.95rem;
+}
+
+/* --- 9. CODE BLOCKS --- */
+.code-block {
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-code-border);
+  border-radius: var(--border-radius);
+  margin: 25px 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-code-block);
+  position: relative;
+}
+
+.code-header {
+  background: var(--color-primary);
+  color: white;
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.code-lang {
+  font-family: 'Fira Code', monospace;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.file-name {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.8rem;
+}
+
+.copy-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.3s ease;
+}
+
+.copy-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.copy-btn.copied {
+  background: var(--color-success);
+}
+
+.code-block pre {
+  margin: 0;
+  padding: var(--code-block-padding);
+  overflow-x: auto;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.code-block code {
+  color: var(--color-text);
+  background: none;
+  padding: 0;
+  font-family: inherit;
+}
+
+.code-block.output {
+  background: #2d3748;
+}
+
+.code-block.output .code-header {
+  background: #1a202c;
+}
+
+.code-block.output code {
+  color: #e2e8f0;
+}
+
+.code-block.mini {
+  margin: 10px 0;
+  font-size: 0.8rem;
+}
+
+.code-block.mini .code-header {
+  padding: 8px 15px;
+}
+
+.code-block.mini pre {
+  padding: 15px;
+}
+
+/* --- 10. STEP CONTENT --- */
+.step-content {
+  margin-top: 20px;
+}
+
+.step-explanation {
+  background: var(--color-accent-soft);
+  padding: 20px;
+  border-radius: var(--border-radius);
+  margin: 20px 0;
+  border-left: 4px solid var(--color-primary);
+}
+
+.step-explanation h4 {
+  color: var(--color-primary-dark);
+  margin-bottom: 10px;
+}
+
+.step-explanation ul {
+  color: var(--color-text-light);
+}
+
+.step-visual {
+  margin: 25px 0;
+  text-align: center;
+}
+
+.step-visual svg {
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 2px 8px rgba(91, 155, 213, 0.15));
+}
+
+/* --- 11. NOTES AND ALERTS --- */
+.important-note, .success-note, .warning-note {
+  padding: 15px 20px;
+  border-radius: var(--border-radius);
+  margin: 20px 0;
+  border-left: 4px solid;
+  font-size: 0.95rem;
+}
+
+.important-note {
+  background: #fff3cd;
+  border-color: var(--color-warning);
+  color: #856404;
+}
+
+.success-note {
+  background: #d4edda;
+  border-color: var(--color-success);
+  color: #155724;
+}
+
+.warning-note {
+  background: #f8d7da;
+  border-color: var(--color-danger);
+  color: #721c24;
+}
+
+/* --- 12. CREDENTIAL MAPPING --- */
+.credential-mapping {
+  background: var(--color-card-bg);
+  padding: 25px;
+  border-radius: var(--border-radius);
+  margin: 20px 0;
+  border: 1px solid var(--color-border);
+}
+
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.mapping-item {
+  background: var(--color-background);
+  padding: 15px;
+  border-radius: var(--border-radius);
+  text-align: center;
+  border: 1px solid var(--color-border);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9rem;
+}
+
+/* --- 13. FILE STRUCTURE --- */
+.file-structure {
+  background: var(--color-accent-soft);
+  padding: 20px;
+  border-radius: var(--border-radius);
+  margin: 20px 0;
+  border-left: 4px solid var(--color-info);
+}
+
+.file-structure h4 {
+  color: var(--color-primary-dark);
+  margin-bottom: 10px;
+}
+
+.file-structure code {
+  background: var(--color-background);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: 'Fira Code', monospace;
+  color: var(--color-primary-dark);
+  border: 1px solid var(--color-border);
+}
+
+/* --- 14. PROS AND CONS --- */
+.pros-cons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 25px;
+  margin: 25px 0;
+}
+
+.pros, .cons {
+  padding: 20px;
+  border-radius: var(--border-radius);
+  border: 1px solid;
+}
+
+.pros {
+  background: #f0f9ff;
+  border-color: var(--color-success);
+}
+
+.cons {
+  background: #fef2f2;
+  border-color: var(--color-danger);
+}
+
+.pros h4 {
+  color: var(--color-success);
+  margin-bottom: 15px;
+}
+
+.cons h4 {
+  color: var(--color-danger);
+  margin-bottom: 15px;
+}
+
+/* --- 15. TROUBLESHOOTING GRID --- */
+.troubleshooting-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 25px;
+  margin-top: 30px;
+}
+
+.issue-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  padding: 25px;
+  transition: all 0.3s ease;
+}
+
+.issue-card:hover {
+  box-shadow: var(--shadow-tutorial-card);
+  transform: translateY(-2px);
+}
+
+.issue-card h4 {
+  color: var(--color-danger);
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.issue-card p {
+  color: var(--color-text-light);
+  margin-bottom: 15px;
+  font-size: 0.95rem;
+}
+
+.solution {
+  margin-top: 15px;
+}
+
+.solution strong {
+  color: var(--color-success);
+  display: block;
+  margin-bottom: 10px;
+}
+
+/* --- 16. KEY POINTS --- */
+.key-points {
+  background: linear-gradient(135deg, var(--color-accent-soft) 0%, var(--color-primary-light) 100%);
+  padding: 50px;
+  border-radius: var(--card-radius);
+  margin-top: 60px;
+  position: relative;
+  overflow: hidden;
+}
+
+.key-points::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%235b9bd5' fill-opacity='0.03'%3E%3Cpath d='M20 20L0 0h40L20 20z'/%3E%3C/g%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+.key-points > * {
+  position: relative;
+  z-index: 1;
+}
+
+.key-points h2 {
+  text-align: center;
+  color: var(--color-primary-dark);
+  margin-bottom: 40px;
+  font-size: 2.2rem;
+}
+
+.points-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px;
+}
+
+.point-card {
+  background: var(--color-background);
+  padding: 25px;
+  border-radius: var(--card-radius);
+  text-align: center;
+  box-shadow: var(--shadow-tutorial-card);
+  border: 1px solid var(--color-border);
+  transition: all 0.3s ease;
+}
+
+.point-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(91, 155, 213, 0.15);
+}
+
+.point-icon {
+  font-size: 2rem;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.point-card h4 {
+  color: var(--color-primary-dark);
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+.point-card p {
+  color: var(--color-text-light);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* --- 17. FOOTER --- */
+.site-footer {
+  background: var(--color-primary-dark);
+  color: white;
+  text-align: center;
+  padding: 30px 0;
+  margin-top: 80px;
+}
+
+/* --- 18. RESPONSIVE DESIGN --- */
+@media (max-width: 768px) {
+  .tutorial-hero .container {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  
+  .tutorial-content .container {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  
+  .table-of-contents {
+    position: static;
+    order: 2;
+  }
+  
+  .tutorial-article {
+    order: 1;
+  }
+  
+  .prerequisites-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .pros-cons {
+    grid-template-columns: 1fr;
+  }
+  
+  .troubleshooting-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .points-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tutorial-hero h1 {
+    font-size: 2rem;
+  }
+  
+  .key-points {
+    padding: 30px 20px;
+    margin: 40px -20px 0;
+    border-radius: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .tutorial-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .code-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  
+  .copy-btn {
+    align-self: flex-end;
+  }
+}
+
+/* --- 19. PRINT STYLES --- */
+@media print {
+  .site-header,
+  .table-of-contents,
+  .copy-btn,
+  .site-footer {
+    display: none;
+  }
+  
+  .tutorial-content .container {
+    grid-template-columns: 1fr;
+  }
+  
+  .tutorial-section {
+    break-inside: avoid;
+    margin-bottom: 40px;
+  }
+  
+  .code-block {
+    break-inside: avoid;
+  }
+}
+
+/* --- 20. ACCESSIBILITY IMPROVEMENTS --- */
+.code-block:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.copy-btn:focus {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud-group,
+  .server-group,
+  .warning-icon {
+    animation: none;
+  }
+  
+  .prereq-card:hover,
+  .point-card:hover,
+  .issue-card:hover {
+    transform: none;
+  }
+}
+
+/* --- 21. SUPABASE TUTORIAL SPECIFIC STYLES --- */
+
+/* Tutorial Header for Supabase */
+.tutorial-header {
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-accent-soft) 100%);
+  padding: 60px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tutorial-breadcrumb {
+  margin-bottom: 20px;
+}
+
+.tutorial-breadcrumb a {
+  color: var(--color-primary);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.3s ease;
+}
+
+.tutorial-breadcrumb a:hover {
+  color: var(--color-primary-dark);
+}
+
+.tutorial-header h1 {
+  font-size: 2.5rem;
+  color: var(--color-primary-dark);
+  margin-bottom: 15px;
+  font-family: var(--font-secondary);
+}
+
+.tutorial-subtitle {
+  font-size: 1.2rem;
+  color: var(--color-text-light);
+  margin-bottom: 25px;
+  max-width: 600px;
+}
+
+.tutorial-meta-header {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tutorial-meta-header span {
+  padding: 6px 15px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.difficulty.beginner {
+  background: #d4edda;
+  color: #155724;
+}
+
+.difficulty.intermediate {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.difficulty.advanced {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.duration {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
+.last-updated {
+  background: var(--color-card-bg);
+  color: var(--color-text-light);
+  border: 1px solid var(--color-border);
+}
+
+/* Tutorial Layout */
+.tutorial-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  align-items: start;
+}
+
+/* Sidebar Navigation */
+.tutorial-sidebar {
+  position: sticky;
+  top: 100px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  padding: 25px;
+}
+
+.tutorial-nav h3 {
+  color: var(--color-primary-dark);
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.tutorial-nav ul {
+  list-style: none;
+}
+
+.tutorial-nav li {
+  margin-bottom: 8px;
+}
+
+.tutorial-nav a {
+  display: block;
+  padding: 8px 12px;
+  color: var(--color-text-light);
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.tutorial-nav a:hover,
+.tutorial-nav a.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  transform: translateX(4px);
+}
+
+/* Main Content */
+.tutorial-content {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  padding: 40px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.tutorial-section {
+  margin-bottom: 50px;
+}
+
+.tutorial-section:last-child {
+  margin-bottom: 0;
+}
+
+.tutorial-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.8rem;
+  color: var(--color-primary-dark);
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.section-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--color-primary);
+}
+
+.tutorial-section h3 {
+  font-size: 1.3rem;
+  color: var(--color-primary-dark);
+  margin: 25px 0 15px 0;
+}
+
+.tutorial-section p {
+  margin-bottom: 15px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.tutorial-section ul,
+.tutorial-section ol {
+  margin: 15px 0;
+  padding-left: 25px;
+}
+
+.tutorial-section li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+/* Step Counter */
+.step-counter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-right: 15px;
+  margin-bottom: 15px;
+}
+
+/* Info Boxes */
+.info-box,
+.warning-box,
+.success-box,
+.help-box {
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+  border-radius: var(--border-radius);
+  margin: 25px 0;
+  border-left: 4px solid;
+}
+
+.info-box {
+  background: #e7f3ff;
+  border-left-color: var(--color-primary);
+}
+
+.warning-box {
+  background: #fff3e0;
+  border-left-color: #ff9800;
+}
+
+.success-box {
+  background: #e8f5e8;
+  border-left-color: #4caf50;
+}
+
+.help-box {
+  background: #f3e5f5;
+  border-left-color: #9c27b0;
+}
+
+.info-icon,
+.warning-icon,
+.success-icon,
+.help-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.info-content,
+.warning-content,
+.success-content,
+.help-content {
+  flex: 1;
+}
+
+.info-content h4,
+.warning-content h4,
+.success-content h4,
+.help-content h4 {
+  color: var(--color-primary-dark);
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+}
+
+.info-content p,
+.warning-content p,
+.success-content p,
+.help-content p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.info-content ul,
+.warning-content ul,
+.success-content ul,
+.help-content ul {
+  margin: 10px 0 0 0;
+  padding-left: 20px;
+}
+
+/* Checklist */
+.checklist {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.checklist-item:last-child {
+  border-bottom: none;
+}
+
+.checklist-item input[type="checkbox"] {
+  display: none;
+}
+
+.checkmark {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-primary);
+  border-radius: 4px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.checklist-item input[type="checkbox"]:checked + .checkmark {
+  background: var(--color-primary);
+}
+
+.checklist-item input[type="checkbox"]:checked + .checkmark::after {
+  content: '✓';
+  position: absolute;
+  color: white;
+  font-size: 14px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Settings Table */
+.settings-table {
+  margin: 20px 0;
+  overflow-x: auto;
+}
+
+.settings-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.settings-table th,
+.settings-table td {
+  padding: 15px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-table th {
+  background: var(--color-card-bg);
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  font-size: 0.95rem;
+}
+
+.settings-table td {
+  font-size: 0.9rem;
+}
+
+.settings-table code {
+  background: var(--color-card-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+/* Troubleshooting */
+.troubleshoot-item {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.troubleshoot-item h3 {
+  color: var(--color-primary-dark);
+  margin-bottom: 15px;
+}
+
+.problem {
+  background: #fff3e0;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  border-left: 4px solid #ff9800;
+}
+
+.solution {
+  background: #e8f5e8;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #4caf50;
+}
+
+.problem strong,
+.solution strong {
+  color: var(--color-primary-dark);
+}
+
+/* Conclusion */
+.tutorial-conclusion {
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-accent-soft) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  padding: 40px;
+  margin-top: 40px;
+  text-align: center;
+}
+
+.tutorial-conclusion h2 {
+  color: var(--color-primary-dark);
+  font-size: 2rem;
+  margin-bottom: 20px;
+  border: none;
+  padding: 0;
+}
+
+.next-steps {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: 25px;
+  margin: 25px 0;
+  text-align: left;
+}
+
+.next-steps h3 {
+  color: var(--color-primary-dark);
+  margin-bottom: 15px;
+}
+
+.tutorial-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 30px;
+  flex-wrap: wrap;
+}
+
+/* External Links */
+.external-link {
+  color: var(--color-primary);
+  border-bottom: 1px dotted var(--color-primary);
+}
+
+.external-link:hover {
+  border-bottom-style: solid;
+}
+
+/* Responsive Design for Supabase Tutorial */
+@media (max-width: 1024px) {
+  .tutorial-container {
+    grid-template-columns: 250px 1fr;
+    gap: 30px;
+  }
+  
+  .tutorial-content {
+    padding: 30px;
+  }
+}
+
+@media (max-width: 768px) {
+  .tutorial-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px;
+  }
+  
+  .tutorial-sidebar {
+    position: static;
+    order: -1;
+  }
+  
+  .tutorial-nav {
+    display: block; /* Show on mobile but could be made collapsible */
+  }
+  
+  .tutorial-content {
+    padding: 20px;
+  }
+  
+  .tutorial-header h1 {
+    font-size: 2rem;
+  }
+  
+  .tutorial-meta-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .tutorial-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .tutorial-header {
+    padding: 40px 0;
+  }
+  
+  .tutorial-header h1 {
+    font-size: 1.7rem;
+  }
+  
+  .tutorial-subtitle {
+    font-size: 1rem;
+  }
+  
+  .tutorial-content {
+    padding: 15px;
+  }
+  
+  .tutorial-section h2 {
+    font-size: 1.5rem;
+  }
+  
+  .tutorial-section h3 {
+    font-size: 1.2rem;
+  }
+}
