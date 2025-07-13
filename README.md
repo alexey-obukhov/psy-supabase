@@ -68,20 +68,18 @@ My technical infrastructure has been enhanced with:
 
 Planned Enhancements
 
-1. **Migrate to self-hosting Supabase**: Work in Progress. Already see how it is better, then using supabase.com: free account only has 2gib RAM vs own RAM. Was decided to use:
+1. **Adjust policy**: Work in Progress. 
 CREATE POLICY "Users can access their own data"
   ON your_table
   FOR SELECT, INSERT, UPDATE, DELETE
   USING (user_id = auth.uid());
 with singe schema instead of user=schema.
 
-2. **Finish web-site**: www.psy-supabase.com is already live with Index, chat, supabase, etc. sections. Add logging using password.
+2. **Integrate vector search in chatbot**: The hipothese about "every thought is connected" was proven in one of the 'test_real_data' folder testing Script. Now there is need to integrate it to the Chat.
 
-3. **Integrate vector search in chatbot**: The hipothese about "every thought is connected" was prove in one of the 'test_real_data' folder testing Script. Now need to integrate it to the Chat.
+3*. **Emotion Trajectory**: Track a client’s emotional changes over time.
 
-4*. **Emotion Trajectory**: Track a client’s emotional changes over time.
-
-5*. **AI Integration**: Expand AI in the project with a 'knowledge database' to enhance response generation from user input on life, problems, and therapy expectations.
+4*. **AI Integration**: Expand AI in the project with a 'knowledge database' to enhance response generation from user input on life, problems, and therapy expectations.
 
 ## Implementation Status
 
@@ -96,7 +94,9 @@ with singe schema instead of user=schema.
 - ✅ Smart prompt truncation
 - ✅ Enhanced Prompt Manager
 - ✅ Token-efficient templates
+- ✅ Migration on self-hosted Supabase 
 - ✅ Enhancing Vector Search by Segmenting Text into Meaningful Units
+- 📅 Integrating implemented Vector Search by Segmenting Text in real chat-bot (planned)
 - 📅 Integrating Emotional trajectory tracking (planned)
 - 📅 AI Integration (planned)
 
