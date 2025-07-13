@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloudflare Tunnel Recovery Tutorial - Mindful Assistant</title>
+  <link rel="stylesheet" href="styles/app_style.css">
+  <link rel="stylesheet" href="styles/tutorial_style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Montserrat:wght@500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1 class="site-title">Mindful Assistant</h1>
+      <nav class="site-nav">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="advantages.html">Advantages</a></li>
+          <li><a href="webchat.html">Chat</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="tutorials.html" class="active">Tutorials</a></li>
+        </ul>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <section class="hero tutorial-hero">
+    <div class="container">
+      <div class="hero-content">
+        <h1>Cloudflare Tunnel Recovery</h1>
+        <p class="hero-subtitle">Complete guide to recover missing tunnel credentials and restore your secure connections</p>
+        <div class="tutorial-meta">
+          <span class="difficulty">Difficulty: Intermediate</span>
+          <span class="duration">Duration: 10-15 minutes</span>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <svg class="tunnel-diagram" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- Cloud representation -->
+          <g class="cloud-group">
+            <ellipse cx="80" cy="60" rx="25" ry="15" fill="#5b9bd5" opacity="0.7"/>
+            <ellipse cx="70" cy="50" rx="20" ry="12" fill="#5b9bd5" opacity="0.8"/>
+            <ellipse cx="90" cy="50" rx="18" ry="10" fill="#5b9bd5" opacity="0.9"/>
+            <text x="80" y="100" text-anchor="middle" fill="#4682b4" font-size="12" font-weight="bold">Cloudflare</text>
+          </g>
+          
+          <!-- Tunnel representation -->
+          <g class="tunnel-group">
+            <path d="M 120 75 Q 200 50, 280 75" stroke="#8db3e2" stroke-width="8" fill="none" opacity="0.6"/>
+            <path d="M 120 75 Q 200 100, 280 75" stroke="#8db3e2" stroke-width="8" fill="none" opacity="0.6"/>
+            <circle cx="200" cy="75" r="3" fill="#5b9bd5">
+              <animate attributeName="r" values="3;6;3" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <text x="200" y="95" text-anchor="middle" fill="#4682b4" font-size="10">Secure Tunnel</text>
+          </g>
+          
+          <!-- Server representation -->
+          <g class="server-group">
+            <rect x="310" y="50" width="30" height="50" fill="#4682b4" rx="3"/>
+            <rect x="315" y="55" width="20" height="8" fill="#d0e5f5"/>
+            <rect x="315" y="65" width="20" height="8" fill="#d0e5f5"/>
+            <rect x="315" y="75" width="20" height="8" fill="#d0e5f5"/>
+            <circle cx="320" cy="85" r="2" fill="#5b9bd5"/>
+            <circle cx="330" cy="85" r="2" fill="#5b9bd5"/>
+            <text x="325" y="115" text-anchor="middle" fill="#4682b4" font-size="12" font-weight="bold">Your Server</text>
+          </g>
+          
+          <!-- Warning icon for broken connection -->
+          <g class="warning-icon" opacity="0.8">
+            <polygon points="200,25 195,35 205,35" fill="#D9534F"/>
+            <circle cx="200" cy="30" r="1" fill="white"/>
+            <line x1="200" y1="27" x2="200" y2="29" stroke="white" stroke-width="0.5"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <main class="tutorial-content">
+    <div class="container">
+      <nav class="table-of-contents">
+        <h3>Table of Contents</h3>
+        <ul>
+          <li><a href="#problem">Problem Overview</a></li>
+          <li><a href="#prerequisites">Prerequisites</a></li>
+          <li><a href="#step1">Step 1: Authentication</a></li>
+          <li><a href="#step2">Step 2: List Tunnels</a></li>
+          <li><a href="#step3">Step 3: Generate Token</a></li>
+          <li><a href="#step4">Step 4: Extract Credentials</a></li>
+          <li><a href="#step5">Step 5: Create Credentials File</a></li>
+          <li><a href="#step6">Step 6: Configure & Test</a></li>
+          <li><a href="#alternatives">Alternative Methods</a></li>
+          <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+      </nav>
+
+      <article class="tutorial-article">
+        <section id="problem" class="tutorial-section">
+          <h2>Problem Overview</h2>
+          <div class="problem-card">
+            <div class="problem-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L1 21h22L12 2z" stroke="#D9534F" stroke-width="2" fill="#D9534F" opacity="0.1"/>
+                <path d="M12 8v4M12 16h.01" stroke="#D9534F" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="problem-content">
+              <h3>Missing Cloudflare Tunnel Credentials</h3>
+              <p>You have a Cloudflare tunnel configuration file but the credentials JSON file is missing or corrupted.</p>
+              <ul class="problem-symptoms">
+                <li>Config file exists: <code>config.yml</code></li>
+                <li>Missing credentials file: <code>/home/user/.cloudflared/{tunnel-id}.json</code></li>
+                <li>Error: "Cannot determine default origin certificate path"</li>
+                <li>Error: "credentials file not found"</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="prerequisites" class="tutorial-section">
+          <h2>Prerequisites</h2>
+          <div class="prerequisites-grid">
+            <div class="prereq-card">
+              <div class="prereq-icon">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M20 6L9 17l-5-5" stroke="#5b9bd5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <h4>Cloudflare Account</h4>
+              <p>Active account with tunnel access permissions</p>
+            </div>
+            <div class="prereq-card">
+              <div class="prereq-icon">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" stroke="#5b9bd5" stroke-width="2"/>
+                </svg>
+              </div>
+              <h4>Cloudflared CLI</h4>
+              <p>Latest version of cloudflared installed</p>
+            </div>
+            <div class="prereq-card">
+              <div class="prereq-icon">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#5b9bd5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <h4>Existing Tunnel</h4>
+              <p>Tunnel not deleted from Cloudflare dashboard</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="step1" class="tutorial-section">
+          <h2>Step 1: Authenticate with Cloudflare</h2>
+          <div class="step-content">
+            <p>First, authenticate your local cloudflared client with your Cloudflare account:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">bash</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>cloudflared tunnel login</code></pre>
+            </div>
+            <div class="step-explanation">
+              <h4>What happens:</h4>
+              <ul>
+                <li>Opens browser to Cloudflare dashboard</li>
+                <li>You select your domain/account</li>
+                <li>Creates certificate file (usually in <code>/root/.cloudflared/cert.pem</code> if run with sudo)</li>
+              </ul>
+            </div>
+            <div class="step-visual">
+              <svg viewBox="0 0 300 150" xmlns="http://www.w3.org/2000/svg">
+                <rect x="20" y="20" width="260" height="110" rx="10" fill="#f0f7fd" stroke="#5b9bd5"/>
+                <text x="150" y="45" text-anchor="middle" fill="#4682b4" font-size="14" font-weight="bold">Browser Authentication</text>
+                <circle cx="80" cy="80" r="15" fill="#5b9bd5"/>
+                <text x="80" y="85" text-anchor="middle" fill="white" font-size="12">1</text>
+                <text x="80" y="110" text-anchor="middle" fill="#4682b4" font-size="10">Login</text>
+                <circle cx="150" cy="80" r="15" fill="#8db3e2"/>
+                <text x="150" y="85" text-anchor="middle" fill="white" font-size="12">2</text>
+                <text x="150" y="110" text-anchor="middle" fill="#4682b4" font-size="10">Select Domain</text>
+                <circle cx="220" cy="80" r="15" fill="#4682b4"/>
+                <text x="220" y="85" text-anchor="middle" fill="white" font-size="12">3</text>
+                <text x="220" y="110" text-anchor="middle" fill="#4682b4" font-size="10">Get Certificate</text>
+                <path d="M 95 80 L 135 80" stroke="#5b9bd5" stroke-width="2" marker-end="url(#arrowhead)"/>
+                <path d="M 165 80 L 205 80" stroke="#5b9bd5" stroke-width="2" marker-end="url(#arrowhead)"/>
+                <defs>
+                  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#5b9bd5"/>
+                  </marker>
+                </defs>
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        <section id="step2" class="tutorial-section">
+          <h2>Step 2: List Your Existing Tunnels</h2>
+          <div class="step-content">
+            <p>Check what tunnels are available in your account:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">bash</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code># Use sudo if certificate is in /root/.cloudflared/
+sudo cloudflared tunnel list</code></pre>
+            </div>
+            <div class="code-block output">
+              <div class="code-header">
+                <span class="code-lang">output</span>
+              </div>
+              <pre><code>ID                                   NAME            CREATED              CONNECTIONS 
+12345678-1234-1234-1234-123456789012 my-tunnel       2025-06-29T12:05:42Z             </code></pre>
+            </div>
+            <div class="important-note">
+              <strong>📝 Important:</strong> Note down your tunnel ID and name for the next steps.
+            </div>
+          </div>
+        </section>
+
+        <section id="step3" class="tutorial-section">
+          <h2>Step 3: Generate Tunnel Token</h2>
+          <div class="step-content">
+            <p>Generate a token that contains all the credentials you need:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">bash</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>sudo cloudflared tunnel token YOUR_TUNNEL_NAME</code></pre>
+            </div>
+            <div class="code-block output">
+              <div class="code-header">
+                <span class="code-lang">output</span>
+              </div>
+              <pre><code>eyJhIjoiYWJjZGVmZ2hpams...rest_of_token</code></pre>
+            </div>
+            <div class="success-note">
+              <strong>✨ Success:</strong> This token contains all the credentials you need! Save it safely.
+            </div>
+          </div>
+        </section>
+
+        <section id="step4" class="tutorial-section">
+          <h2>Step 4: Decode Token to Extract Credentials</h2>
+          <div class="step-content">
+            <p>The token is base64 encoded JSON. Let's decode it to see the credentials structure:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">bash</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>echo "YOUR_TOKEN_HERE" | base64 -d</code></pre>
+            </div>
+            <div class="code-block output">
+              <div class="code-header">
+                <span class="code-lang">json</span>
+              </div>
+              <pre><code>{
+  "a": "your_account_id_here",
+  "s": "your_tunnel_secret_here", 
+  "t": "your_tunnel_id_here"
+}</code></pre>
+            </div>
+            <div class="credential-mapping">
+              <h4>Credential Mapping:</h4>
+              <div class="mapping-grid">
+                <div class="mapping-item">
+                  <code>"a"</code> → <code>AccountTag</code>
+                </div>
+                <div class="mapping-item">
+                  <code>"s"</code> → <code>TunnelSecret</code>
+                </div>
+                <div class="mapping-item">
+                  <code>"t"</code> → <code>TunnelID</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="step5" class="tutorial-section">
+          <h2>Step 5: Create Credentials File</h2>
+          <div class="step-content">
+            <p>Create the missing JSON file with the decoded values:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">bash</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>sudo tee /home/user/.cloudflared/YOUR_TUNNEL_ID.json << 'EOF'
+{
+  "AccountTag": "your_account_id_from_step_4",
+  "TunnelSecret": "your_tunnel_secret_from_step_4",
+  "TunnelID": "your_tunnel_id_from_step_4"
+}
+EOF</code></pre>
+            </div>
+            <div class="file-structure">
+              <h4>File Location Pattern:</h4>
+              <code>/home/user/.cloudflared/{tunnel-id}.json</code>
+            </div>
+          </div>
+        </section>
+
+        <section id="step6" class="tutorial-section">
+          <h2>Step 6: Configure & Test</h2>
+          <div class="step-content">
+            <p>Verify your config file and test the tunnel:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">yaml</span>
+                <span class="file-name">config.yml</span>
+              </div>
+              <pre><code>tunnel: your-tunnel-name
+credentials-file: /home/user/.cloudflared/YOUR_TUNNEL_ID.json
+ingress:
+  - hostname: example.yourdomain.com
+    service: http://localhost:8000
+  - service: http_status:404</code></pre>
+            </div>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">bash</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code># Try without sudo first (preferred)
+cloudflared tunnel --config ~/.cloudflared/config.yml run your-tunnel-name
+
+# If permission issues, use sudo
+sudo cloudflared tunnel --config ~/.cloudflared/config.yml run your-tunnel-name</code></pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="alternatives" class="tutorial-section">
+          <h2>Alternative: Using Token Directly</h2>
+          <div class="step-content">
+            <p>Instead of creating a credentials file, you can run the tunnel directly with the token (simpler approach):</p>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">bash</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>cloudflared tunnel --token "YOUR_TOKEN_FROM_STEP_3" run</code></pre>
+            </div>
+            <div class="pros-cons">
+              <div class="pros">
+                <h4>✅ Pros:</h4>
+                <ul>
+                  <li>Simpler setup</li>
+                  <li>No file management</li>
+                  <li>Works immediately</li>
+                </ul>
+              </div>
+              <div class="cons">
+                <h4>❌ Cons:</h4>
+                <ul>
+                  <li>Token in command history</li>
+                  <li>No config file benefits</li>
+                  <li>Harder to manage multiple ingress rules</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="troubleshooting" class="tutorial-section">
+          <h2>Troubleshooting</h2>
+          <div class="troubleshooting-grid">
+            <div class="issue-card">
+              <h4>🚫 Permission Denied</h4>
+              <p><strong>Problem:</strong> Certificate saved to <code>/root/.cloudflared/</code> but running as regular user</p>
+              <div class="solution">
+                <strong>Solution:</strong>
+                <div class="code-block mini">
+                  <pre><code># Copy certificate
+sudo cp /root/.cloudflared/cert.pem ~/.cloudflared/
+# OR run commands with sudo</code></pre>
+                </div>
+              </div>
+            </div>
+
+            <div class="issue-card">
+              <h4>🔐 Directory Ownership</h4>
+              <p><strong>Problem:</strong> <code>.cloudflared</code> directory owned by root</p>
+              <div class="solution">
+                <strong>Solution:</strong>
+                <div class="code-block mini">
+                  <pre><code>sudo chown -R $USER:$USER ~/.cloudflared/</code></pre>
+                </div>
+              </div>
+            </div>
+
+            <div class="issue-card">
+              <h4>❌ Tunnel Not Found</h4>
+              <p><strong>Problem:</strong> Tunnel was deleted from Cloudflare dashboard</p>
+              <div class="solution">
+                <strong>Solution:</strong>
+                <div class="code-block mini">
+                  <pre><code>cloudflared tunnel create new-tunnel-name
+cloudflared tunnel route dns new-tunnel-name your-hostname.domain.com</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="key-points">
+          <h2>Key Points to Remember</h2>
+          <div class="points-grid">
+            <div class="point-card">
+              <div class="point-icon">🎯</div>
+              <h4>Token contains everything</h4>
+              <p>The base64 token from <code>cloudflared tunnel token</code> has all credentials</p>
+            </div>
+            <div class="point-card">
+              <div class="point-icon">📁</div>
+              <h4>File naming matters</h4>
+              <p>Credentials file must be named exactly <code>{tunnel-id}.json</code></p>
+            </div>
+            <div class="point-card">
+              <div class="point-icon">📍</div>
+              <h4>Location is crucial</h4>
+              <p>Credentials file path in config must match actual file location</p>
+            </div>
+            <div class="point-card">
+              <div class="point-icon">🔒</div>
+              <h4>Permissions matter</h4>
+              <p>Ensure proper ownership of <code>.cloudflared</code> directory and files</p>
+            </div>
+            <div class="point-card">
+              <div class="point-icon">⚡</div>
+              <h4>Security first</h4>
+              <p>Avoid running with sudo when possible</p>
+            </div>
+            <div class="point-card">
+              <div class="point-icon">🗂️</div>
+              <h4>File structure</h4>
+              <p>Keep organized: <code>cert.pem</code>, <code>config.yml</code>, <code>{tunnel-id}.json</code></p>
+            </div>
+          </div>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-info">
+          <h3>Mindful Assistant</h3>
+          <p>Tutorial: Cloudflare Tunnel Recovery - Complete technical documentation</p>
+        </div>
+        <div class="footer-links">
+          <h4>Links</h4>
+          <ul>
+            <li><a href="https://github.com/alexey-obukhov/psy-supabase">GitHub</a></li>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="advantages.html">Advantages</a></li>
+            <li><a href="webchat.html">Chat</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="copyright">
+        <p>&copy; 2025 Mindful Assistant</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function copyCode(button) {
+      const codeBlock = button.closest('.code-block').querySelector('code');
+      const text = codeBlock.textContent;
+      
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.classList.add('copied');
+        
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    // Smooth scrolling for table of contents
+    document.querySelectorAll('.table-of-contents a').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // Animate tunnel diagram
+    function animateTunnel() {
+      const tunnelGroup = document.querySelector('.tunnel-group');
+      if (tunnelGroup) {
+        tunnelGroup.style.opacity = '0.3';
+        setTimeout(() => {
+          tunnelGroup.style.opacity = '1';
+        }, 1000);
+      }
+    }
+
+    // Start animation when page loads
+    window.addEventListener('load', () => {
+      setTimeout(animateTunnel, 2000);
+      setInterval(animateTunnel, 8000);
+    });
+
+    // Mobile menu toggle
+    document.querySelector('.menu-toggle')?.addEventListener('click', function() {
+      document.querySelector('.site-nav').classList.toggle('active');
+    });
+  </script>
+</body>
+</html>

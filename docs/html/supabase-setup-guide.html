@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supabase Setup Guide - Mindful Assistant</title>
+  <link rel="stylesheet" href="styles/app_style.css">
+  <link rel="stylesheet" href="styles/tutorial_style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1 class="site-title">Mindful Assistant</h1>
+      <nav class="site-nav">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="advantages.html">Advantages</a></li>
+          <li><a href="webchat.html">Chat</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="tutorials.html">Tutorials</a></li>
+        </ul>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <section class="tutorial-header">
+    <div class="container">
+      <div class="tutorial-breadcrumb">
+        <a href="tutorials.html">← Back to Tutorials</a>
+      </div>
+      <h1>Supabase Setup Guide</h1>
+      <p class="tutorial-subtitle">Complete guide to setting up Supabase database and authentication for Mindful Assistant</p>
+      <div class="tutorial-meta-header">
+        <span class="difficulty beginner">Beginner</span>
+        <span class="duration">20-30 minutes</span>
+        <span class="last-updated">Updated: July 2025</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="tutorial-container">
+    <aside class="tutorial-sidebar">
+      <nav class="tutorial-nav">
+        <h3>Table of Contents</h3>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#prerequisites">Prerequisites</a></li>
+          <li><a href="#create-project">Create Supabase Project</a></li>
+          <li><a href="#database-schema">Database Schema</a></li>
+          <li><a href="#auth-setup">Authentication Setup</a></li>
+          <li><a href="#rls-policies">Row Level Security</a></li>
+          <li><a href="#api-keys">API Keys & Configuration</a></li>
+          <li><a href="#test-connection">Test Connection</a></li>
+          <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <main class="tutorial-content">
+      <section id="overview" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+            <path d="M20.188 10.934c.388.472.582.707.582 1.066 0 .359-.194.594-.582 1.066a9.859 9.859 0 01-1.988 2.21c-1.632 1.369-3.656 2.24-5.95 2.24s-4.318-.871-5.95-2.24a9.859 9.859 0 01-1.988-2.21C4.194 12.594 4 12.359 4 12c0-.359.194-.594.582-1.066a9.859 9.859 0 011.988-2.21C8.202 7.355 10.226 6.484 12.25 6.484s4.318.871 5.95 2.24a9.859 9.859 0 011.988 2.21z" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Overview
+        </h2>
+        <p>This tutorial will guide you through setting up a complete Supabase backend for the Mindful Assistant project. You'll create a new Supabase project, configure the database schema, set up authentication, and establish secure access policies.</p>
+        
+        <div class="info-box">
+          <div class="info-icon">ℹ️</div>
+          <div class="info-content">
+            <h4>What is Supabase?</h4>
+            <p>Supabase is an open-source Firebase alternative that provides a PostgreSQL database, authentication, real-time subscriptions, and APIs out of the box.</p>
+          </div>
+        </div>
+
+        <h3>What You'll Build</h3>
+        <ul>
+          <li>PostgreSQL database with conversation storage</li>
+          <li>User authentication system</li>
+          <li>Secure data access with Row Level Security (RLS)</li>
+          <li>API endpoints for the frontend application</li>
+          <li>Real-time data synchronization</li>
+        </ul>
+      </section>
+
+      <section id="prerequisites" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M13 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Prerequisites
+        </h2>
+        <p>Before starting, ensure you have:</p>
+        <div class="checklist">
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            A Supabase account (free tier available)
+          </label>
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            Basic understanding of SQL
+          </label>
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            Access to your project's configuration files
+          </label>
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            A code editor for updating configuration
+          </label>
+        </div>
+      </section>
+
+      <section id="create-project" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"/>
+            <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+            <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2"/>
+            <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2"/>
+            <polyline points="10,9 9,9 8,9" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Create Supabase Project
+        </h2>
+        
+        <div class="step-counter">Step 1</div>
+        <h3>Sign Up / Sign In to Supabase</h3>
+        <ol>
+          <li>Go to <a href="https://supabase.com" target="_blank" class="external-link">https://supabase.com</a></li>
+          <li>Click "Start your project" or "Sign in"</li>
+          <li>Sign up with GitHub, Google, or email</li>
+        </ol>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Create New Project</h3>
+        <ol>
+          <li>Click "New Project" in your dashboard</li>
+          <li>Choose your organization (or create one)</li>
+          <li>Configure your project:</li>
+        </ol>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Project Configuration</span>
+          </div>
+          <pre><code>Project Name: mindful-assistant
+Database Password: [Choose a strong password]
+Region: [Select closest to your users]
+Pricing Plan: Free (for development)</code></pre>
+        </div>
+
+        <div class="warning-box">
+          <div class="warning-icon">⚠️</div>
+          <div class="warning-content">
+            <h4>Important</h4>
+            <p>Save your database password securely! You'll need it for direct database connections.</p>
+          </div>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Wait for Project Creation</h3>
+        <p>Project creation typically takes 1-2 minutes. You'll see a progress indicator during setup.</p>
+      </section>
+
+      <section id="database-schema" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" stroke-width="2"/>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" stroke="currentColor" stroke-width="2"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Database Schema Setup
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Access SQL Editor</h3>
+        <ol>
+          <li>In your Supabase dashboard, click "SQL Editor" in the sidebar</li>
+          <li>You'll see the SQL editor interface</li>
+        </ol>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Create Core Tables</h3>
+        <p>Run the following SQL to create the main tables for conversation storage:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">conversations_table.sql</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>-- Create conversations table
+CREATE TABLE IF NOT EXISTS conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    is_archived BOOLEAN DEFAULT FALSE
+);
+
+-- Create messages table
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Create Analysis Tables</h3>
+        <p>Add tables for pain point detection and analysis:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">analysis_tables.sql</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>-- Create pain points table
+CREATE TABLE IF NOT EXISTS pain_points (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    pain_point TEXT NOT NULL,
+    category TEXT,
+    severity_score FLOAT,
+    confidence_score FLOAT,
+    first_detected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_mentioned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    occurrence_count INTEGER DEFAULT 1
+);
+
+-- Create user profiles for personalization
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    display_name TEXT,
+    preferences JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for analysis tables
+CREATE INDEX IF NOT EXISTS idx_pain_points_user_id ON pain_points(user_id);
+CREATE INDEX IF NOT EXISTS idx_pain_points_conversation_id ON pain_points(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_pain_points_category ON pain_points(category);</code></pre>
+        </div>
+
+        <div class="step-counter">Step 4</div>
+        <h3>Run the SQL Commands</h3>
+        <ol>
+          <li>Copy the first SQL block and paste it into the SQL editor</li>
+          <li>Click "Run" to execute the commands</li>
+          <li>Repeat for the second SQL block</li>
+          <li>Verify tables were created in the "Table Editor" section</li>
+        </ol>
+      </section>
+
+      <section id="auth-setup" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Authentication Setup
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Configure Auth Settings</h3>
+        <ol>
+          <li>Go to "Authentication" > "Settings" in your Supabase dashboard</li>
+          <li>Configure the following settings:</li>
+        </ol>
+
+        <div class="settings-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Setting</th>
+                <th>Value</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Site URL</td>
+                <td><code>http://localhost:3000</code></td>
+                <td>Your development URL</td>
+              </tr>
+              <tr>
+                <td>Redirect URLs</td>
+                <td><code>http://localhost:3000/**</code></td>
+                <td>Allowed redirect patterns</td>
+              </tr>
+              <tr>
+                <td>Enable email confirmations</td>
+                <td>Enabled</td>
+                <td>Require email verification</td>
+              </tr>
+              <tr>
+                <td>Enable signup</td>
+                <td>Enabled</td>
+                <td>Allow new user registration</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Set Up Email Templates</h3>
+        <ol>
+          <li>Go to "Authentication" > "Email Templates"</li>
+          <li>Customize the confirmation and recovery email templates</li>
+          <li>Update the action URLs to match your domain</li>
+        </ol>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Configure Auth Providers (Optional)</h3>
+        <p>Enable additional auth providers if needed:</p>
+        <ul>
+          <li>Google OAuth</li>
+          <li>GitHub OAuth</li>
+          <li>Discord OAuth</li>
+        </ul>
+      </section>
+
+      <section id="rls-policies" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Row Level Security (RLS)
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Enable RLS on Tables</h3>
+        <p>Row Level Security ensures users can only access their own data:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">enable_rls.sql</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>-- Enable RLS on all tables
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pain_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Create Security Policies</h3>
+        <p>Define who can access what data:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">rls_policies.sql</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>-- Conversations policies
+CREATE POLICY "Users can view their own conversations" ON conversations
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own conversations" ON conversations
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own conversations" ON conversations
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own conversations" ON conversations
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Messages policies
+CREATE POLICY "Users can view messages in their conversations" ON messages
+    FOR SELECT USING (
+        conversation_id IN (
+            SELECT id FROM conversations WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create messages in their conversations" ON messages
+    FOR INSERT WITH CHECK (
+        conversation_id IN (
+            SELECT id FROM conversations WHERE user_id = auth.uid()
+        )
+    );
+
+-- Pain points policies
+CREATE POLICY "Users can view their own pain points" ON pain_points
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own pain points" ON pain_points
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own pain points" ON pain_points
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- User profiles policies
+CREATE POLICY "Users can view their own profile" ON user_profiles
+    FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own profile" ON user_profiles
+    FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can create their own profile" ON user_profiles
+    FOR INSERT WITH CHECK (auth.uid() = id);</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Test RLS Policies</h3>
+        <p>Verify your policies work correctly by testing with different user contexts.</p>
+      </section>
+
+      <section id="api-keys" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          API Keys & Configuration
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Get Your API Keys</h3>
+        <ol>
+          <li>Go to "Settings" > "API" in your Supabase dashboard</li>
+          <li>Copy the following values:</li>
+        </ol>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">API Configuration</span>
+          </div>
+          <pre><code>URL: https://your-project-ref.supabase.co
+Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Service Role Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</code></pre>
+        </div>
+
+        <div class="warning-box">
+          <div class="warning-icon">⚠️</div>
+          <div class="warning-content">
+            <h4>Security Note</h4>
+            <p>Never expose your Service Role Key in client-side code. Use it only in server environments.</p>
+          </div>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Update Your Project Configuration</h3>
+        <p>Add the keys to your project's configuration file:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">config.yml</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Supabase Configuration
+supabase:
+  url: "https://your-project-ref.supabase.co"
+  anon_key: "your-anon-key-here"
+  service_role_key: "your-service-role-key-here"  # Server-side only!
+  
+# Database Connection (optional for direct access)
+database:
+  host: "db.your-project-ref.supabase.co"
+  port: 5432
+  database: "postgres"
+  user: "postgres"
+  password: "your-database-password"</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Environment Variables</h3>
+        <p>For security, use environment variables in production:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">.env</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-anon-key-here
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+DATABASE_URL=postgresql://postgres:your-password@db.your-project-ref.supabase.co:5432/postgres</code></pre>
+        </div>
+      </section>
+
+      <section id="test-connection" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Test Your Connection
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Install Supabase Client</h3>
+        <p>Install the Supabase Python client in your project:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Terminal</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>pip install supabase</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Test Connection Script</h3>
+        <p>Create a simple test to verify your setup:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">test_supabase.py</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>import os
+from supabase import create_client, Client
+
+# Initialize Supabase client
+url = "https://your-project-ref.supabase.co"
+key = "your-anon-key-here"
+supabase: Client = create_client(url, key)
+
+def test_connection():
+    try:
+        # Test basic connection
+        response = supabase.table('conversations').select("*").limit(1).execute()
+        print("✅ Connection successful!")
+        print(f"Response: {response}")
+        
+        # Test authentication
+        auth_response = supabase.auth.get_session()
+        print("✅ Authentication service accessible!")
+        
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+
+if __name__ == "__main__":
+    test_connection()</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Run the Test</h3>
+        <p>Execute the test script to verify everything works:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Terminal</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>python test_supabase.py</code></pre>
+        </div>
+
+        <div class="success-box">
+          <div class="success-icon">✅</div>
+          <div class="success-content">
+            <h4>Success!</h4>
+            <p>If you see "Connection successful!" your Supabase setup is complete and ready to use.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="troubleshooting" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Troubleshooting
+        </h2>
+
+        <div class="troubleshoot-item">
+          <h3>Connection Issues</h3>
+          <div class="problem">
+            <strong>Problem:</strong> "Failed to connect to Supabase"
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Verify your Supabase URL and API keys are correct</li>
+              <li>Check if your project is paused (free tier limitation)</li>
+              <li>Ensure your network allows connections to Supabase</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="troubleshoot-item">
+          <h3>RLS Policy Errors</h3>
+          <div class="problem">
+            <strong>Problem:</strong> "Row level security policy violation"
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Verify you're authenticated before making requests</li>
+              <li>Check that RLS policies allow your operation</li>
+              <li>Test policies in the SQL editor with different user contexts</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="troubleshoot-item">
+          <h3>Authentication Issues</h3>
+          <div class="problem">
+            <strong>Problem:</strong> Authentication not working
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Check your Site URL in Authentication settings</li>
+              <li>Verify redirect URLs are configured correctly</li>
+              <li>Ensure email confirmations are properly set up</li>
+              <li>Check browser console for JavaScript errors</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="troubleshoot-item">
+          <h3>Performance Issues</h3>
+          <div class="problem">
+            <strong>Problem:</strong> Slow query performance
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Add indexes to frequently queried columns</li>
+              <li>Use LIMIT clauses for large datasets</li>
+              <li>Optimize your RLS policies</li>
+              <li>Consider upgrading from the free tier</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-box">
+          <div class="help-icon">🆘</div>
+          <div class="help-content">
+            <h4>Need More Help?</h4>
+            <p>Check out these resources:</p>
+            <ul>
+              <li><a href="https://supabase.com/docs" target="_blank">Supabase Documentation</a></li>
+              <li><a href="https://github.com/supabase/supabase/discussions" target="_blank">Community Discussions</a></li>
+              <li><a href="https://discord.supabase.com" target="_blank">Discord Community</a></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="tutorial-conclusion">
+        <h2>🎉 Congratulations!</h2>
+        <p>You've successfully set up Supabase for the Mindful Assistant project. Your backend now includes:</p>
+        <ul>
+          <li>✅ PostgreSQL database with conversation tables</li>
+          <li>✅ User authentication system</li>
+          <li>✅ Secure Row Level Security policies</li>
+          <li>✅ API endpoints ready for your frontend</li>
+        </ul>
+
+        <div class="next-steps">
+          <h3>Next Steps</h3>
+          <ul>
+            <li>Integrate the Supabase client into your application</li>
+            <li>Set up user registration and login flows</li>
+            <li>Implement conversation storage and retrieval</li>
+            <li>Add real-time features for live chat</li>
+          </ul>
+        </div>
+
+        <div class="tutorial-actions">
+          <a href="tutorials.html" class="btn btn-outline">← Back to Tutorials</a>
+          <a href="https://github.com/alexey-obukhov/psy-supabase" class="btn btn-primary" target="_blank">View Source Code</a>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-info">
+          <h3>Mindful Assistant</h3>
+          <p>Technical tutorials and documentation for the open-source psychological support platform.</p>
+        </div>
+        <div class="footer-links">
+          <h4>Links</h4>
+          <ul>
+            <li><a href="https://github.com/alexey-obukhov/psy-supabase">GitHub</a></li>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="advantages.html">Advantages</a></li>
+            <li><a href="webchat.html">Chat</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="copyright">
+        <p>&copy; 2025 Mindful Assistant</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="scripts/app_page.js"></script>
+  <script>
+    // Copy to clipboard functionality
+    function copyToClipboard(button) {
+      const codeBlock = button.parentElement.nextElementSibling;
+      const text = codeBlock.textContent;
+      
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.style.background = '#28a745';
+        
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.style.background = '';
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
+    }
+
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('.tutorial-nav a').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const targetId = this.getAttribute('href').substring(1);
+        const targetSection = document.getElementById(targetId);
+        if (targetSection) {
+          targetSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
+
+    // Highlight current section in navigation
+    function highlightCurrentSection() {
+      const sections = document.querySelectorAll('.tutorial-section');
+      const navLinks = document.querySelectorAll('.tutorial-nav a');
+      
+      let currentSection = '';
+      
+      sections.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top <= 100) {
+          currentSection = section.id;
+        }
+      });
+      
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + currentSection) {
+          link.classList.add('active');
+        }
+      });
+    }
+
+    window.addEventListener('scroll', highlightCurrentSection);
+    highlightCurrentSection(); // Initial call
+  </script>
+</body>
+</html>

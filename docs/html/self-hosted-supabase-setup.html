@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self-Hosted Supabase Setup - Mindful Assistant</title>
+  <link rel="stylesheet" href="styles/app_style.css">
+  <link rel="stylesheet" href="styles/tutorial_style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1 class="site-title">Mindful Assistant</h1>
+      <nav class="site-nav">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="advantages.html">Advantages</a></li>
+          <li><a href="webchat.html">Chat</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="tutorials.html">Tutorials</a></li>
+        </ul>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <section class="tutorial-header">
+    <div class="container">
+      <div class="tutorial-breadcrumb">
+        <a href="tutorials.html">← Back to Tutorials</a>
+      </div>
+      <h1>Self-Hosted Supabase Setup</h1>
+      <p class="tutorial-subtitle">Deploy your own Supabase instance with Docker for complete data control and privacy</p>
+      <div class="tutorial-meta-header">
+        <span class="difficulty intermediate">Intermediate</span>
+        <span class="duration">45-60 minutes</span>
+        <span class="last-updated">Updated: July 2025</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="tutorial-container">
+    <aside class="tutorial-sidebar">
+      <nav class="tutorial-nav">
+        <h3>Table of Contents</h3>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#prerequisites">Prerequisites</a></li>
+          <li><a href="#system-requirements">System Requirements</a></li>
+          <li><a href="#installation">Installation</a></li>
+          <li><a href="#configuration">Configuration</a></li>
+          <li><a href="#database-setup">Database Setup</a></li>
+          <li><a href="#auth-config">Authentication Config</a></li>
+          <li><a href="#ssl-setup">SSL Setup</a></li>
+          <li><a href="#monitoring">Monitoring</a></li>
+          <li><a href="#backup-strategy">Backup Strategy</a></li>
+          <li><a href="#updating">Updating</a></li>
+          <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <main class="tutorial-content">
+      <section id="overview" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+            <path d="M20.188 10.934c.388.472.582.707.582 1.066 0 .359-.194.594-.582 1.066a9.859 9.859 0 01-1.988 2.21c-1.632 1.369-3.656 2.24-5.95 2.24s-4.318-.871-5.95-2.24a9.859 9.859 0 01-1.988-2.21C4.194 12.594 4 12.359 4 12c0-.359.194-.594.582-1.066a9.859 9.859 0 011.988-2.21C8.202 7.355 10.226 6.484 12.25 6.484s4.318.871 5.95 2.24a9.859 9.859 0 011.988 2.21z" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Overview
+        </h2>
+        <p>This tutorial will guide you through setting up a self-hosted Supabase instance using Docker. Self-hosting gives you complete control over your data, enhanced privacy, and the ability to customize the platform to your specific needs.</p>
+        
+        <div class="info-box">
+          <div class="info-icon">ℹ️</div>
+          <div class="info-content">
+            <h4>Why Self-Host Supabase?</h4>
+            <p>Self-hosting provides complete data sovereignty, no vendor lock-in, unlimited customization, and potentially lower costs for large-scale deployments.</p>
+          </div>
+        </div>
+
+        <h3>What You'll Deploy</h3>
+        <ul>
+          <li>PostgreSQL database with real-time capabilities</li>
+          <li>PostgREST API server for automatic REST endpoints</li>
+          <li>GoTrue authentication server</li>
+          <li>Kong API Gateway for request routing</li>
+          <li>Supabase Studio dashboard for management</li>
+          <li>Storage server for file uploads</li>
+          <li>Edge Functions runtime (optional)</li>
+        </ul>
+
+        <h3>Architecture Overview</h3>
+        <div class="info-box">
+          <div class="info-icon">🏗️</div>
+          <div class="info-content">
+            <h4>Supabase Stack Components</h4>
+            <ul>
+              <li><strong>Database:</strong> PostgreSQL with extensions</li>
+              <li><strong>API:</strong> PostgREST for automatic API generation</li>
+              <li><strong>Auth:</strong> GoTrue for user management</li>
+              <li><strong>Storage:</strong> S3-compatible file storage</li>
+              <li><strong>Dashboard:</strong> Supabase Studio for administration</li>
+              <li><strong>Gateway:</strong> Kong for routing and rate limiting</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="prerequisites" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M13 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Prerequisites
+        </h2>
+        <p>Before starting, ensure you have the following:</p>
+        <div class="checklist">
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            A Linux server (Ubuntu 20.04+ recommended)
+          </label>
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            Docker and Docker Compose installed
+          </label>
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            Git installed
+          </label>
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            Domain name pointing to your server (for SSL)
+          </label>
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            Basic command line knowledge
+          </label>
+          <label class="checklist-item">
+            <input type="checkbox" disabled>
+            <span class="checkmark"></span>
+            SMTP credentials for email (optional)
+          </label>
+        </div>
+
+        <div class="warning-box">
+          <div class="warning-icon">⚠️</div>
+          <div class="warning-content">
+            <h4>Important Security Note</h4>
+            <p>Self-hosting requires proper security configuration. Ensure your server is properly secured with firewalls, regular updates, and strong authentication.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="system-requirements" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+            <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          System Requirements
+        </h2>
+
+        <h3>Minimum Requirements</h3>
+        <div class="settings-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Minimum</th>
+                <th>Recommended</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>CPU</td>
+                <td>2 cores</td>
+                <td>4+ cores</td>
+                <td>More cores for concurrent users</td>
+              </tr>
+              <tr>
+                <td>RAM</td>
+                <td>4 GB</td>
+                <td>8+ GB</td>
+                <td>Database caching benefits from more RAM</td>
+              </tr>
+              <tr>
+                <td>Storage</td>
+                <td>20 GB</td>
+                <td>100+ GB SSD</td>
+                <td>Depends on data and file storage needs</td>
+              </tr>
+              <tr>
+                <td>Network</td>
+                <td>100 Mbps</td>
+                <td>1 Gbps</td>
+                <td>For file uploads and downloads</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Docker Requirements</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Check Docker Installation</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Check Docker version (should be 20.10+)
+docker --version
+
+# Check Docker Compose version (should be 1.29+)
+docker-compose --version
+
+# Verify Docker is running
+docker ps</code></pre>
+        </div>
+      </section>
+
+      <section id="installation" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="currentColor" stroke-width="2"/>
+            <polyline points="3.27,6.96 12,12.01 20.73,6.96" stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Installation
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Clone Supabase Repository</h3>
+        <p>Get the official Supabase self-hosting setup:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Terminal</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Create directory for Supabase
+mkdir ~/supabase-selfhosted
+cd ~/supabase-selfhosted
+
+# Clone the repository
+git clone --depth 1 https://github.com/supabase/supabase.git
+cd supabase/docker
+
+# Copy example environment file
+cp .env.example .env</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Install Docker (if not already installed)</h3>
+        <p>Install Docker and Docker Compose on Ubuntu:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Ubuntu Docker Installation</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Update package index
+sudo apt update
+
+# Install required packages
+sudo apt install apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Add Docker's official GPG key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Add Docker repository
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Log out and back in for group changes to take effect</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Generate Secrets</h3>
+        <p>Generate secure secrets for your installation:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Generate Secrets</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Generate JWT secret (save this!)
+openssl rand -base64 32
+
+# Generate anonymous key (save this!)
+openssl rand -base64 32
+
+# Generate service role key (save this!)
+openssl rand -base64 32
+
+# Generate PostgreSQL password
+openssl rand -base64 32</code></pre>
+        </div>
+      </section>
+
+      <section id="configuration" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 20h9" stroke="currentColor" stroke-width="2"/>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Configuration
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Configure Environment Variables</h3>
+        <p>Edit the <code>.env</code> file with your specific settings:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">.env Configuration</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Basic Configuration
+POSTGRES_PASSWORD=your_secure_postgres_password_here
+JWT_SECRET=your_jwt_secret_here
+ANON_KEY=your_anon_key_here
+SERVICE_ROLE_KEY=your_service_role_key_here
+
+# Site Configuration
+SITE_URL=https://your-domain.com
+ADDITIONAL_REDIRECT_URLS=https://your-domain.com
+
+# API Configuration
+API_EXTERNAL_URL=https://your-domain.com
+
+# Dashboard Configuration
+DASHBOARD_USERNAME=admin
+DASHBOARD_PASSWORD=your_dashboard_password_here
+
+# Database Configuration
+POSTGRES_HOST=db
+POSTGRES_DB=postgres
+POSTGRES_PORT=5432
+
+# Storage Configuration
+STORAGE_BACKEND=file
+STORAGE_FILE_SIZE_LIMIT=52428800
+STORAGE_S3_BUCKET=supabase-storage
+
+# SMTP Configuration (optional)
+SMTP_ADMIN_EMAIL=admin@your-domain.com
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_USER=your-smtp-user
+SMTP_PASS=your-smtp-password
+SMTP_SENDER_NAME=Your App Name
+
+# Security
+ENABLE_EMAIL_CONFIRMATIONS=true
+ENABLE_EMAIL_AUTOCONFIRM=false
+ENABLE_PHONE_CONFIRMATIONS=false
+ENABLE_PHONE_AUTOCONFIRM=false</code></pre>
+        </div>
+
+        <div class="warning-box">
+          <div class="warning-icon">⚠️</div>
+          <div class="warning-content">
+            <h4>Security Best Practices</h4>
+            <ul>
+              <li>Use strong, unique passwords for all services</li>
+              <li>Keep your JWT secret secure and never expose it</li>
+              <li>Regularly rotate your secrets</li>
+              <li>Use environment-specific configurations</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Configure Docker Compose Overrides (Optional)</h3>
+        <p>Create a <code>docker-compose.override.yml</code> for custom configurations:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">docker-compose.override.yml</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>version: "3.8"
+
+services:
+  db:
+    volumes:
+      # Custom PostgreSQL configuration
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c log_statement=all
+      -c log_destination=stderr
+      -c log_min_duration_statement=0
+    
+  kong:
+    ports:
+      # Bind to specific interfaces for security
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8443:8443"
+    
+  studio:
+    environment:
+      # Additional studio configuration
+      - SUPABASE_REST_URL=http://kong:8000/rest/v1/</code></pre>
+        </div>
+      </section>
+
+      <section id="database-setup" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" stroke-width="2"/>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" stroke="currentColor" stroke-width="2"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Database Setup
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Start Supabase Services</h3>
+        <p>Launch all Supabase components:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Start Services</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Start all services
+docker-compose up -d
+
+# Check if all services are running
+docker-compose ps
+
+# View logs if there are issues
+docker-compose logs</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Initialize Database Schema</h3>
+        <p>Set up the initial database schema for Mindful Assistant:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Connect to Database</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Connect to PostgreSQL container
+docker-compose exec db psql -U postgres -d postgres
+
+# Or connect from outside the container
+psql -h localhost -p 54322 -U postgres -d postgres</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Create Application Tables</h3>
+        <p>Run the same SQL from the cloud Supabase tutorial:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">mindful_assistant_schema.sql</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>-- Enable necessary extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Create conversations table
+CREATE TABLE IF NOT EXISTS conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    is_archived BOOLEAN DEFAULT FALSE
+);
+
+-- Create messages table
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- Create pain points table
+CREATE TABLE IF NOT EXISTS pain_points (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    pain_point TEXT NOT NULL,
+    category TEXT,
+    severity_score FLOAT,
+    confidence_score FLOAT,
+    first_detected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_mentioned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    occurrence_count INTEGER DEFAULT 1
+);
+
+-- Create user profiles
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    display_name TEXT,
+    preferences JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pain_points_user_id ON pain_points(user_id);
+CREATE INDEX IF NOT EXISTS idx_pain_points_conversation_id ON pain_points(conversation_id);
+
+-- Enable RLS
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pain_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies (same as cloud version)
+-- Conversations policies
+CREATE POLICY "Users can view their own conversations" ON conversations
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own conversations" ON conversations
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own conversations" ON conversations
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own conversations" ON conversations
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Messages policies
+CREATE POLICY "Users can view messages in their conversations" ON messages
+    FOR SELECT USING (
+        conversation_id IN (
+            SELECT id FROM conversations WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create messages in their conversations" ON messages
+    FOR INSERT WITH CHECK (
+        conversation_id IN (
+            SELECT id FROM conversations WHERE user_id = auth.uid()
+        )
+    );
+
+-- Pain points policies
+CREATE POLICY "Users can view their own pain points" ON pain_points
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own pain points" ON pain_points
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own pain points" ON pain_points
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- User profiles policies
+CREATE POLICY "Users can view their own profile" ON user_profiles
+    FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own profile" ON user_profiles
+    FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can create their own profile" ON user_profiles
+    FOR INSERT WITH CHECK (auth.uid() = id);</code></pre>
+        </div>
+      </section>
+
+      <section id="auth-config" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Authentication Configuration
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Access Supabase Studio</h3>
+        <p>Open your browser and navigate to Supabase Studio:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Studio Access</span>
+          </div>
+          <pre><code>URL: http://localhost:3000
+Username: admin (or your DASHBOARD_USERNAME)
+Password: your_dashboard_password_here</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Configure Authentication Settings</h3>
+        <p>In Studio, go to Authentication > Settings:</p>
+
+        <div class="settings-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Setting</th>
+                <th>Value</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Site URL</td>
+                <td><code>https://your-domain.com</code></td>
+                <td>Your production domain</td>
+              </tr>
+              <tr>
+                <td>Redirect URLs</td>
+                <td><code>https://your-domain.com/**</code></td>
+                <td>Allowed redirect patterns</td>
+              </tr>
+              <tr>
+                <td>JWT Expiry</td>
+                <td><code>3600</code></td>
+                <td>Token expiry in seconds</td>
+              </tr>
+              <tr>
+                <td>Enable signup</td>
+                <td>Enabled</td>
+                <td>Allow new registrations</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Test Authentication</h3>
+        <p>Create a test user to verify authentication works:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Create Test User</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Using curl to test signup
+curl -X POST 'http://localhost:8000/auth/v1/signup' \
+-H "apikey: YOUR_ANON_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+  "email": "test@example.com",
+  "password": "testpassword123"
+}'</code></pre>
+        </div>
+      </section>
+
+      <section id="ssl-setup" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2"/>
+            <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          SSL Setup with Let's Encrypt
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Install Certbot</h3>
+        <p>Install Let's Encrypt certbot for SSL certificates:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Install Certbot</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Install certbot
+sudo apt install certbot
+
+# Install nginx plugin
+sudo apt install python3-certbot-nginx</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Configure Nginx Reverse Proxy</h3>
+        <p>Create an nginx configuration for SSL termination:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">/etc/nginx/sites-available/supabase</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>server {
+    listen 80;
+    server_name your-domain.com;
+    
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    location /rest/ {
+        proxy_pass http://localhost:8000/rest/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    location /auth/ {
+        proxy_pass http://localhost:8000/auth/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    location /storage/ {
+        proxy_pass http://localhost:8000/storage/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Obtain SSL Certificate</h3>
+        <p>Get a free SSL certificate from Let's Encrypt:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">SSL Certificate</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Enable the site
+sudo ln -s /etc/nginx/sites-available/supabase /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Obtain SSL certificate
+sudo certbot --nginx -d your-domain.com
+
+# Test automatic renewal
+sudo certbot renew --dry-run</code></pre>
+        </div>
+      </section>
+
+      <section id="monitoring" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2"/>
+            <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3" stroke="currentColor" stroke-width="2"/>
+            <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3" stroke="currentColor" stroke-width="2"/>
+            <path d="M13 12h3" stroke="currentColor" stroke-width="2"/>
+            <path d="M5 12h3" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Monitoring and Maintenance
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Health Check Script</h3>
+        <p>Create a script to monitor service health:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">health-check.sh</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>#!/bin/bash
+
+# Health check script for Supabase
+echo "=== Supabase Health Check ==="
+echo "Timestamp: $(date)"
+
+# Check if all containers are running
+echo "Checking container status..."
+docker-compose ps
+
+# Check database connectivity
+echo "Checking database connectivity..."
+docker-compose exec -T db pg_isready -U postgres
+
+# Check API endpoints
+echo "Checking API endpoints..."
+curl -f http://localhost:8000/rest/v1/ > /dev/null 2>&1 && echo "REST API: OK" || echo "REST API: FAILED"
+curl -f http://localhost:8000/auth/v1/health > /dev/null 2>&1 && echo "Auth API: OK" || echo "Auth API: FAILED"
+
+# Check disk space
+echo "Checking disk space..."
+df -h /
+
+# Check memory usage
+echo "Checking memory usage..."
+free -h
+
+echo "=== Health Check Complete ==="</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Log Management</h3>
+        <p>Set up log rotation and monitoring:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">View and Manage Logs</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># View logs for all services
+docker-compose logs
+
+# View logs for specific service
+docker-compose logs db
+docker-compose logs kong
+docker-compose logs auth
+
+# Follow logs in real-time
+docker-compose logs -f
+
+# Limit log output
+docker-compose logs --tail=100</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Performance Monitoring</h3>
+        <p>Monitor system performance and database stats:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Database Performance</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Connect to database and check stats
+docker-compose exec db psql -U postgres -d postgres -c "
+SELECT 
+    schemaname,
+    tablename,
+    attname,
+    n_distinct,
+    correlation 
+FROM pg_stats 
+WHERE schemaname = 'public';"
+
+# Check active connections
+docker-compose exec db psql -U postgres -d postgres -c "
+SELECT count(*) as active_connections 
+FROM pg_stat_activity 
+WHERE state = 'active';"
+
+# Check database size
+docker-compose exec db psql -U postgres -d postgres -c "
+SELECT pg_size_pretty(pg_database_size('postgres')) as database_size;"</code></pre>
+        </div>
+      </section>
+
+      <section id="backup-strategy" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"/>
+            <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+            <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2"/>
+            <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2"/>
+            <polyline points="10,9 9,9 8,9" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Backup Strategy
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Database Backup Script</h3>
+        <p>Create automated database backups:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">backup-database.sh</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>#!/bin/bash
+
+# Database backup script
+BACKUP_DIR="/backups/supabase"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="supabase_backup_$DATE.sql"
+
+# Create backup directory if it doesn't exist
+mkdir -p $BACKUP_DIR
+
+# Create database backup
+docker-compose exec -T db pg_dump -U postgres postgres > "$BACKUP_DIR/$BACKUP_FILE"
+
+# Compress the backup
+gzip "$BACKUP_DIR/$BACKUP_FILE"
+
+# Remove backups older than 30 days
+find $BACKUP_DIR -name "*.sql.gz" -mtime +30 -delete
+
+echo "Backup completed: $BACKUP_FILE.gz"</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Volume Backup</h3>
+        <p>Backup Docker volumes for complete data protection:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">backup-volumes.sh</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>#!/bin/bash
+
+# Volume backup script
+BACKUP_DIR="/backups/volumes"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p $BACKUP_DIR
+
+# Stop services temporarily
+docker-compose stop
+
+# Backup volumes
+docker run --rm -v supabase_db_data:/data -v $BACKUP_DIR:/backup alpine tar czf /backup/db_data_$DATE.tar.gz -C /data .
+docker run --rm -v supabase_storage_data:/data -v $BACKUP_DIR:/backup alpine tar czf /backup/storage_data_$DATE.tar.gz -C /data .
+
+# Restart services
+docker-compose start
+
+# Remove old volume backups (keep 7 days)
+find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
+
+echo "Volume backup completed"</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Automated Backup Schedule</h3>
+        <p>Set up cron jobs for automated backups:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Crontab Setup</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Edit crontab
+crontab -e
+
+# Add these lines for automated backups:
+# Daily database backup at 2 AM
+0 2 * * * /path/to/backup-database.sh
+
+# Weekly volume backup on Sundays at 3 AM
+0 3 * * 0 /path/to/backup-volumes.sh
+
+# Daily health check at 6 AM
+0 6 * * * /path/to/health-check.sh >> /var/log/supabase-health.log</code></pre>
+        </div>
+      </section>
+
+      <section id="updating" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 4v6h6" stroke="currentColor" stroke-width="2"/>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Updating Supabase
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Check for Updates</h3>
+        <p>Regularly check for Supabase updates:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Update Process</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Navigate to Supabase directory
+cd ~/supabase-selfhosted/supabase/docker
+
+# Check current version
+git log --oneline -1
+
+# Fetch latest changes
+git fetch origin
+
+# Check what's new
+git log --oneline HEAD..origin/master
+
+# Create backup before updating
+./backup-database.sh
+./backup-volumes.sh</code></pre>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Perform Update</h3>
+        <p>Update to the latest version:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Update Commands</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Stop services
+docker-compose down
+
+# Pull latest changes
+git pull origin master
+
+# Pull new Docker images
+docker-compose pull
+
+# Start with new images
+docker-compose up -d
+
+# Check if everything is working
+docker-compose ps
+./health-check.sh</code></pre>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Rollback if Needed</h3>
+        <p>If something goes wrong, rollback to previous version:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Rollback Process</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Stop services
+docker-compose down
+
+# Rollback to previous commit
+git reset --hard HEAD~1
+
+# Restore from backup if needed
+docker-compose exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS postgres;"
+docker-compose exec -T db psql -U postgres -c "CREATE DATABASE postgres;"
+zcat /backups/supabase/latest_backup.sql.gz | docker-compose exec -T db psql -U postgres postgres
+
+# Start services
+docker-compose up -d</code></pre>
+        </div>
+      </section>
+
+      <section id="troubleshooting" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Troubleshooting
+        </h2>
+
+        <div class="troubleshoot-item">
+          <h3>Services Won't Start</h3>
+          <div class="problem">
+            <strong>Problem:</strong> Docker containers fail to start
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Check Docker daemon is running: <code>sudo systemctl status docker</code></li>
+              <li>Verify port availability: <code>sudo netstat -tulpn | grep :8000</code></li>
+              <li>Check disk space: <code>df -h</code></li>
+              <li>Review logs: <code>docker-compose logs</code></li>
+              <li>Restart Docker: <code>sudo systemctl restart docker</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="troubleshoot-item">
+          <h3>Database Connection Issues</h3>
+          <div class="problem">
+            <strong>Problem:</strong> Cannot connect to PostgreSQL
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Verify database container is running: <code>docker-compose ps db</code></li>
+              <li>Check database logs: <code>docker-compose logs db</code></li>
+              <li>Test connection: <code>docker-compose exec db pg_isready -U postgres</code></li>
+              <li>Verify password in .env file</li>
+              <li>Check firewall settings</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="troubleshoot-item">
+          <h3>SSL Certificate Issues</h3>
+          <div class="problem">
+            <strong>Problem:</strong> SSL certificate not working
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Verify domain DNS points to your server</li>
+              <li>Check nginx configuration: <code>sudo nginx -t</code></li>
+              <li>Renew certificate: <code>sudo certbot renew</code></li>
+              <li>Check certificate status: <code>sudo certbot certificates</code></li>
+              <li>Verify firewall allows ports 80 and 443</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="troubleshoot-item">
+          <h3>High Memory Usage</h3>
+          <div class="problem">
+            <strong>Problem:</strong> System running out of memory
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Increase server RAM</li>
+              <li>Optimize PostgreSQL settings</li>
+              <li>Add swap space: <code>sudo fallocate -l 2G /swapfile</code></li>
+              <li>Monitor container usage: <code>docker stats</code></li>
+              <li>Clean up old Docker images: <code>docker system prune</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="troubleshoot-item">
+          <h3>Performance Issues</h3>
+          <div class="problem">
+            <strong>Problem:</strong> Slow response times
+          </div>
+          <div class="solution">
+            <strong>Solutions:</strong>
+            <ul>
+              <li>Add database indexes for frequently queried columns</li>
+              <li>Increase PostgreSQL shared_buffers</li>
+              <li>Use connection pooling</li>
+              <li>Monitor slow queries: <code>pg_stat_statements</code></li>
+              <li>Upgrade server hardware</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-box">
+          <div class="help-icon">🆘</div>
+          <div class="help-content">
+            <h4>Additional Resources</h4>
+            <ul>
+              <li><a href="https://supabase.com/docs/guides/self-hosting" target="_blank">Official Self-Hosting Docs</a></li>
+              <li><a href="https://github.com/supabase/supabase/discussions" target="_blank">Supabase Discussions</a></li>
+              <li><a href="https://discord.supabase.com" target="_blank">Discord Community</a></li>
+              <li><a href="https://www.postgresql.org/docs/" target="_blank">PostgreSQL Documentation</a></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="tutorial-conclusion">
+        <h2>🎉 Self-Hosted Supabase is Ready!</h2>
+        <p>Congratulations! You've successfully deployed your own Supabase instance. You now have:</p>
+        <ul>
+          <li>✅ Complete data sovereignty and privacy</li>
+          <li>✅ Scalable PostgreSQL database with real-time features</li>
+          <li>✅ Secure authentication system</li>
+          <li>✅ Administrative dashboard</li>
+          <li>✅ SSL encryption and security</li>
+          <li>✅ Automated backup system</li>
+        </ul>
+
+        <div class="next-steps">
+          <h3>Next Steps</h3>
+          <ul>
+            <li>Configure your application to use the self-hosted instance</li>
+            <li>Set up monitoring and alerting</li>
+            <li>Test disaster recovery procedures</li>
+            <li>Optimize performance based on your usage patterns</li>
+            <li>Consider setting up a staging environment</li>
+          </ul>
+        </div>
+
+        <div class="warning-box">
+          <div class="warning-icon">⚠️</div>
+          <div class="warning-content">
+            <h4>Security Reminder</h4>
+            <p>Remember to regularly update your system, monitor logs, and maintain backups. Self-hosting requires ongoing maintenance and security vigilance.</p>
+          </div>
+        </div>
+
+        <div class="tutorial-actions">
+          <a href="tutorials.html" class="btn btn-outline">← Back to Tutorials</a>
+          <a href="https://github.com/alexey-obukhov/psy-supabase" class="btn btn-primary" target="_blank">View Source Code</a>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-info">
+          <h3>Mindful Assistant</h3>
+          <p>Technical tutorials and documentation for the open-source psychological support platform.</p>
+        </div>
+        <div class="footer-links">
+          <h4>Links</h4>
+          <ul>
+            <li><a href="https://github.com/alexey-obukhov/psy-supabase">GitHub</a></li>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="advantages.html">Advantages</a></li>
+            <li><a href="webchat.html">Chat</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="copyright">
+        <p>&copy; 2025 Mindful Assistant</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="scripts/app_page.js"></script>
+  <script>
+    // Copy to clipboard functionality
+    function copyToClipboard(button) {
+      const codeBlock = button.parentElement.nextElementSibling;
+      const text = codeBlock.textContent;
+      
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.style.background = '#28a745';
+        
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.style.background = '';
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
+    }
+
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('.tutorial-nav a').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const targetId = this.getAttribute('href').substring(1);
+        const targetSection = document.getElementById(targetId);
+        if (targetSection) {
+          targetSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
+
+    // Highlight current section in navigation
+    function highlightCurrentSection() {
+      const sections = document.querySelectorAll('.tutorial-section');
+      const navLinks = document.querySelectorAll('.tutorial-nav a');
+      
+      let currentSection = '';
+      
+      sections.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top <= 100) {
+          currentSection = section.id;
+        }
+      });
+      
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + currentSection) {
+          link.classList.add('active');
+        }
+      });
+    }
+
+    window.addEventListener('scroll', highlightCurrentSection);
+    highlightCurrentSection(); // Initial call
+  </script>
+</body>
+</html>
