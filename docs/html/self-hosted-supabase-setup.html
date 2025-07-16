@@ -54,34 +54,13 @@
           <li><a href="#system-requirements">System Requirements</a></li>
           <li><a href="#installation">Installation</a></li>
           <li><a href="#configuration">Configuration</a></li>
-          <li><a href="#database-setup">Database Setup</a></li>
-          <li><a href="#auth-config">Authentication Config</a></li>
+          <li><a href="#auth-config">Authentication & Email (Gmail SMTP)</a></li>
           <li><a href="#ssl-setup">SSL Setup</a></li>
           <li><a href="#monitoring">Monitoring</a></li>
           <li><a href="#backup-strategy">Backup Strategy</a></li>
           <li><a href="#updating">Updating</a></li>
           <li><a href="#troubleshooting">Troubleshooting</a></li>
         </ul>
-      </nav>
-    </aside>
-
-    <main class="tutorial-content">
-      <section id="overview" class="tutorial-section">
-        <h2>
-          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-            <path d="M20.188 10.934c.388.472.582.707.582 1.066 0 .359-.194.594-.582 1.066a9.859 9.859 0 01-1.988 2.21c-1.632 1.369-3.656 2.24-5.95 2.24s-4.318-.871-5.95-2.24a9.859 9.859 0 01-1.988-2.21C4.194 12.594 4 12.359 4 12c0-.359.194-.594.582-1.066a9.859 9.859 0 011.988-2.21C8.202 7.355 10.226 6.484 12.25 6.484s4.318.871 5.95 2.24a9.859 9.859 0 011.988 2.21z" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          Overview
-        </h2>
-        <p>This tutorial will guide you through setting up a self-hosted Supabase instance using Docker. Self-hosting gives you complete control over your data, enhanced privacy, and the ability to customize the platform to your specific needs.</p>
-        
-        <div class="info-box">
-          <div class="info-icon">ℹ️</div>
-          <div class="info-content">
-            <h4>Why Self-Host Supabase?</h4>
-            <p>Self-hosting provides complete data sovereignty, no vendor lock-in, unlimited customization, and potentially lower costs for large-scale deployments.</p>
-          </div>
         </div>
 
         <h3>What You'll Deploy</h3>
@@ -89,38 +68,13 @@
           <li>PostgreSQL database with real-time capabilities</li>
           <li>PostgREST API server for automatic REST endpoints</li>
           <li>GoTrue authentication server</li>
-          <li>Kong API Gateway for request routing</li>
-          <li>Supabase Studio dashboard for management</li>
-          <li>Storage server for file uploads</li>
-          <li>Edge Functions runtime (optional)</li>
-        </ul>
-
-        <h3>Architecture Overview</h3>
-        <div class="info-box">
-          <div class="info-icon">🏗️</div>
-          <div class="info-content">
-            <h4>Supabase Stack Components</h4>
-            <ul>
               <li><strong>Database:</strong> PostgreSQL with extensions</li>
               <li><strong>API:</strong> PostgREST for automatic API generation</li>
               <li><strong>Auth:</strong> GoTrue for user management</li>
               <li><strong>Storage:</strong> S3-compatible file storage</li>
-              <li><strong>Dashboard:</strong> Supabase Studio for administration</li>
-              <li><strong>Gateway:</strong> Kong for routing and rate limiting</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section id="prerequisites" class="tutorial-section">
-        <h2>
-          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M13 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M5 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
           Prerequisites
         </h2>
         <p>Before starting, ensure you have the following:</p>
@@ -130,7 +84,6 @@
             <span class="checkmark"></span>
             A Linux server (Ubuntu 20.04+ recommended)
           </label>
-          <label class="checklist-item">
             <input type="checkbox" disabled>
             <span class="checkmark"></span>
             Docker and Docker Compose installed
@@ -140,7 +93,6 @@
             <span class="checkmark"></span>
             Git installed
           </label>
-          <label class="checklist-item">
             <input type="checkbox" disabled>
             <span class="checkmark"></span>
             Domain name pointing to your server (for SSL)
@@ -154,7 +106,6 @@
             <input type="checkbox" disabled>
             <span class="checkmark"></span>
             SMTP credentials for email (optional)
-          </label>
         </div>
 
         <div class="warning-box">
@@ -163,7 +114,6 @@
             <h4>Important Security Note</h4>
             <p>Self-hosting requires proper security configuration. Ensure your server is properly secured with firewalls, regular updates, and strong authentication.</p>
           </div>
-        </div>
       </section>
 
       <section id="system-requirements" class="tutorial-section">
@@ -171,14 +121,11 @@
           <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
             <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
-            <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
           </svg>
           System Requirements
         </h2>
 
         <h3>Minimum Requirements</h3>
-        <div class="settings-table">
-          <table>
             <thead>
               <tr>
                 <th>Component</th>
@@ -191,7 +138,6 @@
               <tr>
                 <td>CPU</td>
                 <td>2 cores</td>
-                <td>4+ cores</td>
                 <td>More cores for concurrent users</td>
               </tr>
               <tr>
@@ -206,7 +152,6 @@
                 <td>100+ GB SSD</td>
                 <td>Depends on data and file storage needs</td>
               </tr>
-              <tr>
                 <td>Network</td>
                 <td>100 Mbps</td>
                 <td>1 Gbps</td>
@@ -216,7 +161,6 @@
           </table>
         </div>
 
-        <h3>Docker Requirements</h3>
         <div class="code-block">
           <div class="code-header">
             <span class="code-title">Check Docker Installation</span>
@@ -225,8 +169,6 @@
           <pre><code># Check Docker version (should be 20.10+)
 docker --version
 
-# Check Docker Compose version (should be 1.29+)
-docker-compose --version
 
 # Verify Docker is running
 docker ps</code></pre>
@@ -324,86 +266,32 @@ openssl rand -base64 32</code></pre>
             <path d="M12 20h9" stroke="currentColor" stroke-width="2"/>
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2"/>
           </svg>
-          Configuration
-        </h2>
-
-        <div class="step-counter">Step 1</div>
-        <h3>Configure Environment Variables</h3>
-        <p>Edit the <code>.env</code> file with your specific settings:</p>
-
-        <div class="code-block">
-          <div class="code-header">
-            <span class="code-title">.env Configuration</span>
-            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
-          </div>
-          <pre><code># Basic Configuration
-POSTGRES_PASSWORD=your_secure_postgres_password_here
-JWT_SECRET=your_jwt_secret_here
-ANON_KEY=your_anon_key_here
-SERVICE_ROLE_KEY=your_service_role_key_here
-
-# Site Configuration
 SITE_URL=https://your-domain.com
 ADDITIONAL_REDIRECT_URLS=https://your-domain.com
-
-# API Configuration
-API_EXTERNAL_URL=https://your-domain.com
-
-# Dashboard Configuration
-DASHBOARD_USERNAME=admin
-DASHBOARD_PASSWORD=your_dashboard_password_here
-
-# Database Configuration
-POSTGRES_HOST=db
-POSTGRES_DB=postgres
-POSTGRES_PORT=5432
-
-# Storage Configuration
-STORAGE_BACKEND=file
-STORAGE_FILE_SIZE_LIMIT=52428800
-STORAGE_S3_BUCKET=supabase-storage
-
-# SMTP Configuration (optional)
-SMTP_ADMIN_EMAIL=admin@your-domain.com
-SMTP_HOST=smtp.your-provider.com
-SMTP_PORT=587
-SMTP_USER=your-smtp-user
-SMTP_PASS=your-smtp-password
-SMTP_SENDER_NAME=Your App Name
-
-# Security
-ENABLE_EMAIL_CONFIRMATIONS=true
-ENABLE_EMAIL_AUTOCONFIRM=false
-ENABLE_PHONE_CONFIRMATIONS=false
-ENABLE_PHONE_AUTOCONFIRM=false</code></pre>
-        </div>
-
-        <div class="warning-box">
-          <div class="warning-icon">⚠️</div>
-          <div class="warning-content">
-            <h4>Security Best Practices</h4>
-            <ul>
-              <li>Use strong, unique passwords for all services</li>
-              <li>Keep your JWT secret secure and never expose it</li>
-              <li>Regularly rotate your secrets</li>
-              <li>Use environment-specific configurations</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="step-counter">Step 2</div>
-        <h3>Configure Docker Compose Overrides (Optional)</h3>
-        <p>Create a <code>docker-compose.override.yml</code> for custom configurations:</p>
-
         <div class="code-block">
-          <div class="code-header">
-            <span class="code-title">docker-compose.override.yml</span>
-            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
           </div>
           <pre><code>version: "3.8"
 
-services:
-  db:
+      <section id="auth-config" class="tutorial-section">
+        <h2>
+          <svg class="section-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Authentication & Email (Gmail SMTP)
+        </h2>
+
+        <div class="step-counter">Step 1</div>
+        <h3>Adjust Your Configuration</h3>
+        <p>Open the <code>.env</code> file in your <code>supabase/docker</code> directory and set the following variables to match your environment. This is the most important step for customizing your self-hosted Supabase instance.</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">.env Example</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Basic Configuration
     volumes:
       # Custom PostgreSQL configuration
       - ./postgresql.conf:/etc/postgresql/postgresql.conf
@@ -433,6 +321,31 @@ services:
             <ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" stroke-width="2"/>
             <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" stroke="currentColor" stroke-width="2"/>
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="currentColor" stroke-width="2"/>
+        </div>
+
+        <div class="info-box">
+          <div class="info-icon">ℹ️</div>
+          <div class="info-content">
+            <h4>Gmail SMTP Setup</h4>
+            <ul>
+              <li>Go to <a href="https://myaccount.google.com/security" target="_blank">Google Account Security</a> and enable 2-Step Verification if not already enabled.</li>
+              <li>Under "App passwords", generate a new app password for "Mail" (select "Other" if needed).</li>
+              <li>Use this app password as <code>SMTP_PASS</code> in your <code>.env</code> file.</li>
+              <li>Make sure <code>SMTP_USER</code> and <code>SMTP_ADMIN_EMAIL</code> are your Gmail address.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step-counter">Step 2</div>
+        <h3>Start Supabase Services</h3>
+        <p>Once your configuration is set, launch all Supabase components:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Start Services</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code># Start all services
           </svg>
           Database Setup
         </h2>
@@ -440,8 +353,23 @@ services:
         <div class="step-counter">Step 1</div>
         <h3>Start Supabase Services</h3>
         <p>Launch all Supabase components:</p>
+        </div>
+
+        <div class="step-counter">Step 3</div>
+        <h3>Access Supabase Studio & Test Email Auth</h3>
+        <p>Open your browser and navigate to Supabase Studio:</p>
 
         <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Studio Access</span>
+          </div>
+          <pre><code>URL: http://localhost:3000
+
+        <div class="code-block">
+        </div>
+
+        <p>Go to <strong>Authentication &rarr; Settings</strong> and verify your email settings. Try signing up a new user to test that email confirmation is sent via Gmail SMTP.</p>
+      </section>
           <div class="code-header">
             <span class="code-title">Start Services</span>
             <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
@@ -887,43 +815,10 @@ SELECT pg_size_pretty(pg_database_size('postgres')) as database_size;"</code></p
           Backup Strategy
         </h2>
 
-        <div class="step-counter">Step 1</div>
-        <h3>Database Backup Script</h3>
-        <p>Create automated database backups:</p>
-
-        <div class="code-block">
-          <div class="code-header">
-            <span class="code-title">backup-database.sh</span>
-            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
-          </div>
-          <pre><code>#!/bin/bash
-
-# Database backup script
-BACKUP_DIR="/backups/supabase"
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="supabase_backup_$DATE.sql"
-
-# Create backup directory if it doesn't exist
-mkdir -p $BACKUP_DIR
-
-# Create database backup
-docker-compose exec -T db pg_dump -U postgres postgres > "$BACKUP_DIR/$BACKUP_FILE"
-
-# Compress the backup
-gzip "$BACKUP_DIR/$BACKUP_FILE"
-
-# Remove backups older than 30 days
-find $BACKUP_DIR -name "*.sql.gz" -mtime +30 -delete
-
-echo "Backup completed: $BACKUP_FILE.gz"</code></pre>
-        </div>
-
-        <div class="step-counter">Step 2</div>
-        <h3>Volume Backup</h3>
-        <p>Backup Docker volumes for complete data protection:</p>
-
-        <div class="code-block">
-          <div class="code-header">
+        <h3>Health Check</h3>
+        <p>To check if Supabase is healthy, just run:</p>
+        <div class="code-block"><pre><code>docker-compose ps</code></pre></div>
+        <p>If all services show <b>Up</b>, everything is working.</p>
             <span class="code-title">backup-volumes.sh</span>
             <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
           </div>
@@ -1157,50 +1052,36 @@ docker-compose up -d</code></pre>
         </div>
 
         <div class="help-box">
-          <div class="help-icon">🆘</div>
-          <div class="help-content">
-            <h4>Additional Resources</h4>
-            <ul>
-              <li><a href="https://supabase.com/docs/guides/self-hosting" target="_blank">Official Self-Hosting Docs</a></li>
-              <li><a href="https://github.com/supabase/supabase/discussions" target="_blank">Supabase Discussions</a></li>
-              <li><a href="https://discord.supabase.com" target="_blank">Discord Community</a></li>
-              <li><a href="https://www.postgresql.org/docs/" target="_blank">PostgreSQL Documentation</a></li>
-            </ul>
-          </div>
-        </div>
-      </section>
 
       <section class="tutorial-conclusion">
-        <h2>🎉 Self-Hosted Supabase is Ready!</h2>
-        <p>Congratulations! You've successfully deployed your own Supabase instance. You now have:</p>
         <ul>
           <li>✅ Complete data sovereignty and privacy</li>
-          <li>✅ Scalable PostgreSQL database with real-time features</li>
-          <li>✅ Secure authentication system</li>
           <li>✅ Administrative dashboard</li>
           <li>✅ SSL encryption and security</li>
-          <li>✅ Automated backup system</li>
-        </ul>
 
         <div class="next-steps">
           <h3>Next Steps</h3>
-          <ul>
-            <li>Configure your application to use the self-hosted instance</li>
             <li>Set up monitoring and alerting</li>
             <li>Test disaster recovery procedures</li>
-            <li>Optimize performance based on your usage patterns</li>
-            <li>Consider setting up a staging environment</li>
           </ul>
         </div>
-
         <div class="warning-box">
-          <div class="warning-icon">⚠️</div>
+        <div class="step-counter">Step 1</div>
+        <h3>Health Check Script</h3>
+        <p>To check if Supabase is healthy, just make sure all Docker containers are running:</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">health-check.sh</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code>#!/bin/bash
           <div class="warning-content">
             <h4>Security Reminder</h4>
             <p>Remember to regularly update your system, monitor logs, and maintain backups. Self-hosting requires ongoing maintenance and security vigilance.</p>
           </div>
         </div>
 
+        </div>
         <div class="tutorial-actions">
           <a href="tutorials.html" class="btn btn-outline">← Back to Tutorials</a>
           <a href="https://github.com/alexey-obukhov/psy-supabase" class="btn btn-primary" target="_blank">View Source Code</a>
