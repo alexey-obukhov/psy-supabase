@@ -7,17 +7,17 @@
   --color-secondary: #8db3e2;      /* Lighter blue */
   --color-accent-calm: #4682b4;    /* Steel blue */
   --color-accent-soft: #e7f2fa;    /* Softest blue */
-  
+
   /* Text Colors */
   --color-text: #333333;           /* Dark gray for text */
   --color-text-light: #666666;     /* Medium gray for secondary text */
-  
+
   /* Background Colors */
   --color-background: #ffffff;     /* White background */
   --color-card-bg: #f9fbfd;        /* Very light blue-gray for cards */
   --color-alt-bg: #f0f7fd;         /* Alternative background */
   --color-border: #e0e9f5;         /* Light blue-gray for borders */
-  
+
   /* Chat Colors */
   --color-bubble-bot: #E3F2FD;
   --color-bubble-user: #E9ECEF;
@@ -27,7 +27,7 @@
   /* Typography */
   --font-primary: 'Lato', sans-serif;
   --font-secondary: 'Montserrat', sans-serif;
-  
+
   /* Spacing */
   --section-padding: 50px;
   --border-radius: 8px;
@@ -886,11 +886,11 @@ section {
   .site-nav {
     display: none;
   }
-  
+
   .menu-toggle {
     display: block;
   }
-  
+
   .site-nav.active {
     display: flex;
     position: absolute;
@@ -901,25 +901,25 @@ section {
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
     padding: 20px;
   }
-  
+
   .site-nav.active ul {
     flex-direction: column;
     width: 100%;
   }
-  
+
   .hero.split-layout .container {
     grid-template-columns: 1fr;
   }
-  
+
   .hero-visual {
     height: 200px;
     order: -1;
   }
-  
+
   .flex-layout {
     grid-template-columns: 1fr;
   }
-  
+
   .tech-highlights .split-content {
     grid-template-columns: 1fr;
   }
@@ -929,17 +929,17 @@ section {
   .feature-row {
     flex-direction: column;
   }
-  
+
   .contact-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .form-row {
     flex-direction: column;
     gap: 15px;
     margin-bottom: 0;
   }
-  
+
   .footer-grid {
     grid-template-columns: 1fr;
     gap: 20px;

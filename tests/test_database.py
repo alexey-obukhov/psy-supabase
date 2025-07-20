@@ -87,9 +87,9 @@ class TestDatabaseManager:
             # Verify result
             assert result is False
 
-            # Verify the error message was logged with the actual message format
+            # Verify the error message was logged with the actual message format used in the code
             mock_logger.error.assert_any_call(
-                "Error creating schema for user %s: %s", TEST_USER_ID, "Schema creation error"
+                "Error creating schema for user %s: %s", TEST_USER_ID, "Schema creation failed"
             )
 
     def test_get_conversation_history(self, db_manager, sample_history):

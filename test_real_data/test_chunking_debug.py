@@ -1,24 +1,25 @@
 """Debug the semantic chunking method specifically."""
 
+import datetime
 import os
 import sys
 import uuid
-import datetime
 from typing import cast
 
 # Add project to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv
+
 from psy_supabase import get_package_logger
 from psy_supabase.core.database import DatabaseManager
-from dotenv import load_dotenv
 
 load_dotenv()
 
 logger = get_package_logger(__name__)
 
 
-def debug_chunking():
+def debug_chunking() -> None:
     """Debug what semantic chunking is actually doing."""
 
     logger.info("🔍 Debugging semantic chunking method")
@@ -29,11 +30,7 @@ def debug_chunking():
     supabase_key = cast(str, os.environ.get("SUPABASE_KEY"))
     test_user_id = f"debug_user_{uuid.uuid4().hex[:8]}"
 
-    db_manager = DatabaseManager(
-        supabase_url=supabase_url,
-        supabase_key=supabase_key,
-        user_id=test_user_id
-    )
+    db_manager = DatabaseManager(supabase_url=supabase_url, supabase_key=supabase_key, user_id=test_user_id)
 
     pain_detector = db_manager.pain_point_detector
     db_manager.schema_name = db_manager.schema_name
@@ -185,7 +182,9 @@ def debug_chunking():
     except Exception as e:
         logger.info(f"❌ Chunking test failed: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     debug_chunking()

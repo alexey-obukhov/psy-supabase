@@ -7,7 +7,7 @@ import os
 import traceback
 from logging import Logger
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -79,11 +79,13 @@ def load_toxicity_model(
             log.info("Downloading toxicity model '%s' to %s", toxicity_model_name, local_path)
             ensure_dir_exists(local_path)
             toxicity_tokenizer = AutoTokenizer.from_pretrained(toxicity_model_name)
-            toxicity_tokenizer.save_pretrained(local_path)
+            if toxicity_tokenizer is not None:
+                toxicity_tokenizer.save_pretrained(local_path)
             toxicity_model = AutoModelForSequenceClassification.from_pretrained(
                 toxicity_model_name, torch_dtype=torch.float32
             )
-            toxicity_model.save_pretrained(local_path)
+            if toxicity_model is not None:
+                toxicity_model.save_pretrained(local_path)
             log.info("Toxicity model saved to %s", local_path)
 
         # Explicit Type Check for Model
@@ -107,8 +109,9 @@ def load_toxicity_model(
             return None, None
 
         # Move to CPU and set to eval mode
-        toxicity_model = toxicity_model.to("cpu")
-        toxicity_model.eval()
+        if toxicity_model is not None:
+            toxicity_model = toxicity_model.to("cpu")
+            toxicity_model.eval()
         log.info("Toxicity model and tokenizer loaded successfully and moved to CPU.")
 
     except Exception as e:

@@ -680,7 +680,7 @@ def non_toxic_rag_processor(mock_db_manager_with_spy, mock_text_generator):  # p
 
     # Patch the response_generator if it exists and has the method
     if hasattr(processor, "response_generator") and hasattr(processor.response_generator, "check_toxic_content"):
-        processor.response_generator.check_toxic_content = lambda text, session_id: None
+        processor.response_generator.check_toxic_content = lambda user_question, session_id: None
 
     return processor
 

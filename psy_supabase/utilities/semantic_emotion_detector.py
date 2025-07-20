@@ -1,5 +1,4 @@
-import re
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -108,7 +107,8 @@ class SemanticEmotionDetector:
             norm = np.linalg.norm(embedding)
             if norm > 0:
                 embedding = embedding / norm
-            return embedding[0]
+            # Ensure compatibility with numpy 2.0+ by explicitly converting to float64
+            return np.asarray(embedding[0], dtype=np.float64)
 
     def detect_emotion(self, text: str) -> Tuple[str, float]:
         """Detect emotion by comparing text embedding similarity with emotion templates"""
@@ -183,6 +183,9 @@ class SemanticEmotionDetector:
 
     def _cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
         """Compute cosine similarity between two vectors"""
+        # Ensure numpy 2.0+ compatibility with explicit dtype conversion
+        vec1 = np.asarray(vec1, dtype=np.float64)
+        vec2 = np.asarray(vec2, dtype=np.float64)
         return float(np.dot(vec1, vec2))
 
     def get_standardized_emotion(self, emotion: str) -> str:

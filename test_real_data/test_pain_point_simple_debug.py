@@ -4,20 +4,25 @@ import os
 import sys
 import uuid
 from typing import cast
+
 import numpy as np
+
 # Configure logging
 from psy_supabase import get_package_logger
+
 logger = get_package_logger(__name__)
 # Add project to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv
+
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.model_manager import get_embedding_provider
-from dotenv import load_dotenv
 
 load_dotenv()
 
-def test_similarity_only():
+
+def test_similarity_only() -> None:
     """Test just the similarity calculation."""
 
     logger.info("🔍 Testing pain point similarity calculation only")
@@ -28,11 +33,7 @@ def test_similarity_only():
     supabase_key = cast(str, os.environ.get("SUPABASE_KEY"))
     test_user_id = f"debug_user_{uuid.uuid4().hex[:8]}"
 
-    db_manager = DatabaseManager(
-        supabase_url=supabase_url,
-        supabase_key=supabase_key,
-        user_id=test_user_id
-    )
+    db_manager = DatabaseManager(supabase_url=supabase_url, supabase_key=supabase_key, user_id=test_user_id)
 
     # Get the pain detector
     pain_detector = db_manager.pain_point_detector
@@ -146,6 +147,7 @@ def test_similarity_only():
 
     except Exception as e:
         logger.info(f"❌ Chunk similarity failed: {e}")
+
 
 if __name__ == "__main__":
     test_similarity_only()

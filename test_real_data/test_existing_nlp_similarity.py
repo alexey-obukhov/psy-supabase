@@ -10,7 +10,8 @@ from psy_supabase import get_package_logger
 
 logger = get_package_logger(__name__)
 
-def test_existing_nlp():
+
+def test_existing_nlp() -> None:
     """Test semantic similarity with existing spaCy setup."""
 
     logger.info("🔍 Testing existing spaCy semantic similarity")
@@ -24,7 +25,7 @@ def test_existing_nlp():
     logger.info(f"Question 2: {q2}")
 
     try:
-        from psy_supabase.utilities.nlp_utils import get_spacy_model, extract_entities
+        from psy_supabase.utilities.nlp_utils import extract_entities, get_spacy_model
 
         # Get existing spaCy model
         nlp = get_spacy_model()
@@ -73,7 +74,7 @@ def test_existing_nlp():
                 ("inadequate", "inadequate"),
                 ("work", "day"),
                 ("every", "every"),
-                ("day", "day")
+                ("day", "day"),
             ]
 
             for w1, w2 in key_pairs:
@@ -88,7 +89,9 @@ def test_existing_nlp():
     except Exception as e:
         logger.info(f"❌ Error testing spaCy: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     test_existing_nlp()

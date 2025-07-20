@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   'use strict';
-  
+
   // --- 1. DOM Element References ---
   const chatForm = document.getElementById('chat-form');
   const usernameInput = document.getElementById('username');
@@ -12,10 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const siteNav = document.querySelector('.site-nav');
 
   // API endpoint from the original script
-  const API_ENDPOINT = 'http://psy-supabase.com:5008/chat';
+  const API_ENDPOINT = 'http://psy-supabase.com:5000/chat';
 
   // --- 2. UI Enhancements ---
-  
+
   // Mobile navigation toggle
   if (menuToggle) {
     menuToggle.addEventListener('click', function() {
@@ -30,21 +30,21 @@ document.addEventListener('DOMContentLoaded', () => {
     .menu-toggle.open span:nth-child(1) {
       transform: rotate(45deg) translate(5px, 5px);
     }
-    
+
     .menu-toggle.open span:nth-child(2) {
       opacity: 0;
     }
-    
+
     .menu-toggle.open span:nth-child(3) {
       transform: rotate(-45deg) translate(5px, -5px);
     }
-    
+
     .fade-in {
       opacity: 0;
       transform: translateY(20px);
       transition: opacity 0.6s ease, transform 0.6s ease;
     }
-    
+
     .fade-in.appear {
       opacity: 1;
       transform: translateY(0);
@@ -58,13 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const targetId = this.getAttribute('href');
       const targetElement = document.querySelector(targetId);
-      
+
       if (targetElement) {
         targetElement.scrollIntoView({
           behavior: 'smooth',
           block: 'start'
         });
-        
+
         // Close mobile menu if open
         if (siteNav && siteNav.classList.contains('active')) {
           siteNav.classList.remove('active');
@@ -76,13 +76,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Intersection Observer for animations
   const animatedElements = document.querySelectorAll('.feature-card, .process-step');
-  
+
   if ('IntersectionObserver' in window && animatedElements.length > 0) {
     const appearOptions = {
       threshold: 0.15,
       rootMargin: '0px 0px -50px 0px'
     };
-    
+
     const appearOnScroll = new IntersectionObserver(function(entries, observer) {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }, appearOptions);
-    
+
     animatedElements.forEach(element => {
       element.classList.add('fade-in');
       appearOnScroll.observe(element);
@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!question) {
         questionTextarea.classList.add('input-error');
       }
-      return; 
+      return;
     }
 
     appendMessage(question, 'user');
@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bubbleDiv.style.backgroundColor = 'var(--color-error)';
       bubbleDiv.style.color = 'var(--color-white)';
     }
-    
+
     messageDiv.appendChild(bubbleDiv);
     chatLog.appendChild(messageDiv);
 
@@ -224,12 +224,12 @@ if (tabBtns.length > 0) {
     btn.addEventListener('click', () => {
       // Remove active class from all buttons
       tabBtns.forEach(b => b.classList.remove('active'));
-      
+
       // Add active class to clicked button
       btn.classList.add('active');
-      
+
       const category = btn.getAttribute('data-tab');
-      
+
       // Show/hide cards based on category
       advantageCards.forEach(card => {
         if (category === 'all' || card.getAttribute('data-category') === category) {

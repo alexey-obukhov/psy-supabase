@@ -25,14 +25,25 @@ import re
 import traceback
 from functools import wraps
 from logging import Logger
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from psy_supabase import get_package_logger
+
+# Import ColoredLogger for type annotations
+try:
+    from prismalog.log import ColoredLogger
+except ImportError:
+    ColoredLogger = Logger  # Fallback
 from psy_supabase.utilities.keep_words import keep_words
 from psy_supabase.utilities.nlp_utils import get_spacy_model
 
 if TYPE_CHECKING:
     from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    try:
+        from prismalog.log import ColoredLogger
+    except ImportError:
+        ColoredLogger = Logger
 
 
 def clean_text(text: str) -> str:
@@ -61,7 +72,7 @@ def clean_text(text: str) -> str:
     return text
 
 
-def tokenize_and_lemmatize(text: str, logger: Optional[Logger] = None) -> str:
+def tokenize_and_lemmatize(text: str, logger: "Optional[Union[Logger, Any]]" = None) -> str:
     """
     Tokenize and lemmatize text using spaCy.
 
@@ -130,7 +141,7 @@ def download_and_store_model(
         raise
 
 
-def debug_errors(logger: Optional[Logger] = None) -> Callable:
+def debug_errors(logger: "Optional[Union[Logger, Any]]" = None) -> Callable:
     """
     Decorator to debug errors in methods with detailed information.
 
@@ -157,6 +168,9 @@ def debug_errors(logger: Optional[Logger] = None) -> Callable:
     # Get a default logger if none provided
     if logger is None:
         logger = get_package_logger(__name__)
+
+    # Assert logger is not None for type checking
+    assert logger is not None
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -234,14 +248,21 @@ def cleanup_memory(force_cuda_cleanup: bool = True) -> None:
 
     logger = get_package_logger(__name__)
 
-    # First collect Python garbage
-    gc.collect()
+    # Import CUDA_CONFIG for configurable cleanup behavior
+    from ..config import CUDA_CONFIG
+
+    # First collect Python garbage if configured
+    gc_frequency = CUDA_CONFIG.get("gc_collect_frequency", 0)
+    if isinstance(gc_frequency, int) and gc_frequency > 0:
+        gc.collect()
 
     # Then handle CUDA memory if available and requested
     if force_cuda_cleanup and torch.cuda.is_available():
-        # Get initial memory stats for logging
-        before_allocated = torch.cuda.memory_allocated() / (1024**3)
-        before_reserved = torch.cuda.memory_reserved() / (1024**3)
+        # Get initial memory stats for logging if monitoring is enabled
+        before_allocated = before_reserved = 0.0
+        if CUDA_CONFIG.get("monitor_memory_usage", False):
+            before_allocated = torch.cuda.memory_allocated() / (1024**3)
+            before_reserved = torch.cuda.memory_reserved() / (1024**3)
 
         # Suppress the specific PyTorch warning
         with warnings.catch_warnings():
@@ -255,25 +276,29 @@ def cleanup_memory(force_cuda_cleanup: bool = True) -> None:
                 except:
                     pass
 
-        # Force garbage collection again after moving tensors
-        gc.collect()
+        # Force garbage collection again after moving tensors (if configured)
+        if isinstance(gc_frequency, int) and gc_frequency > 0:
+            gc.collect()
 
-        # Clear CUDA cache
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
+        # Clear CUDA cache if enabled in config
+        if CUDA_CONFIG.get("torch_cuda_empty_cache", False):
+            torch.cuda.empty_cache()
 
-        # Get final memory stats
-        after_allocated = torch.cuda.memory_allocated() / (1024**3)
-        after_reserved = torch.cuda.memory_reserved() / (1024**3)
+        # Synchronize if enabled in config
+        if CUDA_CONFIG["torch_cuda_synchronize"]:
+            torch.cuda.synchronize()
 
-        # Log memory change
-        logger.info(
-            "GPU memory cleanup: %.2fGB → %.2fGB allocated, %.2fGB → %.2fGB reserved",
-            before_allocated,
-            after_allocated,
-            before_reserved,
-            after_reserved,
-        )
+        # Log memory change if monitoring is enabled
+        if CUDA_CONFIG["monitor_memory_usage"]:
+            after_allocated = torch.cuda.memory_allocated() / (1024**3)
+            after_reserved = torch.cuda.memory_reserved() / (1024**3)
+            logger.info(
+                "GPU memory cleanup: %.2fGB → %.2fGB allocated, %.2fGB → %.2fGB reserved",
+                before_allocated,
+                after_allocated,
+                before_reserved,
+                after_reserved,
+            )
 
 
 def parse_bool_env(env_var: str, default: bool = False) -> bool:

@@ -25,9 +25,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from typeguard import typechecked
 
 from psy_supabase import get_package_logger
-from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_THEME, DEFAULT_TOPIC
+from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_TOPIC
 from psy_supabase.core.database import DatabaseManager
-from psy_supabase.core.dynamic_rag import DynamicRAGRetriever
 from psy_supabase.core.text_generator import TextGenerator
 from psy_supabase.utilities.prompt_selector import PromptSelector
 from psy_supabase.utilities.semantic_emotion_detector import SemanticEmotionDetector

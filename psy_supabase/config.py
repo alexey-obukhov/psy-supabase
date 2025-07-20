@@ -116,6 +116,40 @@ TOXICITY_CONFIG = {
     "check_generated_response": True,  # Scan AI responses for toxicity
 }
 
+# CUDA/GPU Performance Configuration
+# ==================================
+# Controls GPU memory management and CUDA optimization
+CUDA_CONFIG = {
+    # Memory management
+    "cleanup_threshold": 15,  # Clean up GPU memory after this many requests - less frequent with 16GB VRAM
+    "cleanup_time_threshold": 600,  # Clean up GPU memory after this many seconds (10 minutes) - longer with good VRAM
+    "random_cleanup_probability": 0.02,  # 2% chance to randomly clean up memory - reduced for performance
+    "force_cpu_fallback": False,  # Force CPU usage even if CUDA is available
+    # Model loading optimization
+    "lazy_model_loading": True,  # Load models only when needed
+    "model_cache_enabled": True,  # Keep models in memory between requests
+    "max_cached_models": 4,  # Maximum number of models to keep in GPU memory - increased for 16GB VRAM
+    # Memory allocation strategies
+    "torch_cuda_empty_cache": True,  # Call torch.cuda.empty_cache() during cleanup
+    "torch_cuda_synchronize": True,  # Call torch.cuda.synchronize() for memory consistency
+    "gc_collect_frequency": 1,  # Run garbage collection every N cleanups
+    # Performance tuning
+    "mixed_precision": True,  # Use mixed precision (fp16) for faster inference - RTX 3070 Ti has excellent Tensor Cores
+    "optimized_attention": True,  # Use optimized attention mechanisms when available
+    "compile_models": True,  # Use torch.compile() for model optimization (requires PyTorch 2.0+)
+    "quantization_8bit": False,  # Enable 8-bit quantization for models - not needed with 16GB VRAM
+    "quantization_4bit": False,  # Enable 4-bit quantization for models - not needed with 16GB VRAM
+    # Device management
+    "device_selection": "auto",  # "auto", "cuda", "cpu", or specific device like "cuda:0"
+    "multi_gpu_strategy": "single",  # "single", "data_parallel", "model_parallel"
+    "gpu_memory_fraction": 0.85,  # Fraction of GPU memory to use (0.1-1.0) - optimized for RTX 3070 Ti
+    # Monitoring and debugging
+    "monitor_memory_usage": True,  # Log GPU memory usage statistics
+    "log_device_info": True,  # Log CUDA device information at startup
+    "memory_profiling": False,  # Enable detailed memory profiling (development only)
+    "warn_on_memory_pressure": True,  # Warn when GPU memory usage is high
+}
+
 # RAG Processing Configuration
 # ===========================
 # Controls retrieval-augmented generation behavior and caching
@@ -320,3 +354,159 @@ RAG_CONFIG = {
 # 2. Enable detailed logging to debug retrieval
 # 3. Check vector database content quality
 # 4. Verify embedding model compatibility
+
+# CUDA/GPU PERFORMANCE OPTIMIZATION GUIDE
+# =======================================
+#
+# FOR HIGH-PERFORMANCE GPU SETUPS (RTX 4090, A100, etc.):
+# - Set CUDA_CONFIG["cleanup_threshold"] = 20 (less frequent cleanups)
+# - Set CUDA_CONFIG["cleanup_time_threshold"] = 600 (10 minutes)
+# - Set CUDA_CONFIG["max_cached_models"] = 5 (more models in memory)
+# - Set CUDA_CONFIG["mixed_precision"] = True (faster inference with fp16)
+# - Set CUDA_CONFIG["compile_models"] = True (PyTorch 2.0+ optimization)
+# - Set CUDA_CONFIG["gpu_memory_fraction"] = 0.9 (use most of GPU memory)
+# - Set CUDA_CONFIG["optimized_attention"] = True (enable all optimizations)
+#
+# FOR CONSUMER GPUS (RTX 3060, GTX 1080, etc.):
+# - Set CUDA_CONFIG["cleanup_threshold"] = 5 (frequent memory cleanups)
+# - Set CUDA_CONFIG["cleanup_time_threshold"] = 120 (2 minutes)
+# - Set CUDA_CONFIG["max_cached_models"] = 2 (limited model caching)
+# - Set CUDA_CONFIG["mixed_precision"] = True (save memory with fp16)
+# - Set CUDA_CONFIG["gpu_memory_fraction"] = 0.7 (leave room for system)
+# - Set CUDA_CONFIG["warn_on_memory_pressure"] = True (monitor usage)
+# - Set CUDA_CONFIG["random_cleanup_probability"] = 0.1 (10% cleanup chance)
+#
+# FOR LOW-MEMORY GPUS (4GB-8GB VRAM):
+# - Set CUDA_CONFIG["cleanup_threshold"] = 3 (aggressive memory management)
+# - Set CUDA_CONFIG["cleanup_time_threshold"] = 60 (1 minute)
+# - Set CUDA_CONFIG["max_cached_models"] = 1 (minimal caching)
+# - Set CUDA_CONFIG["lazy_model_loading"] = True (load on demand)
+# - Set CUDA_CONFIG["model_cache_enabled"] = False (disable model caching)
+# - Set CUDA_CONFIG["gpu_memory_fraction"] = 0.6 (conservative memory usage)
+# - Set CUDA_CONFIG["gc_collect_frequency"] = 1 (frequent garbage collection)
+#
+# FOR CPU-ONLY SYSTEMS:
+# - Set CUDA_CONFIG["force_cpu_fallback"] = True (disable GPU entirely)
+# - Set CUDA_CONFIG["model_cache_enabled"] = True (CPU memory is cheaper)
+# - Set CUDA_CONFIG["max_cached_models"] = 3 (more aggressive CPU caching)
+# - Set CUDA_CONFIG["monitor_memory_usage"] = False (no GPU to monitor)
+#
+# FOR DEVELOPMENT/DEBUGGING:
+# - Set CUDA_CONFIG["memory_profiling"] = True (detailed memory tracking)
+# - Set CUDA_CONFIG["log_device_info"] = True (verbose device information)
+# - Set CUDA_CONFIG["monitor_memory_usage"] = True (track all allocations)
+# - Set CUDA_CONFIG["cleanup_threshold"] = 1 (cleanup after every request)
+# - Set CUDA_CONFIG["warn_on_memory_pressure"] = True (immediate warnings)
+#
+# FOR PRODUCTION HIGH-THROUGHPUT:
+# - Set CUDA_CONFIG["cleanup_threshold"] = 50 (minimize cleanup overhead)
+# - Set CUDA_CONFIG["cleanup_time_threshold"] = 1800 (30 minutes)
+# - Set CUDA_CONFIG["random_cleanup_probability"] = 0.01 (1% cleanup chance)
+# - Set CUDA_CONFIG["mixed_precision"] = True (maximum performance)
+# - Set CUDA_CONFIG["compile_models"] = True (optimize model execution)
+# - Set CUDA_CONFIG["memory_profiling"] = False (disable debug overhead)
+#
+# CUDA MEMORY MANAGEMENT STRATEGIES:
+# =================================
+#
+# Aggressive Memory Management (for limited VRAM):
+# - Set CUDA_CONFIG["torch_cuda_empty_cache"] = True
+# - Set CUDA_CONFIG["torch_cuda_synchronize"] = True
+# - Set CUDA_CONFIG["gc_collect_frequency"] = 1
+# - Set CUDA_CONFIG["cleanup_threshold"] = 2
+# - Set CUDA_CONFIG["random_cleanup_probability"] = 0.15
+#
+# Balanced Memory Management (for moderate VRAM):
+# - Set CUDA_CONFIG["torch_cuda_empty_cache"] = True
+# - Set CUDA_CONFIG["torch_cuda_synchronize"] = False
+# - Set CUDA_CONFIG["gc_collect_frequency"] = 3
+# - Set CUDA_CONFIG["cleanup_threshold"] = 10
+# - Set CUDA_CONFIG["random_cleanup_probability"] = 0.05
+#
+# Conservative Memory Management (for high VRAM):
+# - Set CUDA_CONFIG["torch_cuda_empty_cache"] = False
+# - Set CUDA_CONFIG["torch_cuda_synchronize"] = False
+# - Set CUDA_CONFIG["gc_collect_frequency"] = 10
+# - Set CUDA_CONFIG["cleanup_threshold"] = 25
+# - Set CUDA_CONFIG["random_cleanup_probability"] = 0.01
+#
+# MULTI-GPU CONFIGURATIONS:
+# ========================
+#
+# Single GPU (most common):
+# - Set CUDA_CONFIG["device_selection"] = "auto" (or "cuda:0")
+# - Set CUDA_CONFIG["multi_gpu_strategy"] = "single"
+#
+# Data Parallel (multiple GPUs, same model):
+# - Set CUDA_CONFIG["device_selection"] = "cuda"
+# - Set CUDA_CONFIG["multi_gpu_strategy"] = "data_parallel"
+# - Set CUDA_CONFIG["max_cached_models"] = 1 (replicated across GPUs)
+#
+# Model Parallel (very large models):
+# - Set CUDA_CONFIG["device_selection"] = "cuda"
+# - Set CUDA_CONFIG["multi_gpu_strategy"] = "model_parallel"
+# - Set CUDA_CONFIG["gpu_memory_fraction"] = 0.9 (use most memory)
+#
+# TROUBLESHOOTING CUDA ISSUES:
+# ===========================
+#
+# If getting CUDA Out of Memory errors:
+# 1. Reduce CUDA_CONFIG["gpu_memory_fraction"] to 0.5
+# 2. Set CUDA_CONFIG["cleanup_threshold"] to 1
+# 3. Enable CUDA_CONFIG["torch_cuda_empty_cache"] = True
+# 4. Disable CUDA_CONFIG["model_cache_enabled"] = False
+# 5. Set CUDA_CONFIG["max_cached_models"] = 1
+#
+# If inference is too slow:
+# 1. Enable CUDA_CONFIG["mixed_precision"] = True
+# 2. Enable CUDA_CONFIG["compile_models"] = True
+# 3. Increase CUDA_CONFIG["cleanup_threshold"] to 20
+# 4. Set CUDA_CONFIG["optimized_attention"] = True
+# 5. Increase CUDA_CONFIG["max_cached_models"] to 3
+#
+# If models fail to load:
+# 1. Set CUDA_CONFIG["force_cpu_fallback"] = True (temporary)
+# 2. Check CUDA_CONFIG["device_selection"] is correct
+# 3. Enable CUDA_CONFIG["log_device_info"] = True
+# 4. Verify CUDA drivers and PyTorch CUDA support
+#
+# If memory leaks occur:
+# 1. Enable CUDA_CONFIG["torch_cuda_empty_cache"] = True
+# 2. Set CUDA_CONFIG["gc_collect_frequency"] = 1
+# 3. Reduce CUDA_CONFIG["cleanup_threshold"] to 3
+# 4. Enable CUDA_CONFIG["memory_profiling"] = True
+# 5. Monitor with CUDA_CONFIG["monitor_memory_usage"] = True
+#
+# PERFORMANCE MONITORING:
+# ======================
+#
+# Enable Full Monitoring (development):
+# - Set CUDA_CONFIG["monitor_memory_usage"] = True
+# - Set CUDA_CONFIG["log_device_info"] = True
+# - Set CUDA_CONFIG["memory_profiling"] = True
+# - Set CUDA_CONFIG["warn_on_memory_pressure"] = True
+#
+# Minimal Monitoring (production):
+# - Set CUDA_CONFIG["monitor_memory_usage"] = False
+# - Set CUDA_CONFIG["log_device_info"] = False
+# - Set CUDA_CONFIG["memory_profiling"] = False
+# - Set CUDA_CONFIG["warn_on_memory_pressure"] = True (keep warnings)
+#
+# HARDWARE-SPECIFIC OPTIMIZATIONS:
+# ===============================
+#
+# NVIDIA RTX 30/40 Series:
+# - Set CUDA_CONFIG["mixed_precision"] = True (excellent Tensor Core support)
+# - Set CUDA_CONFIG["optimized_attention"] = True (flash attention support)
+# - Set CUDA_CONFIG["compile_models"] = True (good compiler support)
+#
+# NVIDIA GTX 10/16 Series:
+# - Set CUDA_CONFIG["mixed_precision"] = False (no Tensor Cores)
+# - Set CUDA_CONFIG["gpu_memory_fraction"] = 0.7 (older memory management)
+# - Set CUDA_CONFIG["cleanup_threshold"] = 5 (more frequent cleanup)
+#
+# NVIDIA Tesla/Quadro (datacenter):
+# - Set CUDA_CONFIG["gpu_memory_fraction"] = 0.95 (maximize usage)
+# - Set CUDA_CONFIG["max_cached_models"] = 5 (large memory)
+# - Set CUDA_CONFIG["cleanup_threshold"] = 30 (infrequent cleanup)
+# - Set CUDA_CONFIG["mixed_precision"] = True (enterprise Tensor Cores)

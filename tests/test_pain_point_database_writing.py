@@ -4,11 +4,12 @@ This will help identify where and how pain points are being stored.
 """
 
 import json
-import pytest
-from typing import Dict, Any
+from typing import Any, Dict
 from unittest.mock import Mock
 
+import pytest
 from prismalog.log import get_logger
+
 from psy_supabase.core.database import DatabaseManager
 
 # Set up logger
@@ -17,6 +18,7 @@ logger = get_logger(__name__)
 
 class TestPainPointDatabaseWriting:
     """Test suite for pain point database writing functionality."""
+
     @pytest.fixture
     def mock_db_manager(self) -> DatabaseManager:
         """Create a mock database manager for testing."""
@@ -36,7 +38,7 @@ class TestPainPointDatabaseWriting:
                     "theme": "self_compassion",
                     "recurring_terms": ["inadequate", "every day", "tired"],
                     "first_seen": 1234567890,
-                    "affected_interactions": [1, 3, 5]
+                    "affected_interactions": [1, 3, 5],
                 },
                 {
                     "template_used": "anxiety_management",
@@ -45,12 +47,12 @@ class TestPainPointDatabaseWriting:
                     "theme": "workplace_anxiety",
                     "recurring_terms": ["worried", "job", "security"],
                     "first_seen": 1234567892,
-                    "affected_interactions": [2, 4]
-                }
+                    "affected_interactions": [2, 4],
+                },
             ],
             "severity": "medium",
             "analysis_time_window_days": 30,
-            "total_interactions_analyzed": 5
+            "total_interactions_analyzed": 5,
         }
 
     def test_pain_point_detection_returns_correct_format(self, mock_db_manager, sample_pain_point_data):
@@ -80,6 +82,7 @@ class TestPainPointDatabaseWriting:
 
         # Mock detect_pain_points to simulate recurrence detection
         call_count = 0
+
         def mock_detect_with_recurrence(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -90,7 +93,9 @@ class TestPainPointDatabaseWriting:
                 logger.info("🔍 Recurrence detected - pain points found!")
                 modified_sample_data = sample_pain_point_data.copy()
                 for pp in modified_sample_data["pain_points"]:
-                    pp["question"] = "Should I start looking for another job? I'm tired of feeling inadequate every day in this place."
+                    pp["question"] = (
+                        "Should I start looking for another job? I'm tired of feeling inadequate every day in this place."
+                    )
                 return modified_sample_data
 
         mock_db_manager.detect_pain_points.side_effect = mock_detect_with_recurrence
@@ -100,11 +105,12 @@ class TestPainPointDatabaseWriting:
             "question": "Should I start looking for another job? I'm tired of feeling inadequate every day in this place.",
             "answer": "It sounds like you're experiencing some workplace stress...",
             "context": "workplace discussion",
-            "metadata": {}
+            "metadata": {},
         }
 
         # Mock add_interaction to capture what would be stored
         stored_interactions = []
+
         def mock_add_interaction(data, session_id=None):
             metadata = data.get("metadata", {})
 
@@ -127,18 +133,22 @@ class TestPainPointDatabaseWriting:
                             if question_text and recurring_terms:
                                 existing_questions = [pp.get("question", "") for pp in existing_pain_points]
                                 if question_text not in existing_questions:
-                                    existing_pain_points.append({
-                                        "question": question_text,  # Store original question
-                                        "detected": True,
-                                        "similarity": 1.0,
-                                        "template_used": new_pp.get("template_used", "cognitive_behavioral_therapy"),
-                                        "occurrence_count": new_pp.get("occurrence_count", 1),
-                                        "severity": new_pp.get("severity", "low"),
-                                        "theme": new_pp.get("theme", "general_support"),
-                                        "recurring_terms": recurring_terms[:3],  # Keep for comparison
-                                        "first_seen": new_pp.get("first_seen", 0),
-                                        "affected_interactions": new_pp.get("affected_interactions", [])
-                                    })
+                                    existing_pain_points.append(
+                                        {
+                                            "question": question_text,  # Store original question
+                                            "detected": True,
+                                            "similarity": 1.0,
+                                            "template_used": new_pp.get(
+                                                "template_used", "cognitive_behavioral_therapy"
+                                            ),
+                                            "occurrence_count": new_pp.get("occurrence_count", 1),
+                                            "severity": new_pp.get("severity", "low"),
+                                            "theme": new_pp.get("theme", "general_support"),
+                                            "recurring_terms": recurring_terms[:3],  # Keep for comparison
+                                            "first_seen": new_pp.get("first_seen", 0),
+                                            "affected_interactions": new_pp.get("affected_interactions", []),
+                                        }
+                                    )
 
                         metadata["pain_points"] = existing_pain_points
                         metadata["has_pain_points"] = True
@@ -175,7 +185,7 @@ class TestPainPointDatabaseWriting:
             "question": "I'm still feeling inadequate every day and considering leaving.",
             "answer": "I understand this is an ongoing concern...",
             "context": "follow-up discussion",
-            "metadata": {}
+            "metadata": {},
         }
 
         result2 = mock_db_manager.add_interaction(interaction_data2, "test_session")
@@ -212,14 +222,18 @@ class TestPainPointDatabaseWriting:
             pytest.fail("Pain points should be stored on recurrence (second occurrence)")
 
         # Verify detect_pain_points was called twice
-        assert mock_db_manager.detect_pain_points.call_count == 2, f"Expected 2 calls, got {mock_db_manager.detect_pain_points.call_count}"
+        assert (
+            mock_db_manager.detect_pain_points.call_count == 2
+        ), f"Expected 2 calls, got {mock_db_manager.detect_pain_points.call_count}"
 
         logger.info("✅ Pain point recurrence detection test passed!")
 
     def test_pain_point_question_storage(self, sample_pain_point_data):
         """Test that pain points store original questions with recurring terms for comparison."""
         # Sample data
-        full_question = "Should I start looking for another job? I'm tired of feeling inadequate every day in this place."
+        full_question = (
+            "Should I start looking for another job? I'm tired of feeling inadequate every day in this place."
+        )
         expected_terms = ["inadequate", "every day", "tired"]
 
         # Simulate the pain point processing
@@ -250,7 +264,7 @@ class TestPainPointDatabaseWriting:
                     "theme": "self_compassion",
                     "recurring_terms": ["inadequate", "every day", "tired"],  # For comparison
                     "first_seen": 1234567890,
-                    "affected_interactions": [1, 3, 5]
+                    "affected_interactions": [1, 3, 5],
                 }
             ],
             "has_pain_points": True,
@@ -260,8 +274,8 @@ class TestPainPointDatabaseWriting:
                 "total_detected": 2,
                 "overall_severity": "medium",
                 "analysis_time_window": 30,
-                "total_interactions_analyzed": 5
-            }
+                "total_interactions_analyzed": 5,
+            },
         }
 
         # Validate structure
@@ -281,9 +295,7 @@ class TestPainPointDatabaseWriting:
 
     def test_duplicate_prevention(self):
         """Test that duplicate pain points are prevented using questions."""
-        existing_pain_points = [
-            {"question": "I feel inadequate at work every day", "detected": True}
-        ]
+        existing_pain_points = [{"question": "I feel inadequate at work every day", "detected": True}]
 
         new_question = "I feel inadequate at work every day"  # Same question
         existing_questions = [pp.get("question", "") for pp in existing_pain_points]
@@ -302,8 +314,9 @@ class TestPainPointDatabaseWriting:
         # Skip if not available
         try:
             import os
-            supabase_url = os.getenv('SUPABASE_URL')
-            supabase_key = os.getenv('SUPABASE_KEY')
+
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_KEY")
 
             if not supabase_url or not supabase_key:
                 pytest.skip("Skipping real database test - credentials not available")
@@ -316,7 +329,7 @@ class TestPainPointDatabaseWriting:
                 "question": "I feel inadequate at work every single day",
                 "answer": "Test response",
                 "context": "test context",
-                "metadata": {}
+                "metadata": {},
             }
 
             result = db_manager.add_interaction(test_data, session_id="test_pain_points")
@@ -342,12 +355,12 @@ if __name__ == "__main__":
                 "theme": "self_compassion",
                 "recurring_terms": ["inadequate", "every day", "tired"],
                 "first_seen": 1234567890,
-                "affected_interactions": [1, 3, 5]
+                "affected_interactions": [1, 3, 5],
             }
         ],
         "severity": "medium",
         "analysis_time_window_days": 30,
-        "total_interactions_analyzed": 5
+        "total_interactions_analyzed": 5,
     }
 
     logger.info("🧪 Running Pain Point Database Writing Tests")

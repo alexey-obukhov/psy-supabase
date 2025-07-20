@@ -52,7 +52,7 @@ setup(
         "supabase>=2.6.0",
         "python-dotenv>=1.0.1",
         "pandas>=2.0.3",
-        "numpy>=1.24.4",
+        "numpy>=2.0.0",
         "httpx[http2]>=0.26.0,<0.28.0",
         "werkzeug==3.0.6",
         "spacy==3.7.5",

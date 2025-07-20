@@ -3,7 +3,6 @@ Fixtures for integration tests.
 These fixtures create real components with minimal mocking to test actual integration.
 """
 
-import os
 import uuid
 from unittest.mock import MagicMock, patch
 

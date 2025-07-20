@@ -68,7 +68,7 @@ My technical infrastructure has been enhanced with:
 
 Planned Enhancements
 
-1. **Adjust policy**: Work in Progress. 
+1. **Adjust policy**: Work in Progress.
 CREATE POLICY "Users can access their own data"
   ON your_table
   FOR SELECT, INSERT, UPDATE, DELETE
@@ -94,7 +94,7 @@ with singe schema instead of user=schema.
 - ✅ Smart prompt truncation
 - ✅ Enhanced Prompt Manager
 - ✅ Token-efficient templates
-- ✅ Migration on self-hosted Supabase 
+- ✅ Migration on self-hosted Supabase
 - ✅ Enhancing Vector Search by Segmenting Text into Meaningful Units
 - 📅 Integrating implemented Vector Search by Segmenting Text in real chat-bot (planned)
 - 📅 Integrating Emotional trajectory tracking (planned)

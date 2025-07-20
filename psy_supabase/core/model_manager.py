@@ -28,12 +28,12 @@ complexity of model loading and memory management.
 import gc
 import os
 import traceback
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.cuda
 from sentence_transformers import SentenceTransformer
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer
 from typeguard import typechecked
 
 from psy_supabase import get_package_logger
@@ -66,7 +66,7 @@ class ModelManager:
     embedding_model: Optional[SentenceTransformer] = None
     sentence_transformer: Optional[SentenceTransformer] = None
     generator: Optional[TextGenerator] = None
-    toxicity_model: Optional[AutoModelForCausalLM] = None
+    toxicity_model: Optional[Union[AutoModelForCausalLM, AutoModelForSequenceClassification]] = None
     toxicity_tokenizer: Optional[AutoTokenizer] = None
 
     @classmethod
@@ -93,7 +93,7 @@ class ModelManager:
         self.model_name = model_name
         self.logger = get_package_logger(__name__)
         self.MODELS_DIR = get_models_dir()
-        self.preferred_device = "cuda" if torch.cuda.is_available() else "cpu" if device is None else device
+        self.preferred_device = self._get_preferred_device(device)
         self.quantize = quantize
 
         # Download and store main generation model
@@ -112,6 +112,25 @@ class ModelManager:
         self.sentence_transformer = SentenceTransformer(self.embedding_model_path)
         self.toxicity_model = AutoModelForCausalLM.from_pretrained(self.toxicity_model_path)
         self.toxicity_tokenizer = AutoTokenizer.from_pretrained(self.toxicity_model_path)
+
+    def _get_preferred_device(self, device: Optional[str]) -> str:
+        """Get preferred device using CUDA_CONFIG."""
+        from ..config import CUDA_CONFIG
+
+        if device is not None:
+            return device
+
+        if CUDA_CONFIG.get("force_cpu_fallback", False):
+            return "cpu"
+
+        device_selection = CUDA_CONFIG.get("device_selection", "auto")
+        if device_selection == "auto":
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        if device_selection == "cpu":
+            return "cpu"
+        if isinstance(device_selection, str) and device_selection.startswith("cuda"):
+            return device_selection if torch.cuda.is_available() else "cpu"
+        return "cuda" if torch.cuda.is_available() else "cpu"
 
     def _download_if_needed(self, model_name: str, model_class: Any, model_type: str) -> str:
         """
@@ -212,7 +231,9 @@ class ModelManager:
         return self.generator
 
     @typechecked
-    def load_toxicity_model(self) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+    def load_toxicity_model(
+        self,
+    ) -> Tuple[Union[AutoModelForCausalLM, AutoModelForSequenceClassification], AutoTokenizer]:
         """Load the toxicity detection model using the common utility."""
         try:
             # Call the common function
@@ -305,30 +326,40 @@ class ModelManager:
 
         try:
             # Use TextGenerator's embedding function if it exists
-            generator = self.get_generator()
-            if hasattr(generator, "get_embedding"):
-                self.logger.info("Using TextGenerator for embedding generation")
-                embedding_tensor = generator.get_embedding(text)
-                if embedding_tensor is not None:
-                    return embedding_tensor.squeeze().cpu().tolist()
+            generator: TextGenerator = self.get_generator()
+            if generator is not None:
+                if hasattr(generator, "get_embedding"):
+                    self.logger.info("Using TextGenerator for embedding generation")
+                    embedding_tensor = generator.get_embedding(text)
+                    if embedding_tensor is not None:
+                        return embedding_tensor.squeeze().cpu().tolist()
 
-            # Fallback: Generate embedding directly using the model
-            self.logger.info("Generating embedding directly from model hidden states")
-            if hasattr(generator, "model") and hasattr(generator, "tokenizer"):
-                inputs = generator.tokenizer(
-                    text, return_tensors="pt", padding=True, truncation=True, max_length=512
-                ).to(generator.device)
+                # Fallback: Generate embedding directly using the model
+                self.logger.info("Generating embedding directly from model hidden states")
+                if hasattr(generator, "model") and hasattr(generator, "tokenizer") and generator.tokenizer is not None:
+                    inputs = generator.tokenizer(
+                        text, return_tensors="pt", padding=True, truncation=True, max_length=512
+                    )
+                    if hasattr(inputs, "to") and callable(inputs.to):
+                        inputs = inputs.to(generator.device)
+                    else:
+                        # Move each tensor in the dict to the device
+                        inputs = {k: v.to(generator.device) for k, v in inputs.items()}
 
-                with torch.no_grad():
-                    outputs = generator.model(**inputs, output_hidden_states=True)
-                    # Use last hidden state
-                    hidden_states = outputs.hidden_states[-1]
-                    # Mean pooling
-                    embedding = hidden_states.mean(dim=1)
-                    return embedding.squeeze().cpu().tolist()
+                    with torch.no_grad():
+                        if generator.model is not None:
+                            outputs = generator.model(**inputs, output_hidden_states=True)
+                            # Use last hidden state
+                            hidden_states = outputs.hidden_states[-1]
+                            # Mean pooling
+                            embedding = hidden_states.mean(dim=1)
+                            return embedding.squeeze().cpu().tolist()
+                        else:
+                            self.logger.error("Generator model is None, cannot generate embedding")
+                            return None
 
-            # If we got here, we couldn't use the generator for embeddings
-            raise ValueError("Model doesn't support embedding generation")
+                # If we got here, we couldn't use the generator for embeddings
+                raise ValueError("Model doesn't support embedding generation")
 
         except Exception as e:
             self.logger.error("Error generating embedding with main model: %s", e)
@@ -409,12 +440,14 @@ class ModelManager:
                         self.sentence_transformer.save(local_path)
                         self.logger.info("SentenceTransformer saved to %s", local_path)
 
-                    # Move to the right device
-                    if self.preferred_device == "cuda" and torch.cuda.is_available():
-                        self.sentence_transformer = self.sentence_transformer.to(self.preferred_device)
+                # Move to the right device
+                if self.preferred_device == "cuda" and torch.cuda.is_available():
+                    self.sentence_transformer = self.sentence_transformer.to(self.preferred_device)
 
                 # Get embedding dimension
                 embedding_dim = self.sentence_transformer.get_sentence_embedding_dimension()
+                if embedding_dim is None:
+                    embedding_dim = 1536
 
                 # Process texts (replace empty with spaces to avoid errors)
                 processed_texts = [text if text and text.strip() else " " for text in texts]

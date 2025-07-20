@@ -185,12 +185,10 @@ def map_theme_to_approach_type(theme: str) -> Union[str, List[str]]:
 
 def map_approach_name(theme: str) -> str:
     """Map a theme to its human-readable name."""
-    from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
-
     approaches = TherapeuticMappings.get_approach_for_theme(theme)
     if isinstance(approaches, list) and approaches:
         return approaches[0]  # Use first approach
-    elif isinstance(approaches, str):
+    if isinstance(approaches, str):
         return approaches
     return "empathy_validation"
 

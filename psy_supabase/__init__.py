@@ -7,9 +7,10 @@ Configures logging for the entire package.
 
 import logging
 import os
+from typing import Union
 
 from prismalog.config import LoggingConfig
-from prismalog.log import get_logger
+from prismalog.log import ColoredLogger, get_logger
 
 # Initialize logging when package is imported
 if not LoggingConfig.is_initialized():
@@ -21,6 +22,6 @@ if not LoggingConfig.is_initialized():
 __all__ = ["get_logger"]
 
 
-def get_package_logger(name: str) -> logging.Logger:
+def get_package_logger(name: str) -> Union[ColoredLogger, logging.Logger]:
     """Get a logger for this package."""
     return get_logger(name)

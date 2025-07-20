@@ -7,18 +7,18 @@
   --color-warning: #ffc107;
   --color-danger: #dc3545;
   --color-info: #17a2b8;
-  
+
   /* Code block colors */
   --color-code-bg: #f8f9fa;
   --color-code-border: #e9ecef;
   --color-syntax-comment: #6c757d;
   --color-syntax-keyword: #d73a49;
   --color-syntax-string: #032f62;
-  
+
   /* Tutorial spacing */
   --tutorial-section-gap: 60px;
   --code-block-padding: 20px;
-  
+
   /* Enhanced shadows */
   --shadow-tutorial-card: 0 4px 20px rgba(91, 155, 213, 0.1);
   --shadow-code-block: 0 2px 10px rgba(0, 0, 0, 0.05);
@@ -665,41 +665,41 @@
     grid-template-columns: 1fr;
     text-align: center;
   }
-  
+
   .tutorial-content .container {
     grid-template-columns: 1fr;
     gap: 40px;
   }
-  
+
   .table-of-contents {
     position: static;
     order: 2;
   }
-  
+
   .tutorial-article {
     order: 1;
   }
-  
+
   .prerequisites-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .pros-cons {
     grid-template-columns: 1fr;
   }
-  
+
   .troubleshooting-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .points-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .tutorial-hero h1 {
     font-size: 2rem;
   }
-  
+
   .key-points {
     padding: 30px 20px;
     margin: 40px -20px 0;
@@ -712,13 +712,13 @@
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .code-header {
     flex-direction: column;
     gap: 10px;
     align-items: flex-start;
   }
-  
+
   .copy-btn {
     align-self: flex-end;
   }
@@ -732,16 +732,16 @@
   .site-footer {
     display: none;
   }
-  
+
   .tutorial-content .container {
     grid-template-columns: 1fr;
   }
-  
+
   .tutorial-section {
     break-inside: avoid;
     margin-bottom: 40px;
   }
-  
+
   .code-block {
     break-inside: avoid;
   }
@@ -764,7 +764,7 @@
   .warning-icon {
     animation: none;
   }
-  
+
   .prereq-card:hover,
   .point-card:hover,
   .issue-card:hover {
@@ -1230,7 +1230,7 @@
     grid-template-columns: 250px 1fr;
     gap: 30px;
   }
-  
+
   .tutorial-content {
     padding: 30px;
   }
@@ -1242,30 +1242,30 @@
     gap: 20px;
     padding: 20px;
   }
-  
+
   .tutorial-sidebar {
     position: static;
     order: -1;
   }
-  
+
   .tutorial-nav {
     display: block; /* Show on mobile but could be made collapsible */
   }
-  
+
   .tutorial-content {
     padding: 20px;
   }
-  
+
   .tutorial-header h1 {
     font-size: 2rem;
   }
-  
+
   .tutorial-meta-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
-  
+
   .tutorial-actions {
     flex-direction: column;
     align-items: center;
@@ -1276,23 +1276,23 @@
   .tutorial-header {
     padding: 40px 0;
   }
-  
+
   .tutorial-header h1 {
     font-size: 1.7rem;
   }
-  
+
   .tutorial-subtitle {
     font-size: 1rem;
   }
-  
+
   .tutorial-content {
     padding: 15px;
   }
-  
+
   .tutorial-section h2 {
     font-size: 1.5rem;
   }
-  
+
   .tutorial-section h3 {
     font-size: 1.2rem;
   }

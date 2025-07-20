@@ -81,7 +81,7 @@ import jinja2
 import torch
 from detoxify import Detoxify
 from jinja2 import Template
-from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
+from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer, GenerationConfig
 
 from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_THEME, DEFAULT_TOPIC
 from psy_supabase.utilities.common import (
@@ -156,7 +156,9 @@ class TextGenerator:
 
     MODELS_DIR = get_models_dir()
 
-    def __init__(self, model_name: str, device: str, use_bfloat16: bool = False, quantize: bool = False):
+    def __init__(
+        self, model_name: str, device: str, use_bfloat16: Optional[bool] = None, quantize: Optional[bool] = None
+    ):
         """
         Initialize the TextGenerator with model configuration.
 
@@ -166,8 +168,8 @@ class TextGenerator:
         Args:
             model_name (str): Name or path of the language model to use
             device (str): Device to run inference on ('cuda' or 'cpu')
-            use_bfloat16 (bool): Whether to use bfloat16 precision for reduced memory usage
-            quantize (bool): Whether to use 8-bit quantization for optimized inference
+            use_bfloat16 (Optional[bool]): Whether to use bfloat16 precision. If None, uses CUDA_CONFIG["mixed_precision"]
+            quantize (Optional[bool]): Whether to use 8-bit quantization. If None, uses CUDA_CONFIG["quantization_8bit"]
 
         Attributes:
             tokenizer: Initialized tokenizer for selected model
@@ -178,6 +180,20 @@ class TextGenerator:
             Initializes Detoxify for content safety checks and configures model loading
             based on available hardware capabilities.
         """
+        from ..config import CUDA_CONFIG, RESPONSE_CONFIG, TOXICITY_CONFIG
+
+        # Use CUDA_CONFIG defaults if not explicitly provided
+        if use_bfloat16 is None:
+            use_bfloat16 = bool(CUDA_CONFIG.get("mixed_precision", False))
+        if quantize is None:
+            quantize = bool(CUDA_CONFIG.get("quantization_8bit", False))
+
+        # Store RESPONSE_CONFIG for use in generation
+        self.response_config = RESPONSE_CONFIG
+
+        # Store TOXICITY_CONFIG for use in safety checks
+        self.toxicity_config = TOXICITY_CONFIG
+
         if device == "cuda" and not torch.cuda.is_available():
             logger.warning("CUDA requested but not available - falling back to CPU")
             device = "cpu"
@@ -188,8 +204,8 @@ class TextGenerator:
         self.quantize = quantize
         self.tokenizer = None
         self.model = None
-        self.toxic_tokenizer = None
-        self.toxic_model = None
+        self.toxic_tokenizer: Optional[AutoTokenizer] = None
+        self.toxic_model: Optional[AutoModelForSequenceClassification] = None
         self.prompt_templates = prompt_templates
         project_root = get_project_root()
         self.template_dir = os.path.join(project_root, "templates")
@@ -352,8 +368,8 @@ class TextGenerator:
     def generate_text(
         self,
         prompt: str,
-        max_new_tokens: int = 512,
-        temperature: float = 0.7,
+        max_new_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
         top_p: float = 0.9,
         use_cache: bool = True,
     ) -> str:
@@ -369,8 +385,8 @@ class TextGenerator:
 
         Args:
             prompt (str): Input prompt to generate text from
-            max_new_tokens (int): Maximum number of new tokens to generate
-            temperature (float): Sampling temperature (higher = more random)
+            max_new_tokens (int): Maximum number of new tokens to generate (uses RESPONSE_CONFIG if None)
+            temperature (float): Sampling temperature (uses RESPONSE_CONFIG if None)
             top_p (float): Nucleus sampling parameter (lower = more focused)
 
         Returns:
@@ -379,6 +395,11 @@ class TextGenerator:
         Raises:
             Exception: If text generation encounters an error, with detailed logging
         """
+        # Use RESPONSE_CONFIG defaults if not provided
+        if max_new_tokens is None:
+            max_new_tokens = int(self.response_config.get("max_response_length", 512))
+        if temperature is None:
+            temperature = float(self.response_config.get("temperature", 0.7))
         try:
             if not self.model or not self.tokenizer:
                 logger.error("Model or tokenizer not loaded")
@@ -399,7 +420,7 @@ class TextGenerator:
 
             # Check token count and limit if necessary
             token_count = len(self.tokenizer.encode(prompt))
-            max_context_tokens = 2048  # model's context window size
+            max_context_tokens = self.response_config.get("max_context_tokens", 2048)  # Use config value
             logger.info("Prompt token count: %d (limit: %d)", token_count, max_context_tokens)
 
             if token_count > max_context_tokens:
@@ -695,7 +716,7 @@ class TextGenerator:
             text (str): Text to check for toxicity
 
         Returns:
-            bool: True if text is considered toxic (score > 0.8), False otherwise
+            bool: True if text is considered toxic (score > threshold), False otherwise
 
         Note:
             This method gracefully handles errors to prevent blocking the application
@@ -705,13 +726,103 @@ class TextGenerator:
             # Use the pre-initialized Detoxify instance
             results = self.detoxify.predict(text)
             toxic_score = results["toxicity"]
-            logger.info("Toxicity score: %f - Text: %s...", toxic_score, text[:50])
-            return bool(toxic_score > 0.8)
+            threshold = self.toxicity_config.get("threshold", 0.8)
+            logger.info("Toxicity score: %f (threshold: %f) - Text: %s...", toxic_score, threshold, text[:50])
+            return bool(toxic_score > threshold)
 
         except Exception as e:
             logger.error("Error during toxicity check: %s\n%s", e, traceback.format_exc())
             # Don't block the response on toxicity check failure
             return False
+
+    def check_content_safety(
+        self, user_input: Optional[str] = None, generated_response: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Comprehensive content safety check based on TOXICITY_CONFIG settings.
+
+        Args:
+            user_input (str, optional): User's input message to check
+            generated_response (str, optional): AI-generated response to check
+
+        Returns:
+            Dict[str, Any]: Safety check results with blocking recommendations
+        """
+        safety_results: Dict[str, Any] = {
+            "user_input_safe": True,
+            "response_safe": True,
+            "should_block": False,
+            "safety_message": None,
+        }
+
+        try:
+            # Check user input if enabled and provided
+            if user_input and self.toxicity_config.get("check_user_input", True):
+
+                if self.is_toxic(user_input):
+                    safety_results["user_input_safe"] = False
+                    safety_results["should_block"] = True
+                    safety_results["safety_message"] = (
+                        "I notice your message contains content that may be harmful. "
+                        "I'm here to provide support in a respectful conversation. "
+                        "Could you rephrase your question so I can better help you?"
+                    )
+                    logger.warning("User input blocked due to toxicity: %s...", user_input[:50])
+
+            # Check generated response if enabled and provided
+            if generated_response and self.toxicity_config.get("check_generated_response", True):
+
+                if self.is_toxic(generated_response):
+                    safety_results["response_safe"] = False
+                    safety_results["should_block"] = True
+                    safety_results["safety_message"] = self._get_supportive_fallback()
+                    logger.warning("Generated response blocked due to toxicity: %s...", generated_response[:50])
+
+        except Exception as e:
+            logger.error("Error in content safety check: %s", e)
+            # On error, be conservative and use fallback
+            safety_results["should_block"] = True
+            safety_results["safety_message"] = self._get_supportive_fallback()
+
+        return safety_results
+
+    def check_user_input_safety(self, user_input: str) -> bool:
+        """
+        Check if user input is safe based on TOXICITY_CONFIG settings.
+
+        Args:
+            user_input (str): User's input message to check
+
+        Returns:
+            bool: True if input is safe, False if it should be blocked
+        """
+        if not self.toxicity_config.get("check_user_input", True):
+            return True  # Safety checking disabled
+
+        try:
+            return not self.is_toxic(user_input)
+        except Exception as e:
+            logger.error("Error checking user input safety: %s", e)
+            return False  # Be conservative on error
+
+    def check_generated_response_safety(self, generated_response: str) -> bool:
+        """
+        Check if generated response is safe based on TOXICITY_CONFIG settings.
+
+        Args:
+            generated_response (str): AI-generated response to check
+
+        Returns:
+            bool: True if response is safe, False if it should be blocked
+        """
+        if not self.toxicity_config.get("check_generated_response", True):
+            return True  # Safety checking disabled
+
+        try:
+            return not self.is_toxic(generated_response)
+        except Exception as e:
+            logger.error("Error checking generated response safety: %s", e)
+            return False  # Be conservative on error
 
     def get_embedding(self, text: str) -> Optional[torch.Tensor]:
         """Generates embeddings, loading the language model if needed."""

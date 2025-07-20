@@ -943,175 +943,6 @@ class TherapeuticMappings:
             "childhood home",
             "childhood family",
         ],
-        # Family dynamics and favoritism
-        "favoritism": [
-            # Core favoritism terms - word stems that catch variations
-            "favor",
-            "favors",
-            "favorite",
-            "favorites",
-            "favoritism",
-            "favored",
-            "favoring",
-            "prefer",
-            "prefers",
-            "preferred",
-            "preference",
-            "preferential",
-            "preferring",
-            # Family favoritism phrases
-            "golden child",
-            "scapegoat",
-            "black sheep",
-            "favorite child",
-            "preferred child",
-            "special treatment",
-            "treated differently",
-            "different treatment",
-            "unfair treatment",
-            "unequal treatment",
-            "double standards",
-            # Parental favoritism
-            "mom's favorite",
-            "dad's favorite",
-            "mother's favorite",
-            "father's favorite",
-            "parents prefer",
-            "clearly prefers",
-            "obviously favors",
-            "always chooses",
-            "mommy's boy",
-            "daddy's girl",
-            "mama's boy",
-            "papa's girl",
-            # Comparative language
-            "loves more",
-            "cares more",
-            "pays more attention",
-            "spends more time",
-            "gives more to",
-            "shows more love",
-            "more affectionate with",
-            "always takes their side",
-            "takes his side",
-            "takes her side",
-            # Sibling competition
-            "sibling rivalry",
-            "sibling comparison",
-            "compared to sibling",
-            "brother gets",
-            "sister gets",
-            "sibling gets everything",
-            "they get everything",
-            "gets away with everything",
-            "can do no wrong",
-            "never gets in trouble",
-            "always gets what they want",
-            # Emotional impact phrases
-            "never measure up",
-            "always second best",
-            "not as good as",
-            "not the favorite",
-            "less important",
-            "valued less",
-            "feeling left out",
-            "feeling inferior",
-            "feeling less than",
-            "jealous of sibling",
-            "disappointed parents",
-            "not good enough for them",
-            # Behavioral indicators
-            "special privileges",
-            "gets special attention",
-            "gets better treatment",
-            "why can't you be like",
-            "your sibling would",
-            "they never",
-            "living in shadow",
-            "compete with",
-            "always chosen",
-            "never picked",
-            # Family dynamics
-            "parental preference",
-            "family competition",
-            "plays favorites",
-            "pick favorites",
-            "choosing favorites",
-            "clear favorite",
-            "obvious favorite",
-            "always liked better",
-            "treat better",
-            "loved more than",
-        ],
-        "family": [
-            # Core family terms
-            "family",
-            "families",
-            "familial",
-            "parent",
-            "parents",
-            "parental",
-            "mother",
-            "father",
-            "mom",
-            "dad",
-            "sibling",
-            "siblings",
-            "brother",
-            "sister",
-            # Extended family
-            "grandparent",
-            "aunt",
-            "uncle",
-            "cousin",
-            "in-law",
-            "in-laws",
-            "extended family",
-            # Family relationships
-            "family relationship",
-            "family dynamic",
-            "family issue",
-            "family problem",
-            "family conflict",
-            "family tension",
-            # Common phrases
-            "my family",
-            "our family",
-            "the family",
-            "family member",
-            "family situation",
-            "within the family",
-            "in my family",
-        ],
-        "childhood": [
-            # Direct terms
-            "child",
-            "childhood",
-            "children",
-            "kid",
-            "kids",
-            "young",
-            # Time periods
-            "growing up",
-            "grew up",
-            "when I was young",
-            "as a child",
-            "as kids",
-            "early years",
-            "younger years",
-            # Experiences
-            "raised",
-            "upbringing",
-            "childhood experience",
-            "childhood memory",
-            "childhood trauma",
-            # Family context
-            "family history",
-            "family background",
-            "family upbringing",
-            "childhood home",
-            "childhood family",
-        ],
         "insecurity": [
             # Core insecurity terms
             "insecure",
@@ -1998,7 +1829,6 @@ class TherapeuticMappings:
         "relationship": "relationship_issues",
         "interpersonal": "interpersonal_therapy",
         "self-esteem": "self_compassion",
-        "cognitive_behavioral": "cognitive_behavioral_therapy",
         "trauma_informed": "trauma",
         "stress_management": "stress_management",
         "attachment_based": "attachment_based_therapy",
@@ -2438,12 +2268,6 @@ class TherapeuticMappings:
             (r"\btoo much to do\b", 1.5),
             (r"\boverworked\b", 1.8),
         ],
-        "pressure": [
-            (r"\bpressure(d)?\b", 1.8),
-            (r"\bunder pressure\b", 2.0),
-            (r"\bfeel the heat\b", 1.5),
-            (r"\bdeadline pressure\b", 1.5),
-        ],
     }
 
     # 3. INTERPERSONAL/IDENTITY PATTERNS - relationship and self-concept
@@ -2545,11 +2369,10 @@ class TherapeuticMappings:
             if valid_approaches:
                 logger.debug(f"For theme '{theme_lower}', found approaches: {valid_approaches}")
                 return valid_approaches
-            else:
-                logger.warning(
-                    f"Theme '{theme_lower}' has an empty or invalid 'approaches' list after filtering. Defaulting."
-                )
-                return "supportive_listening"
+            logger.warning(
+                f"Theme '{theme_lower}' has an empty or invalid 'approaches' list after filtering. Defaulting."
+            )
+            return "supportive_listening"
         elif isinstance(approaches, str):  # If 'approaches' is a single string
             logger.debug(f"For theme '{theme_lower}', found single string approach: {approaches.lower()}")
             return approaches.lower()
@@ -2606,13 +2429,12 @@ class TherapeuticMappings:
 
         if template_name:
             return template_name
-        else:
-            logger.debug(
-                "No specific template found for theme '%s' (via approach '%s'). Defaulting to 'empathy_validation'.",
-                theme,
-                approach,
-            )
-            return "empathy_validation"  # Provide a default string
+        logger.debug(
+            "No specific template found for theme '%s' (via approach '%s'). Defaulting to 'empathy_validation'.",
+            theme,
+            approach,
+        )
+        return "empathy_validation"  # Provide a default string
 
     @classmethod
     def get_human_readable_name(cls, theme: str) -> str:

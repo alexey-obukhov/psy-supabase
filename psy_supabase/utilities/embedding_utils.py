@@ -34,7 +34,92 @@ Usage:
     print(formatted_embedding_np)  # Output: [0.1,0.2,0.3]
 """
 
+import re
 from typing import Dict, List
+
+
+def calculate_similarity(text1: str, text2: str) -> float:
+    """
+    Calculate semantic similarity between two text strings using basic word overlap.
+
+    This is a simple text-based similarity calculation that doesn't require
+    complex embedding models or numpy operations.
+
+    Args:
+        text1: First text string
+        text2: Second text string
+
+    Returns:
+        Similarity score between 0.0 and 1.0
+    """
+
+    # Normalize and tokenize text
+    def normalize_text(text: str) -> set:
+        words = re.findall(r"\b\w+\b", text.lower())
+        # Remove common stop words
+        stop_words = {
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "with",
+            "by",
+            "is",
+            "are",
+            "was",
+            "were",
+            "been",
+            "be",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "can",
+            "that",
+            "this",
+            "it",
+            "i",
+            "you",
+            "he",
+            "she",
+            "we",
+            "they",
+            "my",
+            "your",
+            "his",
+            "her",
+            "our",
+            "their",
+        }
+        return set(word for word in words if word not in stop_words and len(word) > 2)
+
+    words1 = normalize_text(text1)
+    words2 = normalize_text(text2)
+
+    if not words1 or not words2:
+        return 0.0
+
+    # Calculate Jaccard similarity
+    intersection = len(words1.intersection(words2))
+    union = len(words1.union(words2))
+
+    return intersection / union if union > 0 else 0.0
 
 
 def format_embedding_for_db(embedding: List[float]) -> str:
@@ -84,8 +169,6 @@ def detect_repetition_pattern(original_question: str, current_question: str, sim
     Returns:
         Dictionary with repetition pattern data
     """
-    import re
-
     from psy_supabase.utilities.keep_words import keep_words
 
     # Count occurrences of highly similar questions with threshold 0.7 from supabase queries

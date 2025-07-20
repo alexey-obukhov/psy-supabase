@@ -23,7 +23,8 @@ Dependencies:
 import json
 from collections import Counter
 from datetime import datetime
-from typing import Dict, List, Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
 from psy_supabase import get_package_logger
 from psy_supabase.config import DEFAULT_THEME
 from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
@@ -56,6 +57,7 @@ class PainPointDetector:
 
         # Load config from config.py
         from psy_supabase.config import PAIN_POINT_DETECTION
+
         self.config: Dict[str, Any] = PAIN_POINT_DETECTION
 
         # Type-safe access to chunking config
@@ -87,7 +89,7 @@ class PainPointDetector:
         session_id: str,
         threshold: Optional[float] = None,
         min_occurrences: Optional[int] = None,
-        time_window_days: Optional[int] = None
+        time_window_days: Optional[int] = None,
     ) -> Dict:
         """
         Detect pain points based on TEMPORAL RECURRENCE patterns.
@@ -110,7 +112,9 @@ class PainPointDetector:
             # Use config defaults if not provided - with proper type casting
             threshold = threshold if threshold is not None else float(self.config["similarity_threshold"])
             min_occurrences = min_occurrences if min_occurrences is not None else int(self.config["min_occurrences"])
-            time_window_days = time_window_days if time_window_days is not None else int(self.config["time_window_days"])
+            time_window_days = (
+                time_window_days if time_window_days is not None else int(self.config["time_window_days"])
+            )
             # Get conversation history
             history = self.db_manager.get_conversation_history(session_id)
 
@@ -194,7 +198,7 @@ class PainPointDetector:
         history = self.db_manager.get_conversation_history(session_id)
         current_interaction = None
         for interaction in history:
-            if interaction.get('interaction_id') == interaction_id:
+            if interaction.get("interaction_id") == interaction_id:
                 current_interaction = interaction
                 break
 
@@ -231,8 +235,8 @@ class PainPointDetector:
             metadata = {}
 
         # Get detected pain points from the result
-        detected_pain_points = pain_result.get('pain_points', [])
-        
+        detected_pain_points = pain_result.get("pain_points", [])
+
         if not detected_pain_points:
             logger.debug("No pain points detected - not updating metadata")
             return True
@@ -252,7 +256,7 @@ class PainPointDetector:
                 if question not in existing_questions:
                     # NEW PAIN POINT - first occurrence
                     detected_flag = occurrence_count >= 2  # Only mark as detected if recurring
-                    
+
                     new_pain_point = {
                         "question": question,
                         "detected": detected_flag,  # ✅ False for first occurrence, True for recurring
@@ -261,10 +265,10 @@ class PainPointDetector:
                         "severity": pain_point.get("severity", "low"),
                         "recurring_terms": recurring_terms,
                         "occurrence_count": occurrence_count,
-                        "affected_interactions": pain_point.get("affected_interactions", [])
+                        "affected_interactions": pain_point.get("affected_interactions", []),
                     }
                     existing_pain_points.append(new_pain_point)
-                    
+
                     if detected_flag:
                         logger.info("✅ Added RECURRING pain point (detected=True): %s", question[:50])
                     else:
@@ -277,14 +281,14 @@ class PainPointDetector:
                             existing_pp["occurrence_count"] = occurrence_count
                             existing_pp["detected"] = occurrence_count >= 2  # Mark as detected if recurring
                             existing_pp["affected_interactions"] = pain_point.get("affected_interactions", [])
-                            
+
                             if existing_pp["detected"]:
                                 logger.info("🔄 Updated to RECURRING pain point (detected=True): %s", question[:50])
                             break
 
         # Update metadata only if we have RECURRING pain points (detected=True)
         detected_pain_points_exist = any(pp.get("detected", False) for pp in existing_pain_points)
-        
+
         if detected_pain_points_exist:
             metadata["pain_point_detected"] = True
             metadata["pain_severity"] = pain_result.get("severity", "low")
@@ -292,7 +296,7 @@ class PainPointDetector:
         else:
             metadata["pain_point_detected"] = False
             logger.info("📝 No recurring patterns yet - pain_point_detected=False")
-        
+
         metadata["pain_points"] = existing_pain_points
 
         # Use RPC to update metadata
@@ -311,12 +315,11 @@ class PainPointDetector:
             ).execute()
 
             if update_response.data is True:
-                logger.info("✅ Updated interaction %d with %d pain points",
-                           interaction_id, len(existing_pain_points))
+                logger.info("✅ Updated interaction %d with %d pain points", interaction_id, len(existing_pain_points))
                 return True
             else:
                 logger.error("❌ RPC update failed. Response: %s", update_response.data)
-                if hasattr(update_response, 'error') and update_response.error:
+                if hasattr(update_response, "error") and update_response.error:
                     logger.error("   Error details: %s", update_response.error)
                 return False
 
@@ -336,12 +339,14 @@ class PainPointDetector:
             primary_temporal_group = primary_question["temporal_group"]
 
             similar_questions = []
-            temporal_occurrences = [{
-                "interaction_index": primary_idx,
-                "timestamp": primary_question.get("created_at", ""),
-                "temporal_group": primary_temporal_group,
-                "pain_chunk": primary_question.get("original_text", "")
-            }]
+            temporal_occurrences = [
+                {
+                    "interaction_index": primary_idx,
+                    "timestamp": primary_question.get("created_at", ""),
+                    "temporal_group": primary_temporal_group,
+                    "pain_chunk": primary_question.get("original_text", ""),
+                }
+            ]
 
             for compare_idx, compare_question in enumerate(processed_questions):
                 if compare_idx == primary_idx:
@@ -351,21 +356,22 @@ class PainPointDetector:
                 compare_temporal_group = compare_question["temporal_group"]
 
                 max_chunk_similarity = self._calculate_max_chunk_similarity(primary_chunks, compare_chunks)
-                logger.debug("Similarity between questions %d and %d: %s", primary_idx, compare_idx, max_chunk_similarity)
+                logger.debug(
+                    "Similarity between questions %d and %d: %s", primary_idx, compare_idx, max_chunk_similarity
+                )
 
                 if max_chunk_similarity >= threshold:
                     logger.debug("✅ Similarity %s >= threshold %s", max_chunk_similarity, threshold)
-                    similar_questions.append({
-                        "question": compare_question,
-                        "similarity": max_chunk_similarity
-                    })
+                    similar_questions.append({"question": compare_question, "similarity": max_chunk_similarity})
                     # Add to temporal occurrences
-                    temporal_occurrences.append({
-                        "interaction_index": compare_idx,
-                        "timestamp": compare_question.get("created_at", ""),
-                        "temporal_group": compare_temporal_group,
-                        "pain_chunk": compare_question.get("original_text", "")
-                    })
+                    temporal_occurrences.append(
+                        {
+                            "interaction_index": compare_idx,
+                            "timestamp": compare_question.get("created_at", ""),
+                            "temporal_group": compare_temporal_group,
+                            "pain_chunk": compare_question.get("original_text", ""),
+                        }
+                    )
                 else:
                     logger.debug("❌ Similarity %s < threshold %s", max_chunk_similarity, threshold)
 
@@ -394,7 +400,7 @@ class PainPointDetector:
                     "semantic_theme": self._extract_semantic_theme(all_pain_chunks),
                     "recurring_terms": self._extract_repeating_terms(all_pain_chunks),
                     "first_occurrence": 0,
-                    "first_detected_as_pain_point": 1
+                    "first_detected_as_pain_point": 1,
                 }
                 pain_point_clusters.append(cluster)
 
@@ -409,7 +415,7 @@ class PainPointDetector:
             # Use existing SemanticEmotionDetector
             from psy_supabase.utilities.semantic_emotion_detector import SemanticEmotionDetector
 
-            if not hasattr(self, '_detector'):
+            if not hasattr(self, "_detector"):
                 self._detector = SemanticEmotionDetector()
 
             detector = self._detector
@@ -432,16 +438,13 @@ class PainPointDetector:
                         if isinstance(early_exit, bool) and early_exit and sim > 0.99:
                             log_best = self.chunking_config.get("log_only_best_matches", True)
                             if isinstance(log_best, bool) and log_best:
-                                logger.debug("Perfect match found: '%s' vs '%s' = %s",
-                                             c1[:30], c2[:30], sim)
+                                logger.debug("Perfect match found: '%s' vs '%s' = %s", c1[:30], c2[:30], sim)
                             return float(sim)
 
             # Log only best match if configured
             log_best = self.chunking_config.get("log_only_best_matches", True)
-            if (isinstance(log_best, bool) and log_best
-                and best_match and max_sim > 0.8):
-                logger.debug("Best similarity: '%s' vs '%s' = %s",
-                             best_match[0], best_match[1], max_sim)
+            if isinstance(log_best, bool) and log_best and best_match and max_sim > 0.8:
+                logger.debug("Best similarity: '%s' vs '%s' = %s", best_match[0], best_match[1], max_sim)
 
             return float(max_sim)
 
@@ -528,24 +531,28 @@ class PainPointDetector:
                     else:
                         # Start new group
                         if current_group:
-                            grouped_interactions.append({
-                                "group_id": group_id,
-                                "start_time": self._normalize_timestamp(current_group[0]["created_at"]),
-                                "end_time": self._normalize_timestamp(current_group[-1]["created_at"]),
-                                "interactions": current_group,
-                            })
+                            grouped_interactions.append(
+                                {
+                                    "group_id": group_id,
+                                    "start_time": self._normalize_timestamp(current_group[0]["created_at"]),
+                                    "end_time": self._normalize_timestamp(current_group[-1]["created_at"]),
+                                    "interactions": current_group,
+                                }
+                            )
                             group_id += 1
                         group_start_time = interaction_datetime
                         current_group = [interaction]
 
             # Add the last group
             if current_group:
-                grouped_interactions.append({
-                    "group_id": group_id,
-                    "start_time": self._normalize_timestamp(current_group[0]["created_at"]),
-                    "end_time": self._normalize_timestamp(current_group[-1]["created_at"]),
-                    "interactions": current_group,
-                })
+                grouped_interactions.append(
+                    {
+                        "group_id": group_id,
+                        "start_time": self._normalize_timestamp(current_group[0]["created_at"]),
+                        "end_time": self._normalize_timestamp(current_group[-1]["created_at"]),
+                        "interactions": current_group,
+                    }
+                )
 
             return grouped_interactions
 
@@ -598,30 +605,46 @@ class PainPointDetector:
             # Extract key psychological terms
             key_terms = []
             for token in doc:
-                if token.lemma_.lower() in ['feel', 'feeling', 'inadequate', 'confident', 'confidence',
-                                      'anxious', 'anxiety', 'stressed', 'stress', 'work', 'job',
-                                      'quit', 'quitting', 'career', 'day', 'daily', 'every']:
+                if token.lemma_.lower() in [
+                    "feel",
+                    "feeling",
+                    "inadequate",
+                    "confident",
+                    "confidence",
+                    "anxious",
+                    "anxiety",
+                    "stressed",
+                    "stress",
+                    "work",
+                    "job",
+                    "quit",
+                    "quitting",
+                    "career",
+                    "day",
+                    "daily",
+                    "every",
+                ]:
                     key_terms.append(token.lemma_.lower())
 
             # Group key terms into meaningful phrases
-            if 'feel' in key_terms or 'feeling' in key_terms:
-                emotional_terms = [t for t in key_terms if t in ['inadequate', 'confident', 'anxious', 'stressed']]
+            if "feel" in key_terms or "feeling" in key_terms:
+                emotional_terms = [t for t in key_terms if t in ["inadequate", "confident", "anxious", "stressed"]]
                 if emotional_terms:
                     chunks.append(f"feeling {' '.join(emotional_terms)}")
 
-            if 'work' in key_terms or 'job' in key_terms:
-                chunks.append('work')
+            if "work" in key_terms or "job" in key_terms:
+                chunks.append("work")
 
-            if 'every' in key_terms and 'day' in key_terms:
-                chunks.append('every day')
+            if "every" in key_terms and "day" in key_terms:
+                chunks.append("every day")
 
             # Add individual key terms
             chunks.extend(key_terms)
 
             # Clean and deduplicate
             cleaned_chunks = []
-            for chunk in chunks:
-                cleaned = chunk.strip().lower()
+            for chunk_text in chunks:
+                cleaned = chunk_text.strip().lower()
                 if len(cleaned) > 2 and cleaned not in cleaned_chunks:
                     cleaned_chunks.append(cleaned)
 
@@ -629,6 +652,17 @@ class PainPointDetector:
             full_question = question.strip().lower()
             if full_question not in cleaned_chunks:
                 cleaned_chunks.append(full_question)
+
+            # Respect max_chunks_per_question limit from config
+            max_chunks = self.chunking_config.get("max_chunks_per_question", 8)
+            if len(cleaned_chunks) > max_chunks:
+                # Keep the full question and most important chunks
+                if full_question in cleaned_chunks:
+                    # Remove full question temporarily, slice others, then add it back
+                    other_chunks = [c for c in cleaned_chunks if c != full_question]
+                    cleaned_chunks = other_chunks[: max_chunks - 1] + [full_question]
+                else:
+                    cleaned_chunks = cleaned_chunks[:max_chunks]
 
             return cleaned_chunks
 
@@ -648,6 +682,7 @@ class PainPointDetector:
             # Import spaCy for term extraction - REQUIRED, no fallback
             try:
                 import spacy
+
                 nlp = spacy.load("en_core_web_sm")
             except ImportError:
                 logger.error("ERROR: spaCy is not installed. Please install with: pip install spacy")
@@ -692,6 +727,7 @@ class PainPointDetector:
             # Import spaCy for similarity calculation - REQUIRED, basic fallback only
             try:
                 import spacy
+
                 nlp = spacy.load("en_core_web_sm")
 
                 doc1 = nlp(text1.lower())
@@ -827,61 +863,47 @@ class PainPointDetector:
 
     def _extract_pain_point_severity(self, cluster: Dict, total_questions: int) -> str:
         """Determine the severity level of a pain point cluster."""
-        try:
-            chunk_count = cluster.get("count", 0)
+        chunk_count = cluster.get("count", 0)
 
-            if chunk_count >= 5:
-                return "high"
-            elif chunk_count >= 3:
-                return "medium"
-            else:
-                return "low"
-
-        except Exception:
-            return "low"
+        if chunk_count >= 5:
+            return "high"
+        if chunk_count >= 3:
+            return "medium"
+        return "low"
 
     def _extract_recurrence_timeline(self, cluster: Dict) -> List[Dict]:
         """Extract timeline of when this pain point recurred."""
-        try:
-            temporal_occurrences = cluster.get("temporal_occurrences", [])
+        temporal_occurrences = cluster.get("temporal_occurrences", [])
 
-            timeline = []
-            for i, occurrence in enumerate(temporal_occurrences):
-                timeline.append(
-                    {
-                        "occurrence_number": i + 1,
-                        "timestamp": occurrence["timestamp"],
-                        "is_pain_point_detection": i == 1,  # Second occurrence = pain point detected
-                        "chunk_text": occurrence["pain_chunk"],
-                        "interaction_index": occurrence["interaction_index"],
-                    }
-                )
+        timeline = []
+        for i, occurrence in enumerate(temporal_occurrences):
+            timeline.append(
+                {
+                    "occurrence_number": i + 1,
+                    "timestamp": occurrence["timestamp"],
+                    "is_pain_point_detection": i == 1,  # Second occurrence = pain point detected
+                    "chunk_text": occurrence["pain_chunk"],
+                    "interaction_index": occurrence["interaction_index"],
+                }
+            )
 
-            return timeline
-
-        except Exception:
-            return []
+        return timeline
 
     def _calculate_temporal_severity(
         self, pain_points: List[Dict], total_questions: int, temporal_groups: List[Dict]
     ) -> str:
         """Calculate severity based on temporal recurrence patterns."""
-        try:
-            if not pain_points:
-                return "none"
+        if not pain_points:
+            return "none"
 
-            total_occurrences = sum(p.get("occurrence_count", 0) for p in pain_points)
-            ratio = total_occurrences / total_questions if total_questions > 0 else 0
+        total_occurrences = sum(p.get("occurrence_count", 0) for p in pain_points)
+        ratio = total_occurrences / total_questions if total_questions > 0 else 0
 
-            if ratio > 0.6:
-                return "high"
-            elif ratio > 0.3:
-                return "medium"
-            else:
-                return "low"
-
-        except Exception:
-            return "low"
+        if ratio > 0.6:
+            return "high"
+        if ratio > 0.3:
+            return "medium"
+        return "low"
 
     def _analyze_recurrence_pattern(self, temporal_occurrences: List[Dict]) -> Dict:
         """Analyze the pattern of recurrence."""
@@ -981,21 +1003,21 @@ class PainPointDetector:
             # and database format: "2025-06-05T16:18:14.39755"
 
             # Format 1: ISO with timezone (most common)
-            if clean_timestamp.endswith('Z'):
-                return datetime.fromisoformat(clean_timestamp.replace('Z', '+00:00'))
+            if clean_timestamp.endswith("Z"):
+                return datetime.fromisoformat(clean_timestamp.replace("Z", "+00:00"))
 
             # Format 2: ISO with +00:00 timezone
-            if '+00:00' in clean_timestamp or '-00:00' in clean_timestamp:
+            if "+00:00" in clean_timestamp or "-00:00" in clean_timestamp:
                 return datetime.fromisoformat(clean_timestamp)
 
             # Format 3: ISO without timezone
-            if 'T' in clean_timestamp and not clean_timestamp.endswith(('Z', '+00:00', '-00:00')):
+            if "T" in clean_timestamp and not clean_timestamp.endswith(("Z", "+00:00", "-00:00")):
                 # Handle microseconds - pad to 6 digits or add if missing
-                if '.' in clean_timestamp:
-                    base_part, micro_part = clean_timestamp.rsplit('.', 1)
+                if "." in clean_timestamp:
+                    base_part, micro_part = clean_timestamp.rsplit(".", 1)
                     # Pad microseconds to 6 digits
                     if len(micro_part) < 6:
-                        micro_part = micro_part.ljust(6, '0')
+                        micro_part = micro_part.ljust(6, "0")
                     elif len(micro_part) > 6:
                         micro_part = micro_part[:6]
                     normalized_timestamp = f"{base_part}.{micro_part}+00:00"
@@ -1005,9 +1027,9 @@ class PainPointDetector:
                 return datetime.fromisoformat(normalized_timestamp)
 
             # Format 4: logging format "2025-06-05 18:18:14.397550"
-            if ' ' in clean_timestamp and 'T' not in clean_timestamp:
+            if " " in clean_timestamp and "T" not in clean_timestamp:
                 # Convert space to T and add timezone
-                iso_format = clean_timestamp.replace(' ', 'T') + '+00:00'
+                iso_format = clean_timestamp.replace(" ", "T") + "+00:00"
                 return datetime.fromisoformat(iso_format)
 
             # Fallback: try direct parsing

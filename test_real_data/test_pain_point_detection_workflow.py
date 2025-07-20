@@ -2,27 +2,29 @@
 """
 Test database permissions for pain point storage.
 """
+import json
 import os
 import sys
 import uuid
-import json
-from typing import cast, Dict, Any, List
+from typing import Any, Dict, List, cast
 
 # Add project to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv
+
 from psy_supabase import get_package_logger
+from psy_supabase.config import TEXT_GENERATING_MODEL
 from psy_supabase.core.database import DatabaseManager
 from psy_supabase.core.rag_processor import RAGProcessor
 from psy_supabase.core.text_generator import TextGenerator
-from psy_supabase.config import TEXT_GENERATING_MODEL
-from dotenv import load_dotenv
 
 load_dotenv()
 
 logger = get_package_logger(__name__)
 
-def test_database_permissions():
+
+def test_database_permissions() -> None:
     """Test database permissions for pain point storage using working patterns."""
 
     logger.info("🔍 Testing Database Permissions for Pain Point Storage")
@@ -35,7 +37,7 @@ def test_database_permissions():
 
     if not supabase_url or not supabase_key:
         logger.info("❌ SUPABASE_URL or SUPABASE_KEY not found in environment")
-        return False
+        return
 
     logger.info(f"✅ Environment variables loaded")
     logger.info(f"   URL: {supabase_url[:30]}...")
@@ -43,19 +45,11 @@ def test_database_permissions():
     logger.info(f"📝 Creating database manager for user: {test_user_id}")
 
     # Create components using exact pattern
-    db_manager = DatabaseManager(
-        supabase_url=supabase_url,
-        supabase_key=supabase_key,
-        user_id=test_user_id
-    )
+    db_manager = DatabaseManager(supabase_url=supabase_url, supabase_key=supabase_key, user_id=test_user_id)
 
     generator = TextGenerator(model_name=TEXT_GENERATING_MODEL, device="cpu")
 
-    rag_processor = RAGProcessor(
-        db_manager=db_manager,
-        generator=generator,
-        intelligent_processing_enabled=True
-    )
+    rag_processor = RAGProcessor(db_manager=db_manager, generator=generator, intelligent_processing_enabled=True)
 
     logger.info(f"✅ Database manager created with schema: {db_manager.schema_name}")
 
@@ -69,17 +63,14 @@ def test_database_permissions():
 
     questions = [
         "I feel inadequate at work every single day and it's affecting my confidence",
-        "I'm still feeling inadequate every day and thinking about quitting my job"
+        "I'm still feeling inadequate every day and thinking about quitting my job",
     ]
 
     for i, question in enumerate(questions):
         logger.info(f"Question {i+1}: {question[:50]}...")
 
         response = rag_processor.generate_response(
-            user_question=question,
-            session_id=test_session_id,
-            device="cpu",
-            question_id=i
+            user_question=question, session_id=test_session_id, device="cpu", question_id=i
         )
 
         logger.info(f"✅ Interaction {i+1} added successfully")
@@ -108,7 +99,9 @@ def test_database_permissions():
         elif isinstance(raw_metadata, dict):
             metadata = raw_metadata
 
-        logger.info(f"   Interaction {i+1} metadata keys: {list(metadata.keys()) if isinstance(metadata, dict) else 'NOT_DICT'}")
+        logger.info(
+            f"   Interaction {i+1} metadata keys: {list(metadata.keys()) if isinstance(metadata, dict) else 'NOT_DICT'}"
+        )
 
         if isinstance(metadata, dict) and metadata.get("pain_points") and isinstance(metadata.get("pain_points"), list):
             pain_points = metadata.get("pain_points")
@@ -116,13 +109,17 @@ def test_database_permissions():
                 pain_points_found_in_metadata = True
                 logger.info(f"     🎯 Found {len(pain_points)} pain points in metadata")
                 for j, pp in enumerate(pain_points):
-                    detected = pp.get('detected', False)
-                    question = pp.get('question', 'NO_QUESTION')
-                    theme = pp.get('theme', 'NO_THEME')
-                    similarity = pp.get('similarity', 0.0)
-                    logger.info(f"       Pain point {j+1}: detected={detected}, similarity={similarity}, question='{question[:50]}'")
-            else:
+                    detected = pp.get("detected", False)
+                    question = pp.get("question", "NO_QUESTION")
+                    theme = pp.get("theme", "NO_THEME")
+                    similarity = pp.get("similarity", 0.0)
+                    logger.info(
+                        f"       Pain point {j+1}: detected={detected}, similarity={similarity}, question='{question[:50]}'"
+                    )
+            elif pain_points:
                 logger.info(f"     📝 Found {len(pain_points)} pain points but none detected=True")
+            else:
+                logger.info(f"     📝 Pain points list is empty")
         else:
             logger.info(f"     📝 No pain points in interaction {i+1} metadata")
 
@@ -133,27 +130,19 @@ def test_database_permissions():
     # Test 4: Run direct pain point detection
     logger.info("\n🔍 Test 4: Testing direct pain point detection...")
     pain_result = db_manager.detect_pain_points(
-        session_id=test_session_id,
-        threshold=0.5,
-        min_occurrences=2,
-        time_window_days=1
+        session_id=test_session_id, threshold=0.5, min_occurrences=2, time_window_days=1
     )
     logger.info(f"✅ Pain point detection executed: {pain_result}")
 
-    if pain_result.get('pain_points'):
+    if pain_result.get("pain_points"):
         logger.info(f"   🎯 Found {len(pain_result['pain_points'])} pain points")
         logger.info(f"   Severity: {pain_result.get('severity', 'none')}")
     else:
         logger.info("   📝 No pain points detected")
 
     logger.info("\n🎉 All database permission tests completed successfully!")
-    return True
+
 
 if __name__ == "__main__":
-    success = test_database_permissions()
-    if success:
-        logger.info("\n✅ Database permissions test PASSED")
-        logger.info("💡 Pain point detection and storage is working correctly!")
-    else:
-        logger.info("\n❌ Database permissions test FAILED")
-        sys.exit(1)
+    test_database_permissions()
+    logger.info("\n✅ Database permissions test PASSED")

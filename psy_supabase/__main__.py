@@ -27,7 +27,7 @@ def main() -> None:
             logger.info("Found app object in main module. Running app...")
             # Consider getting host/port from config instead of env vars directly here
             host = os.environ.get("HOST", "0.0.0.0")
-            port = int(os.environ.get("PORT", 5008))
+            port = int(os.environ.get("PORT", 5000))
             logger.info(f"Running Flask/FastAPI app on {host}:{port}")
             main_module.app.run(host=host, port=port)
         else:

@@ -73,11 +73,19 @@ import re
 import traceback
 from typing import Any, Dict, List, Optional
 
+from sentence_transformers import SentenceTransformer
 from supabase import create_client
 from typeguard import typechecked
 
 from psy_supabase import get_package_logger
-from psy_supabase.config import DEFAULT_APPROACH, DEFAULT_EMOTION, DEFAULT_THEME, DEFAULT_TOPIC, TEXT_GENERATING_MODEL
+from psy_supabase.config import (
+    DATABASE_CONFIG,
+    DEFAULT_APPROACH,
+    DEFAULT_EMOTION,
+    DEFAULT_THEME,
+    DEFAULT_TOPIC,
+    TEXT_GENERATING_MODEL,
+)
 from psy_supabase.core.model_manager import get_embedding_provider
 from psy_supabase.core.pain_point_detector import PainPointDetector
 from psy_supabase.utilities.embedding_utils import detect_repetition_pattern
@@ -115,6 +123,10 @@ class DatabaseManager:
         self.supabase_key = supabase_key
         self.user_id = user_id
         self._pain_point_detector: Optional[PainPointDetector] = None
+        self._embedding_cache: Dict[str, List[float]] = {}
+
+        # Store DATABASE_CONFIG for use in batch operations and session management
+        self.db_config = DATABASE_CONFIG
 
         self.supabase = create_client(self.supabase_url, self.supabase_key)
 
@@ -151,6 +163,65 @@ class DatabaseManager:
         from psy_supabase.utilities.therapeutic_mappings import TherapeuticMappings
 
         return {theme: data["keywords"] for theme, data in TherapeuticMappings.THERAPEUTIC_THEMES.items()}
+
+    def check_session_limits(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Check if user has exceeded session limits based on DATABASE_CONFIG.
+
+        Args:
+            user_id: User ID to check (defaults to self.user_id)
+
+        Returns:
+            Dict with session limit status and recommendations
+        """
+        if user_id is None:
+            user_id = self.user_id
+
+        max_sessions = self.db_config.get("max_sessions_per_user", 50)
+
+        # Count user sessions
+        response = self.supabase.rpc(
+            "count_user_sessions", {"p_user_id": user_id, "p_schema_name": self.schema_name}
+        ).execute()
+
+        session_count = response.data[0] if response.data else 0
+
+        return {
+            "current_sessions": session_count,
+            "max_sessions": max_sessions,
+            "within_limits": session_count < max_sessions,
+            "sessions_remaining": max(0, max_sessions - session_count),
+            "should_cleanup": session_count >= max_sessions * 0.8,  # Cleanup at 80%
+        }
+
+    def cleanup_expired_sessions(self, user_id: Optional[str] = None) -> int:
+        """
+        Clean up expired sessions based on DATABASE_CONFIG timeout.
+
+        Args:
+            user_id: User ID to cleanup (defaults to self.user_id)
+
+        Returns:
+            Number of sessions cleaned up
+        """
+        if user_id is None:
+            user_id = self.user_id
+
+        timeout_days = self.db_config.get("session_timeout_days", 7)
+
+        try:
+            response = self.supabase.rpc(
+                "cleanup_expired_sessions",
+                {"p_user_id": user_id, "p_schema_name": self.schema_name, "p_timeout_days": timeout_days},
+            ).execute()
+
+            cleanup_count = response.data[0] if response.data else 0
+            logger.info("Cleaned up %d expired sessions for user %s", cleanup_count, user_id)
+            return cleanup_count
+
+        except Exception as e:
+            logger.error("Error cleaning up expired sessions: %s", e)
+            return 0
 
     @typechecked
     def get_conversation_history(self, session_id: Optional[str] = None) -> List[Dict]:
@@ -233,14 +304,16 @@ class DatabaseManager:
             question = data_point.get("question", "")
             answer = data_point.get("answer", "")
             context = data_point.get("context", "")
-            metadata = data_point.get("metadata", {})
+            metadata_raw = data_point.get("metadata", {})
 
             # Ensure metadata is a dictionary
-            if isinstance(metadata, str):
+            if isinstance(metadata_raw, str):
                 try:
-                    metadata = json.loads(metadata)
+                    metadata: dict = json.loads(metadata_raw)
                 except:
-                    metadata = {"raw_metadata": metadata}
+                    metadata = {"raw_metadata": metadata_raw}
+            else:
+                metadata = metadata_raw
 
             # Add the session_id to metadata for backward compatibility
             if session_id:
@@ -298,7 +371,7 @@ class DatabaseManager:
                         )
 
                         # Keep existing pain_points array structure but enhance it
-                        existing_pain_points = metadata.get("pain_points", [])
+                        existing_pain_points: list = metadata.get("pain_points", [])
                         for new_pp in pain_data["pain_points"]:
                             recurring_terms = new_pp.get("recurring_terms", [])
                             if recurring_terms:  # Check if we have actual terms
@@ -379,8 +452,7 @@ class DatabaseManager:
                             )
 
                             # Try to understand why it failed
-                            if hasattr(update_response, "error") and update_response.error:
-                                logger.error("  Error details: %s", update_response.error)
+                            logger.error("  Error details: %s", update_response.data)
                     else:
                         logger.debug("No pain points detected for session: %s", session_id)
 
@@ -463,7 +535,7 @@ class DatabaseManager:
                 logger.error("Schema creation failed for user %s - no data in response", self.user_id)
                 return False
             if response.data is False:
-                error_message = response.error if response.error else "Schema creation failed"
+                error_message = "Schema creation failed"
                 logger.error("Error creating schema for user %s: %s", self.user_id, error_message)
                 return False
 
@@ -1113,18 +1185,24 @@ class DatabaseManager:
             logger.error("Error adding embedding column: %s", e)
             return False
 
-    def get_interactions_without_embeddings(self, session_id: Optional[str] = None, limit: int = 50) -> List[Dict]:
+    def get_interactions_without_embeddings(
+        self, session_id: Optional[str] = None, limit: Optional[int] = None
+    ) -> List[Dict]:
         """
         Get interactions that don't have embeddings, so they can be enriched.
 
         Args:
             session_id: Optional session ID (defaults to user schema)
-            limit: Maximum number of interactions to retrieve
+            limit: Maximum number of interactions to retrieve (uses DATABASE_CONFIG if None)
 
         Returns:
             list: Interactions without embeddings
         """
         try:
+            # Use DATABASE_CONFIG batch size if limit not provided
+            if limit is None:
+                limit = self.db_config.get("interaction_batch_size", 50)
+
             # Call the function to get interactions without embeddings
             response = self.supabase.rpc(
                 "get_interactions_without_embeddings", {"p_schema_name": self.schema_name, "p_limit": limit}
@@ -1852,27 +1930,28 @@ class DatabaseManager:
     def create_embedding(self, text: str) -> Optional[List[float]]:
         """
         Create an embedding for the given text using the appropriate embedding provider.
-
-        Args:
-            text: Text to create embedding for
-
-        Returns:
-            Optional[List[float]]: Embedding vector or None if an error occurs
+        Uses an in-memory cache to avoid recomputation for the same text.
         """
         try:
-            # Get the embedding provider
-            embedding_provider = get_embedding_provider()
+            cache_key = text.strip().lower()
+            if cache_key in self._embedding_cache:
+                return self._embedding_cache[cache_key]
 
-            # Generate embedding
+            embedding_provider = get_embedding_provider()
             embedding = embedding_provider.generate_embedding(text)
 
-            # Convert to proper format if needed
-            if hasattr(embedding, "tolist") and callable(getattr(embedding, "tolist")):
+            if (
+                not isinstance(embedding, list)
+                and hasattr(embedding, "tolist")
+                and callable(getattr(embedding, "tolist"))
+            ):
                 embedding = embedding.tolist()
 
-            # Ensure it's a list of floats before returning
             if isinstance(embedding, list) and all(isinstance(x, (float, int)) for x in embedding):
-                return [float(x) for x in embedding]
+                embedding = [float(x) for x in embedding]
+                self._embedding_cache[cache_key] = embedding
+                return embedding
+
             logger.error("Generated embedding is not a valid list of floats.")
             return None
 
@@ -1932,13 +2011,16 @@ class DatabaseManager:
             # Check response
             logger.info("RPC response: %s", response.data)
 
-            if response.data is not None:
-                try:
-                    interaction_id = int(response.data)
-                    logger.info("Interaction saved successfully with ID: %d", interaction_id)
-                except (ValueError, TypeError):
-                    logger.error("Could not parse interaction ID from response: %s", response.data)
-                    return False
+            interaction_id = None  # Always define before use
+            if response.data is not None and response.data > 0:
+                interaction_id = response.data
+
+            if interaction_id is None:
+                logger.error("Failed to extract interaction ID from response: %s", response.data)
+                return False
+
+            # Generate embedding for the question if needed
+            embed_response = None
 
             # Generate embedding for the question if needed
             if clean_question:
@@ -1963,7 +2045,7 @@ class DatabaseManager:
                         },
                     ).execute()
 
-                if embed_response.data is True:
+                if embed_response is not None and embed_response.data is True:
                     logger.info("Embedding stored successfully for interaction %d", interaction_id)
 
                     if session_id and len(question.strip()) > 10:
@@ -2139,8 +2221,8 @@ class DatabaseManager:
 
             response = self.supabase.rpc("ensure_schema_exists", {"schema_name": self.schema_name}).execute()
 
-            if response.error:
-                logger.error("Error calling ensure_schema_exists function: %s", response.error)
+            if not response.data:
+                logger.error("Error calling ensure_schema_exists function: %s", response.data)
                 return False
 
             # The function returns a boolean indicating success
@@ -2156,3 +2238,27 @@ class DatabaseManager:
         except Exception as e:
             logger.error("Error ensuring schema exists: %s", e)
             return False
+
+    def model_based_chunk_question(self, question: str) -> List[str]:
+        """
+        Splits a question into semantic chunks using a model-based approach.
+
+        This method currently splits the input question into sentences using NLTK's sentence tokenizer,
+        which serves as a simple proxy for semantic chunking. In a production setting, this function
+        can be extended to use more advanced models (e.g., transformer-based phrase extraction or LLMs)
+        to extract key phrases or semantic units from the input text.
+
+        Args:
+            question (str): The input question or text to be chunked.
+
+        Returns:
+            List[str]: A list of semantic chunks (sentences or phrases) extracted from the input question.
+        """
+        import nltk
+
+        nltk.download("punkt", quiet=True)
+        from nltk.tokenize import sent_tokenize
+
+        sentences = sent_tokenize(question)
+        # Optionally, further split or filter sentences using a model
+        return [s.strip() for s in sentences if len(s.strip()) > 2]

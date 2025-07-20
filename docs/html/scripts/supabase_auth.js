@@ -12,8 +12,8 @@
 })();
 
 // Initialize Supabase client (global)
-const SUPABASE_URL = 'https://supabase.psy-supabase.com';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmY2Rpbmp4and6Y2R4Z3Z4bHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYzMzc3MTYsImV4cCI6MjA1MTkxMzcxNn0.n22JvFNTRvKZnKDl7YGGXjc9Y6HaRcaap9pM-N2eZrs';
+const SUPABASE_URL = 'http://192.168.2.150:8000'; // Your self-hosted Supabase instance
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicmVmIjoibG9jYWxob3N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4Njc0NTYsImV4cCI6MjA2ODIyNzQ1Nn0.OilBLadMfjrrqFSofdDOKlin0j5p4qpyu6fF_ZqFeaw';
 
 // Use the global window.supabase from the UMD build
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
