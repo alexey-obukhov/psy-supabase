@@ -9,6 +9,126 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    /* Pain Point Monitoring Styles */
+    .pain-point-controls {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .pain-point-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pain-point-switch {
+      position: relative;
+      width: 50px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .pain-point-switch.active {
+      background: #4CAF50;
+    }
+
+    .pain-point-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .pain-point-switch.active::after {
+      transform: translateX(26px);
+    }
+
+    .pain-point-status {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .pain-point-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 25px;
+      box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 1000;
+      animation: pulse 2s infinite;
+      display: none;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    .message.pain-point {
+      border-left: 4px solid #ff6b6b;
+      background: linear-gradient(135deg, #fff5f5, #ffe0e0);
+      position: relative;
+    }
+
+    .message.pain-point::before {
+      content: '🚨';
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 16px;
+    }
+
+    .analytics-summary {
+      background: linear-gradient(135deg, #74b9ff, #0984e3);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      font-size: 13px;
+    }
+
+    .analytics-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+    }
+
+    .chat-container {
+      position: relative;
+    }
+
+    #status-message {
+      background: #ffeb3b;
+      color: #333;
+      padding: 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+      display: none;
+    }
+  </style>
 </head>
 <body class="chat-page">
   <header class="site-header">
@@ -29,14 +149,31 @@
     </div>
   </header>
 
+  <!-- Pain Point Monitoring Indicator -->
+  <div id="painPointIndicator" class="pain-point-indicator">
+    🚨 Pain Point Detected
+  </div>
+
   <section class="chat-container">
     <div class="container flex-layout">
       <div class="chat-main">
+        <!-- Pain Point Monitoring Controls -->
+        <div class="pain-point-controls">
+          <div class="pain-point-toggle">
+            <span>Pain Point Monitoring:</span>
+            <div id="painPointToggle" class="pain-point-switch" onclick="togglePainPointMonitoring()"></div>
+          </div>
+          <div id="painPointStatus" class="pain-point-status">
+            Click to enable real-time pain point detection
+          </div>
+        </div>
+
         <div class="chat-interface">
           <div id="chat-log" class="chat-log">
             <div class="message bot-message">
               <div class="message-bubble">
-                <p>Hello. I'm your Mindful Assistant. How can I support you today?</p>
+                <p>Hello! I'm your Mindful Assistant with advanced pain point monitoring. How can I support you today?</p>
+                <small style="opacity: 0.7; font-size: 12px;">💡 Enable monitoring above to get real-time insights into conversation patterns</small>
               </div>
             </div>
           </div>
@@ -67,7 +204,7 @@
           </form>
         </div>
       </div>
-      
+
       <div class="chat-sidebar">
         <div class="help-panel">
           <h3>How to Get Started</h3>
@@ -75,14 +212,34 @@
             <li>Be specific about your feelings</li>
             <li>Ask clarifying questions</li>
             <li>Try to describe thoughts in detail</li>
+            <li>Enable monitoring for insights</li>
             <li>For acute crisis, seek professional help</li>
           </ul>
         </div>
-        
+
         <div class="info-panel">
           <h4>About This Chat</h4>
-          <p>Mindful Assistant uses AI to provide supportive responses based on psychological principles. All conversations are private and secure.</p>
+          <p>Mindful Assistant uses AI to provide supportive responses based on psychological principles. Pain point monitoring helps identify conversation patterns.</p>
           <p><a href="advantages.html">Learn more about how it works</a></p>
+        </div>
+
+        <!-- Analytics Summary Panel -->
+        <div id="analyticsSummary" class="analytics-summary" style="display: none;">
+          <h4>🔍 Session Analytics</h4>
+          <div id="analyticsContent">
+            <div class="analytics-row">
+              <span>Messages:</span>
+              <span id="totalMessages">0</span>
+            </div>
+            <div class="analytics-row">
+              <span>Pain Points:</span>
+              <span id="painPointCount">0</span>
+            </div>
+            <div class="analytics-row">
+              <span>Themes:</span>
+              <span id="dominantThemes">None</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -104,7 +261,414 @@
   </footer>
 
   <script src="scripts/supabase_auth.js"></script>
-  <script src="scripts/chat_page.js"></script>
+  <script>
+    // Developer flag - set to false for production
+    const DEVELOPER_MODE = false;  // false: production, true: development
+    const API_BASE = DEVELOPER_MODE
+      ? 'http://192.168.2.147:5000'     // Local development
+      : 'https://api.psy-supabase.com'; // Production
+
+    let isMonitoring = false;
+    let sessionAnalytics = {
+      totalMessages: 0,
+      painPointsDetected: 0,
+      themes: {}
+    };
+
+    // Authentication variables
+    let currentUser = null;
+    let userId = null;
+    let userProfile = null;
+
+    // Initialize authentication on page load
+    async function initializeAuth() {
+      try {
+        console.log('🔐 Starting authentication initialization...');
+
+        // Wait for Supabase to be ready
+        let attempts = 0;
+        while (!window.supabaseClient && attempts < 50) {
+          console.log(`⏳ Waiting for Supabase client to load... (attempt ${attempts + 1})`);
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+
+        if (!window.supabaseClient) {
+          console.error('❌ Supabase client failed to load after 5 seconds');
+          userId = 'guest_' + Math.random().toString(36).substr(2, 9);
+          addMessage("⚠️ Authentication system unavailable. Using guest mode.", 'bot', 'System');
+          checkBackendStatus();
+          return;
+        }
+
+        console.log('✅ Supabase client loaded successfully');
+
+        // Get current user
+        try {
+          currentUser = await window.getCurrentUser();
+          console.log('👤 Current user check result:', currentUser ? 'Authenticated' : 'Not authenticated');
+        } catch (authError) {
+          console.error('❌ Error getting current user:', authError);
+          currentUser = null;
+        }
+
+        if (currentUser) {
+          userId = currentUser.id;
+          console.log('✅ User authenticated with ID:', userId);
+
+          // Try to get user profile
+          try {
+            const { data: profile, error } = await window.supabaseClient
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single();
+
+            if (profile && !error) {
+              userProfile = profile;
+              console.log('✅ User profile loaded:', profile.username);
+
+              // Pre-fill username field
+              const usernameField = document.getElementById('username');
+              if (usernameField) {
+                usernameField.value = profile.username;
+                usernameField.readOnly = true;
+                usernameField.style.backgroundColor = '#f0f0f0';
+              }
+
+              // Update welcome message
+              const welcomeMsg = document.querySelector('.message.bot-message .message-bubble p');
+              if (welcomeMsg) {
+                welcomeMsg.innerHTML = `Hello ${profile.username}! I'm your Mindful Assistant with advanced pain point monitoring. How can I support you today?`;
+              }
+
+              addMessage(`🔐 Authenticated as ${profile.username} (ID: ${userId.substr(0, 8)}...)`, 'bot', 'System');
+            } else {
+              console.warn('⚠️ User authenticated but no profile found:', error);
+              addMessage(`🔐 Authenticated user but no profile found. Error: ${error?.message || 'Unknown'}`, 'bot', 'System');
+            }
+          } catch (profileError) {
+            console.error('❌ Error loading user profile:', profileError);
+            addMessage(`⚠️ Profile loading failed: ${profileError.message}`, 'bot', 'System');
+          }
+        } else {
+          console.warn('⚠️ No authenticated user found - using guest mode');
+          userId = 'guest_' + Math.random().toString(36).substr(2, 9);
+          addMessage("👤 Using guest mode. For personalized experience, please log in through the login page.", 'bot', 'System');
+        }
+
+        // Now that we have user info, check backend status
+        console.log('🔍 Checking backend status with user ID:', userId);
+        await checkBackendStatus();
+
+      } catch (error) {
+        console.error('❌ Critical error in authentication initialization:', error);
+        userId = 'guest_' + Math.random().toString(36).substr(2, 9);
+        addMessage(`❌ Authentication system error: ${error.message}. Using guest mode.`, 'bot', 'System');
+        await checkBackendStatus();
+      }
+    }
+
+    async function checkBackendStatus() {
+      try {
+        console.log('🔍 Checking backend at:', API_BASE);
+        const res = await fetch(`${API_BASE}/health`, {
+          method: 'GET',
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        console.log('✅ Backend is online at', API_BASE);
+        addMessage(`✅ Connected to Flask server at ${API_BASE}`, 'bot', 'System');
+        return true;
+      } catch (error) {
+        console.error('❌ Backend check failed:', error);
+        addMessage(`❌ Cannot connect to Flask server at ${API_BASE}. Error: ${error.message}`, 'bot', 'System');
+        return false;
+      }
+    }
+
+    async function togglePainPointMonitoring() {
+      const toggle = document.getElementById('painPointToggle');
+      const status = document.getElementById('painPointStatus');
+      const analytics = document.getElementById('analyticsSummary');
+
+      // Prepare headers with authentication
+      const headers = {
+        'X-User-ID': userId,
+        'Content-Type': 'application/json'
+      };
+
+      // Add Supabase session token if available
+      if (currentUser && window.supabaseClient) {
+        try {
+          const { data: { session } } = await window.supabaseClient.auth.getSession();
+          if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+          }
+        } catch (authError) {
+          console.warn('⚠️ Could not get Supabase session for monitoring:', authError);
+        }
+      }
+
+      if (!isMonitoring) {
+        try {
+          console.log('🔍 Starting pain point monitoring...');
+          const response = await fetch(`${API_BASE}/pain_point_monitoring/start`, {
+            method: 'POST',
+            mode: 'cors',
+            headers: headers
+          });
+
+          console.log('📥 Monitoring start response:', response.status);
+
+          if (response.ok) {
+            isMonitoring = true;
+            toggle.classList.add('active');
+            status.textContent = 'Active - Monitoring conversation patterns';
+            analytics.style.display = 'block';
+            console.log('✅ Pain point monitoring started');
+          } else {
+            const errorText = await response.text();
+            console.error('❌ Failed to start monitoring:', errorText);
+            throw new Error(`Failed to start monitoring: ${response.status} ${errorText}`);
+          }
+        } catch (error) {
+          console.error('❌ Error starting monitoring:', error);
+          status.textContent = `Error starting monitoring: ${error.message}`;
+        }
+      } else {
+        try {
+          console.log('🛑 Stopping pain point monitoring...');
+          const response = await fetch(`${API_BASE}/pain_point_monitoring/stop`, {
+            method: 'POST',
+            mode: 'cors',
+            headers: headers
+          });
+
+          if (response.ok) {
+            isMonitoring = false;
+            toggle.classList.remove('active');
+            status.textContent = 'Stopped - Click to enable monitoring';
+            analytics.style.display = 'none';
+            console.log('📊 Pain point monitoring stopped');
+          }
+        } catch (error) {
+          console.error('❌ Error stopping monitoring:', error);
+        }
+      }
+    }
+
+    async function sendMessage() {
+      const username = document.getElementById('username').value.trim();
+      const question = document.getElementById('question').value.trim();
+
+      if (!username || !question) {
+        alert('Please enter both session name and your message');
+        return;
+      }
+
+      // Check backend status first (this will handle fallback if needed)
+      console.log('🔍 Checking backend status before sending message...');
+      if (!(await checkBackendStatus())) {
+        console.error('❌ Backend not available, cannot send message');
+        return;
+      }
+
+      // Add user message to chat
+      addMessage(question, 'user', username);
+
+      // Clear input and show processing
+      document.getElementById('question').value = '';
+      document.getElementById('processing-indicator').style.display = 'block';
+
+      try {
+        console.log('📤 Sending message to:', `${API_BASE}/chat`);
+        console.log('👤 User ID:', userId);
+        console.log('💬 Message:', question);
+
+        // Prepare headers with authentication
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-User-ID': userId
+        };
+
+        // Add Supabase session token if available
+        if (currentUser && window.supabaseClient) {
+          try {
+            const { data: { session } } = await window.supabaseClient.auth.getSession();
+            if (session?.access_token) {
+              headers['Authorization'] = `Bearer ${session.access_token}`;
+              console.log('🔐 Added Supabase auth token');
+            }
+          } catch (authError) {
+            console.warn('⚠️ Could not get Supabase session:', authError);
+          }
+        }
+
+        const response = await fetch(`${API_BASE}/chat`, {
+          method: 'POST',
+          mode: 'cors',
+          headers: headers,
+          body: JSON.stringify({
+            question: question,
+            enable_pain_point_monitoring: isMonitoring,
+            user_profile: userProfile ? {
+              username: userProfile.username,
+              id: userProfile.id
+            } : null
+          })
+        });
+
+        console.log('📥 Response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Server error response:', errorText);
+          throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('✅ Received response:', data);
+
+        // Add AI response
+        addMessage(data.response, 'bot', 'Mindful Assistant');
+
+        // Handle pain point analysis if monitoring is enabled
+        if (data.pain_point_analysis && isMonitoring) {
+          console.log('🔍 Processing pain point analysis:', data.pain_point_analysis);
+          handlePainPointAnalysis(data.pain_point_analysis);
+        }
+
+        // Update analytics
+        sessionAnalytics.totalMessages++;
+        updateAnalyticsDisplay();
+
+      } catch (error) {
+        console.error('❌ Error sending message:', error);
+        addMessage(`I apologize, but I encountered an error: ${error.message}. Please check the console for details and ensure the server is running on port 5000.`, 'bot', 'System');
+      } finally {
+        document.getElementById('processing-indicator').style.display = 'none';
+      }
+    }
+
+    function addMessage(content, type, sender) {
+      const chatLog = document.getElementById('chat-log');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${type}-message`;
+
+      const timestamp = new Date().toLocaleTimeString();
+
+      messageDiv.innerHTML = `
+        <div class="message-bubble">
+          <p>${content}</p>
+          <small style="opacity: 0.7; font-size: 11px;">${sender} • ${timestamp}</small>
+        </div>
+      `;
+
+      chatLog.appendChild(messageDiv);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function handlePainPointAnalysis(analysis) {
+      const lastMessage = document.querySelector('.message:last-child');
+
+      if (analysis.message_analysis && analysis.message_analysis.is_pain_point) {
+        // Mark the message as a pain point
+        lastMessage.classList.add('pain-point');
+
+        // Show pain point indicator
+        const indicator = document.getElementById('painPointIndicator');
+        indicator.style.display = 'block';
+        setTimeout(() => {
+          indicator.style.display = 'none';
+        }, 5000);
+
+        // Update analytics
+        sessionAnalytics.painPointsDetected++;
+
+        // Add theme to analytics
+        const theme = analysis.message_analysis.theme;
+        if (theme) {
+          sessionAnalytics.themes[theme] = (sessionAnalytics.themes[theme] || 0) + 1;
+        }
+
+        console.log(`🚨 Pain point detected: ${theme} (similarity: ${analysis.message_analysis.max_similarity})`);
+      }
+
+      // Update session summary if available
+      if (analysis.session_summary) {
+        sessionAnalytics.totalMessages = analysis.session_summary.total_messages;
+        sessionAnalytics.painPointsDetected = analysis.session_summary.pain_points_detected;
+      }
+
+      updateAnalyticsDisplay();
+    }
+
+    function updateAnalyticsDisplay() {
+      document.getElementById('totalMessages').textContent = sessionAnalytics.totalMessages;
+      document.getElementById('painPointCount').textContent = sessionAnalytics.painPointsDetected;
+
+      const topThemes = Object.entries(sessionAnalytics.themes)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 2)
+        .map(([theme]) => theme)
+        .join(', ');
+
+      document.getElementById('dominantThemes').textContent = topThemes || 'None yet';
+    }
+
+    // Event listeners
+    document.getElementById('chat-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      sendMessage();
+    });
+
+    document.getElementById('question').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Auto-resize textarea
+    document.getElementById('question').addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = this.scrollHeight + 'px';
+    });
+
+    // Check backend status on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 Webchat initializing...');
+      console.log('🔧 Configuration:');
+      console.log('   - Flask API:', API_BASE);
+      console.log('   - Supabase URL:', window.SUPABASE_URL || 'Not loaded');
+      console.log('   - Page URL:', window.location.href);
+
+      // Add startup diagnostics to chat
+      addMessage("🚀 System starting up...", 'bot', 'System');
+      addMessage(`🔧 Flask API: ${API_BASE}`, 'bot', 'System');
+      addMessage(`🔧 Supabase: ${window.SUPABASE_URL || 'Loading...'}`, 'bot', 'System');
+
+      initializeAuth();
+    });
+
+    // Add some demo functionality
+    function addDemoMessages() {
+      setTimeout(() => {
+        if (!currentUser) {
+          addMessage("💡 Tip: Log in through the login page for a personalized experience with saved conversation history!", 'bot', 'System');
+        }
+        addMessage("ℹ️ Ready! Try asking about anxiety, stress, or any other concerns you might have.", 'bot', 'System');
+      }, 3000);
+    }
+
+    // Initialize demo messages after auth check
+    setTimeout(addDemoMessages, 2000);
+  </script>
   <script src="scripts/app_page.js"></script>
 </body>
 </html>

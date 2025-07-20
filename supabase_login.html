@@ -93,9 +93,9 @@
               .single();
             if (profile) {
               showMessage('Logged in as ' + profile.username + ' (UUID: ' + userId + ')', true);
-              // Redirect to user's own Supabase instance
+              // Redirect to the webchat page instead of user's own instance
               setTimeout(() => {
-                window.location.href = `https://supabase.psy-supabase.com/${profile.username}`;
+                window.location.href = 'webchat.html';
               }, 1500); // Show message for 1.5s, then redirect
             } else {
               showMessage('Logged in, but no profile found for this user.', true);

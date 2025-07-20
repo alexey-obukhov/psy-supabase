@@ -72,7 +72,7 @@
           Overview
         </h2>
         <p>This tutorial will guide you through setting up a complete Supabase backend for the Mindful Assistant project. You'll create a new Supabase project, configure the database schema, set up authentication, and establish secure access policies.</p>
-        
+
         <div class="info-box">
           <div class="info-icon">ℹ️</div>
           <div class="info-content">
@@ -138,7 +138,7 @@
           </svg>
           Create Supabase Project
         </h2>
-        
+
         <div class="step-counter">Step 1</div>
         <h3>Sign Up / Sign In to Supabase</h3>
         <ol>
@@ -481,7 +481,7 @@ supabase:
   url: "https://your-project-ref.supabase.co"
   anon_key: "your-anon-key-here"
   service_role_key: "your-service-role-key-here"  # Server-side only!
-  
+
 # Database Connection (optional for direct access)
 database:
   host: "db.your-project-ref.supabase.co"
@@ -550,11 +550,11 @@ def test_connection():
         response = supabase.table('conversations').select("*").limit(1).execute()
         print("✅ Connection successful!")
         print(f"Response: {response}")
-        
+
         # Test authentication
         auth_response = supabase.auth.get_session()
         print("✅ Authentication service accessible!")
-        
+
     except Exception as e:
         print(f"❌ Connection failed: {e}")
 
@@ -727,12 +727,12 @@ if __name__ == "__main__":
     function copyToClipboard(button) {
       const codeBlock = button.parentElement.nextElementSibling;
       const text = codeBlock.textContent;
-      
+
       navigator.clipboard.writeText(text).then(() => {
         const originalText = button.textContent;
         button.textContent = 'Copied!';
         button.style.background = '#28a745';
-        
+
         setTimeout(() => {
           button.textContent = originalText;
           button.style.background = '';
@@ -758,16 +758,16 @@ if __name__ == "__main__":
     function highlightCurrentSection() {
       const sections = document.querySelectorAll('.tutorial-section');
       const navLinks = document.querySelectorAll('.tutorial-nav a');
-      
+
       let currentSection = '';
-      
+
       sections.forEach(section => {
         const rect = section.getBoundingClientRect();
         if (rect.top <= 100) {
           currentSection = section.id;
         }
       });
-      
+
       navLinks.forEach(link => {
         link.classList.remove('active');
         if (link.getAttribute('href') === '#' + currentSection) {

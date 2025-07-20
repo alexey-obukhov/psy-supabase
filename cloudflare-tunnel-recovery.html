@@ -48,7 +48,7 @@
             <ellipse cx="90" cy="50" rx="18" ry="10" fill="#5b9bd5" opacity="0.9"/>
             <text x="80" y="100" text-anchor="middle" fill="#4682b4" font-size="12" font-weight="bold">Cloudflare</text>
           </g>
-          
+
           <!-- Tunnel representation -->
           <g class="tunnel-group">
             <path d="M 120 75 Q 200 50, 280 75" stroke="#8db3e2" stroke-width="8" fill="none" opacity="0.6"/>
@@ -58,7 +58,7 @@
             </circle>
             <text x="200" y="95" text-anchor="middle" fill="#4682b4" font-size="10">Secure Tunnel</text>
           </g>
-          
+
           <!-- Server representation -->
           <g class="server-group">
             <rect x="310" y="50" width="30" height="50" fill="#4682b4" rx="3"/>
@@ -69,7 +69,7 @@
             <circle cx="330" cy="85" r="2" fill="#5b9bd5"/>
             <text x="325" y="115" text-anchor="middle" fill="#4682b4" font-size="12" font-weight="bold">Your Server</text>
           </g>
-          
+
           <!-- Warning icon for broken connection -->
           <g class="warning-icon" opacity="0.8">
             <polygon points="200,25 195,35 205,35" fill="#D9534F"/>
@@ -215,7 +215,7 @@ sudo cloudflared tunnel list</code></pre>
               <div class="code-header">
                 <span class="code-lang">output</span>
               </div>
-              <pre><code>ID                                   NAME            CREATED              CONNECTIONS 
+              <pre><code>ID                                   NAME            CREATED              CONNECTIONS
 12345678-1234-1234-1234-123456789012 my-tunnel       2025-06-29T12:05:42Z             </code></pre>
             </div>
             <div class="important-note">
@@ -264,7 +264,7 @@ sudo cloudflared tunnel list</code></pre>
               </div>
               <pre><code>{
   "a": "your_account_id_here",
-  "s": "your_tunnel_secret_here", 
+  "s": "your_tunnel_secret_here",
   "t": "your_tunnel_id_here"
 }</code></pre>
             </div>
@@ -479,12 +479,12 @@ cloudflared tunnel route dns new-tunnel-name your-hostname.domain.com</code></pr
     function copyCode(button) {
       const codeBlock = button.closest('.code-block').querySelector('code');
       const text = codeBlock.textContent;
-      
+
       navigator.clipboard.writeText(text).then(() => {
         const originalText = button.textContent;
         button.textContent = 'Copied!';
         button.classList.add('copied');
-        
+
         setTimeout(() => {
           button.textContent = originalText;
           button.classList.remove('copied');

@@ -301,13 +301,13 @@ ADDITIONAL_REDIRECT_URLS=https://your-domain.com
       -c log_statement=all
       -c log_destination=stderr
       -c log_min_duration_statement=0
-    
+
   kong:
     ports:
       # Bind to specific interfaces for security
       - "127.0.0.1:8000:8000"
       - "127.0.0.1:8443:8443"
-    
+
   studio:
     environment:
       # Additional studio configuration
@@ -639,7 +639,7 @@ sudo apt install python3-certbot-nginx</code></pre>
           <pre><code>server {
     listen 80;
     server_name your-domain.com;
-    
+
     location / {
         proxy_pass http://localhost:3000;
         proxy_set_header Host $host;
@@ -647,7 +647,7 @@ sudo apt install python3-certbot-nginx</code></pre>
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-    
+
     location /rest/ {
         proxy_pass http://localhost:8000/rest/;
         proxy_set_header Host $host;
@@ -655,7 +655,7 @@ sudo apt install python3-certbot-nginx</code></pre>
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-    
+
     location /auth/ {
         proxy_pass http://localhost:8000/auth/;
         proxy_set_header Host $host;
@@ -663,7 +663,7 @@ sudo apt install python3-certbot-nginx</code></pre>
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-    
+
     location /storage/ {
         proxy_pass http://localhost:8000/storage/;
         proxy_set_header Host $host;
@@ -782,19 +782,19 @@ docker-compose logs --tail=100</code></pre>
           </div>
           <pre><code># Connect to database and check stats
 docker-compose exec db psql -U postgres -d postgres -c "
-SELECT 
+SELECT
     schemaname,
     tablename,
     attname,
     n_distinct,
-    correlation 
-FROM pg_stats 
+    correlation
+FROM pg_stats
 WHERE schemaname = 'public';"
 
 # Check active connections
 docker-compose exec db psql -U postgres -d postgres -c "
-SELECT count(*) as active_connections 
-FROM pg_stat_activity 
+SELECT count(*) as active_connections
+FROM pg_stat_activity
 WHERE state = 'active';"
 
 # Check database size
@@ -1120,12 +1120,12 @@ docker-compose up -d</code></pre>
     function copyToClipboard(button) {
       const codeBlock = button.parentElement.nextElementSibling;
       const text = codeBlock.textContent;
-      
+
       navigator.clipboard.writeText(text).then(() => {
         const originalText = button.textContent;
         button.textContent = 'Copied!';
         button.style.background = '#28a745';
-        
+
         setTimeout(() => {
           button.textContent = originalText;
           button.style.background = '';
@@ -1151,16 +1151,16 @@ docker-compose up -d</code></pre>
     function highlightCurrentSection() {
       const sections = document.querySelectorAll('.tutorial-section');
       const navLinks = document.querySelectorAll('.tutorial-nav a');
-      
+
       let currentSection = '';
-      
+
       sections.forEach(section => {
         const rect = section.getBoundingClientRect();
         if (rect.top <= 100) {
           currentSection = section.id;
         }
       });
-      
+
       navLinks.forEach(link => {
         link.classList.remove('active');
         if (link.getAttribute('href') === '#' + currentSection) {
