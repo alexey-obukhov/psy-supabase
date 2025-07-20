@@ -19,7 +19,7 @@
     "keyword": "relationship",
     "technique": "interpersonal_therapy",
     "template": "relationship_issues",
-    "topic": "relationship",
+    "topic": "relationship_issues",
     "expected_topic": null,
     "expected_approach": null
   },
@@ -27,7 +27,7 @@
     "keyword": "alone",
     "technique": "attachment_based_therapy",
     "template": "empathy_validation",
-    "topic": "abandonment",
+    "topic": "loneliness",
     "expected_topic": null,
     "expected_approach": null
   },
@@ -43,15 +43,15 @@
     "keyword": "grief",
     "technique": "grief_processing",
     "template": "grief_loss",
-    "topic": "grief",
+    "topic": "grief_loss",
     "expected_topic": null,
     "expected_approach": null
   },
   {
     "keyword": "failure",
     "technique": "compassion_focused_therapy",
-    "template": "empathy_validation",
-    "topic": "self-worth",
+    "template": "self_compassion",
+    "topic": "general_support",
     "expected_topic": null,
     "expected_approach": null
   },
